@@ -43,11 +43,11 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.TemporalAdjusters;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.function.Function;
 import java.util.stream.Collectors;
 
 @Service
@@ -69,7 +69,7 @@ public class PanelServicioImpl implements PanelServicio {
         LocalDate dia = fecha == null ? Tiempo.hoy() : fecha;
         LocalDateTime ahora = Tiempo.ahora();
         List<Reserva> delDia = reservas.conTurnoEntre(dia, dia);
-        List<Turno> turnosDia = turnos.findByFechaOrderByIdCanchaAscHoraInicioAsc(dia);
+        List<Turno> turnosDia = turnos.findByFechaOrderByIdCanchaAscHoraInicioAsc(dia).stream().filter(Turno::visible).toList();
 
         long reservasHoy = delDia.stream().filter(Reserva::vigente).count();
         long confirmadasHoy = delDia.stream().filter(r -> r.getEstado() == EstadoReserva.CONFIRMADA).count();
@@ -128,8 +128,9 @@ public class PanelServicioImpl implements PanelServicio {
     }
 
     private List<AgendaDashboardCancha> agenda(List<Turno> turnosDia, List<Reserva> delDia) {
-        Map<Long, Reserva> porTurno = delDia.stream().filter(Reserva::vigente)
-                .collect(Collectors.toMap(r -> r.getTurno().getId(), Function.identity(), (a, b) -> a));
+        Map<Long, Reserva> porTurno = new HashMap<>();
+        delDia.stream().filter(Reserva::vigente)
+                .forEach(r -> r.turnosOrdenados().forEach(t -> porTurno.putIfAbsent(t.getId(), r)));
         Map<Long, List<Turno>> porCancha = turnosDia.stream().collect(Collectors.groupingBy(Turno::getIdCancha));
         List<AgendaDashboardCancha> agenda = new ArrayList<>();
         for (CanchaCatalogo c : complejo.canchas()) {

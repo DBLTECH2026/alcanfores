@@ -178,7 +178,8 @@ export default function Paso3({ alCambiarEnvio }: { alCambiarEnvio: (v: boolean)
     if (!reserva) {
       try {
         reserva = await reservasApi.crear({
-          idTurno: r.turno.idTurno,
+          // v2: varios turnos → idsTurno; uno solo se sigue mandando como idTurno.
+          ...(r.turno.idsTurno.length > 1 ? { idsTurno: r.turno.idsTurno } : { idTurno: r.turno.idTurno }),
           cliente: { dni, nombres: r.cliente.nombres, apellidos: r.cliente.apellidos, telefono: String(r.cliente.telefono), correo: r.cliente.correo },
           metodoPago,
           aceptaTerminos: Boolean(r.cliente.aceptaTerminos),
@@ -199,8 +200,9 @@ export default function Paso3({ alCambiarEnvio }: { alCambiarEnvio: (v: boolean)
           return;
         }
         if (porCampo.metodoPago) setError('metodoPago', { type: 'servidor', message: porCampo.metodoPago });
-        if (porCampo.idTurno) {
-          toast.error(porCampo.idTurno);
+        const errTurno = porCampo.idTurno ?? porCampo.idsTurno ?? Object.entries(porCampo).find(([k]) => k.startsWith('idsTurno'))?.[1];
+        if (errTurno) {
+          toast.error(errTurno);
           r.marcarConflicto();
           return;
         }

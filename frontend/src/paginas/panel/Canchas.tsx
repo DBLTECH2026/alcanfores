@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { CalendarDays, Images, Moon, Pencil, Plus, Ruler, Star, Sun, UsersRound, Layers, EyeOff, CirclePause, CircleCheck } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { CalendarClock, CalendarDays, Clock, Moon, Pencil, Plus, Star, Sun, UsersRound, Layers, EyeOff, CirclePause, CircleCheck } from 'lucide-react';
 import { canchasAdminApi } from '@/api/admin';
 import type { CanchaAdmin } from '@/api/admin/tipos';
 import { useCarga } from '@/hooks/useCarga';
@@ -15,12 +16,18 @@ import { IconoDeporte, Ilustracion, ilustracionDeporte } from '@/componentes/ui/
 import { fmtSoles } from '@/utilidades/formato';
 import { cx } from '@/utilidades/cx';
 import CanchaFormulario from './CanchaFormulario';
+import FichaCanchaAdmin, { type Apartado } from './cancha/FichaCanchaAdmin';
+import { textoSemana } from '@/utilidades/horario';
 
-/** /admin/canchas (lista), /admin/canchas/nueva y /admin/canchas/{id} (formulario + fotos). Solo ADMIN. */
+/**
+ * /admin/canchas (tarjetas), /admin/canchas/nueva y /admin/canchas/{id}[/horario|/configuracion] (ficha con 3 apartados,
+ * SPEC_V2 §F). Solo ADMIN.
+ */
 export default function Canchas() {
-  const sub = useParams()['*'];
+  const sub = useParams()['*'] ?? '';
   if (sub === 'nueva') return <CanchaFormulario />;
-  if (sub && /^\d+$/.test(sub)) return <CanchaFormulario id={Number(sub)} />;
+  const m = /^(\d+)(?:\/(horario|configuracion))?\/?$/.exec(sub);
+  if (m) return <FichaCanchaAdmin key={m[1]} id={Number(m[1])} apartado={(m[2] ?? 'contenido') as Apartado} />;
   return <ListaCanchas />;
 }
 
@@ -47,7 +54,7 @@ function ListaCanchas() {
     <>
       <CabeceraPagina
         titulo="Canchas"
-        subtitulo="Canchas del complejo: activas e inactivas"
+        subtitulo="Toca una cancha para editar su ficha, horario y precios"
         acciones={
           <BotonEnlace to="/admin/canchas/nueva" icono={Plus}>
             Nueva cancha
@@ -72,24 +79,29 @@ function ListaCanchas() {
             const activa = c.estado === 'ACTIVA';
             return (
               <article key={c.id} className={cx('cancha-panel', !activa && 'inactiva')}>
-                <div className="cancha-panel-media">
+                <Link to={`/admin/canchas/${c.id}`} className="cancha-panel-media" aria-label={`Editar ${c.nombre}`} tabIndex={-1}>
                   {c.fotoPrincipal ? <img src={c.fotoPrincipal} alt={c.nombre} loading="lazy" /> : <Ilustracion id={ilustracionDeporte(c.deporte)} />}
                   <span className="dep">
                     <IconoDeporte deporte={c.deporte} />
                     {c.deporteTexto}
                   </span>
-                </div>
+                  {!activa && <span className="estado-portada">Inactiva</span>}
+                </Link>
                 <div className="cancha-panel-cuerpo">
                   <div className="flex items-start justify-between gap-2">
-                    <h3>{c.nombre}</h3>
+                    <h3>
+                      <Link to={`/admin/canchas/${c.id}`} className="hover:underline">
+                        {c.nombre}
+                      </Link>
+                    </h3>
                     <Interruptor activo={activa} alCambiar={() => setCambio(c)}>
-                      {activa ? 'Activa' : 'Inactiva'}
+                      <span className="sr-only">{activa ? 'Activa' : 'Inactiva'}</span>
                     </Interruptor>
                   </div>
+                  <DatoIcono icono={Clock}>{c.horario?.texto || (c.horario?.dias?.length ? textoSemana(c.horario.dias) : 'Horario por defecto')}</DatoIcono>
                   <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                     <DatoIcono icono={Layers}>{c.superficie}</DatoIcono>
                     <DatoIcono icono={UsersRound}>{c.capacidad}</DatoIcono>
-                    {c.medidas && <DatoIcono icono={Ruler}>{c.medidas}</DatoIcono>}
                   </div>
                   <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                     <DatoIcono icono={Sun}>
@@ -102,18 +114,7 @@ function ListaCanchas() {
                       {c.calificacion.total ? `${c.calificacion.promedio.toFixed(1)} (${c.calificacion.total})` : 'Sin reseñas'}
                     </DatoIcono>
                   </div>
-                  {activa ? (
-                    <div className="mini-kpis">
-                      <div className="mini-kpi">
-                        <Images className="ico" aria-hidden />
-                        <b>{c.fotos.length}</b> fotos
-                      </div>
-                      <div className="mini-kpi">
-                        <CalendarDays className="ico" aria-hidden />
-                        <b>#{c.orden}</b> orden
-                      </div>
-                    </div>
-                  ) : (
+                  {!activa && (
                     <div className="oculta-portal">
                       <EyeOff className="ico" aria-hidden />
                       Oculta en el portal
@@ -121,13 +122,12 @@ function ListaCanchas() {
                   )}
                 </div>
                 <div className="cancha-panel-pie">
-                  <BotonEnlace to={`/admin/canchas/${c.id}`} variante="secundario" tamano="sm" icono={Pencil}>
+                  <BotonEnlace to={`/admin/canchas/${c.id}`} variante="secundario" tamano="sm" icono={Pencil} className="flex-1">
                     Editar
                   </BotonEnlace>
-                  <BotonEnlace to={`/admin/canchas/${c.id}#fotos`} variante="fantasma" tamano="sm" icono={Images}>
-                    Fotos
+                  <BotonEnlace to={`/admin/canchas/${c.id}/horario`} variante="fantasma" tamano="sm" icono={CalendarClock}>
+                    Horario
                   </BotonEnlace>
-                  <BotonEnlace to={`/admin/agenda`} variante="fantasma" tamano="sm" icono={CalendarDays} etiqueta="Agenda" />
                 </div>
               </article>
             );

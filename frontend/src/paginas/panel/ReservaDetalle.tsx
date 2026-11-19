@@ -53,7 +53,8 @@ import { Alerta, InsigniaEstado } from '@/componentes/ui/Estados';
 import { Avatar, Cargando, Vacio } from '@/componentes/ui/Datos';
 import { Busto, IconoDeporte } from '@/componentes/ui/Marca';
 import { LineaTiempo, type Hito } from '@/componentes/ui/Reserva';
-import { ahoraLima, deLima, fmtDuracion, fmtFecha, fmtFechaHora, fmtHace, fmtRango24 } from '@/utilidades/fecha';
+import { ahoraLima, deLima, fmtDuracion, fmtFecha, fmtFechaHora, fmtHace } from '@/utilidades/fecha';
+import { horarioDeReserva } from '@/componentes/portal/EstadoReserva';
 import { fmtCelular, fmtSoles } from '@/utilidades/formato';
 
 const EVENTOS: Record<string, { titulo: string; icono: LucideIcon; estado?: Hito['estado'] }> = {
@@ -199,7 +200,7 @@ export default function ReservaDetalle({ codigo }: { codigo: string }) {
               </span>
               <div className="grid gap-1.5">
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="det-hora">{fmtRango24(res.horaInicio, res.horaFin)}</span>
+                  <span className="det-hora">{horarioDeReserva(res, true)}</span>
                   {res.estado !== 'CANCELADA' && (
                     <span className="badge b-menta badge-sm">
                       <Timer className="ico" aria-hidden />
@@ -462,7 +463,7 @@ export default function ReservaDetalle({ codigo }: { codigo: string }) {
         alCerrar={() => setModal(null)}
         titulo={modal === 'ASISTIO' ? 'Marcar asistencia' : 'Marcar no asistió'}
         subtitulo={`${res.codigoReserva} · ${nombre}`}
-        franja={[['Turno', fmtRango24(res.horaInicio, res.horaFin)], ['Cancha', res.cancha.nombre.split(' · ')[0] ?? ''], ['Saldo', fmtSoles(res.saldo)]]}
+        franja={[['Turno', horarioDeReserva(res, true)], ['Cancha', res.cancha.nombre.split(' · ')[0] ?? ''], ['Saldo', fmtSoles(res.saldo)]]}
         textoConfirmar={modal === 'ASISTIO' ? 'Asistió' : 'No asistió'}
         iconoConfirmar={modal === 'ASISTIO' ? UserCheck : UserX}
         peligro={modal === 'NO_ASISTIO'}

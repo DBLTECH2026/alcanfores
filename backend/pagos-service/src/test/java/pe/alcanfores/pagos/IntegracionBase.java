@@ -108,7 +108,19 @@ public abstract class IntegracionBase {
         return new ReservaInterna(10L, codigo, 2L, "Cancha 2", "FUTBOL_6", fecha, LocalTime.of(19, 0), LocalTime.of(20, 0),
                 total, new BigDecimal("45.00"), montoPagado,
                 new ClienteContacto(DNI, "Diego Alonso", "Ramos Quispe", "987654321", "diego.ramos@correo.pe"),
-                estado, estadoPago, total.subtract(montoPagado), LocalDateTime.of(fecha, LocalTime.of(19, 0)));
+                estado, estadoPago, total.subtract(montoPagado), LocalDateTime.of(fecha, LocalTime.of(19, 0)),
+                "7:00–8:00 p. m.", 1);
+    }
+
+    /** Reserva de 2 turnos NO seguidos de la Cancha 2 (9 a. m. y 7 p. m.; S/ 160, adelanto S/ 80) para pasado mañana. */
+    protected static ReservaInterna reservaDosTurnos(String codigo) {
+        LocalDate fecha = Tiempo.hoy().plusDays(2);
+        BigDecimal total = new BigDecimal("160.00");
+        return new ReservaInterna(11L, codigo, 2L, "Cancha 2", "FUTBOL_6", fecha, LocalTime.of(9, 0), LocalTime.of(20, 0),
+                total, new BigDecimal("80.00"), BigDecimal.ZERO,
+                new ClienteContacto(DNI, "Diego Alonso", "Ramos Quispe", "987654321", "diego.ramos@correo.pe"),
+                "PENDIENTE", "SIN_PAGO", total, LocalDateTime.of(fecha, LocalTime.of(9, 0)),
+                "9:00–10:00 a. m. y 7:00–8:00 p. m.", 2);
     }
 
     protected void reservaDisponible(ReservaInterna r) {

@@ -13,6 +13,7 @@ import pe.alcanfores.comun.eventos.DatosReserva;
 import pe.alcanfores.comun.eventos.ReservaCanceladaEvento;
 import pe.alcanfores.comun.eventos.ReservaConfirmadaEvento;
 import pe.alcanfores.comun.eventos.ReservaRegistradaEvento;
+import pe.alcanfores.comun.util.Horarios;
 import pe.alcanfores.comun.util.Tiempo;
 import pe.alcanfores.notificaciones.repositorio.NotificacionRepositorio;
 import pe.alcanfores.notificaciones.servicio.AvisoServicio;
@@ -51,7 +52,8 @@ public class DatosDemo implements ApplicationRunner {
         ClienteContacto diego = new ClienteContacto("70123321", "Diego", "Ramos Quispe", "987654321", "diego.ramos@example.com");
         LocalDateTime inicio = ahora.plusHours(2).plusMinutes(3);
         DatosReserva r1 = new DatosReserva(1L, "ALC-7K3M9P", 1L, "Cancha 1 · Fútbol 5", "FUTBOL_5", inicio.toLocalDate(),
-                inicio.toLocalTime(), inicio.toLocalTime().plusHours(1), dinero("80.00"), dinero("40.00"), BigDecimal.ZERO, diego);
+                inicio.toLocalTime(), inicio.toLocalTime().plusHours(1), dinero("80.00"), dinero("40.00"), BigDecimal.ZERO, diego,
+                Horarios.rango(inicio.toLocalTime(), inicio.toLocalTime().plusHours(1)), 1);
         avisos.alRegistrarReserva(new ReservaRegistradaEvento(UUID.randomUUID(), ahora, r1, "WEB", "YAPE", ahora.plusMinutes(20)));
         DatosReserva r1Pagada = conPagado(r1, dinero("40.00"));
         avisos.alConfirmarReserva(new ReservaConfirmadaEvento(UUID.randomUUID(), ahora, r1Pagada, dinero("40.00")));
@@ -61,13 +63,15 @@ public class DatosDemo implements ApplicationRunner {
         ClienteContacto maria = new ClienteContacto("45678912", "María Fernanda", "Torres Huamán", "912345678",
                 "maria.torres@example.com");
         DatosReserva r2 = new DatosReserva(2L, "ALC-Q8W4ZR", 4L, "Losa multiusos", "MULTIUSO", ahora.toLocalDate().minusDays(1),
-                LocalTime.of(20, 0), LocalTime.of(21, 0), dinero("50.00"), dinero("25.00"), dinero("50.00"), maria);
+                LocalTime.of(20, 0), LocalTime.of(21, 0), dinero("50.00"), dinero("25.00"), dinero("50.00"), maria,
+                "8:00–9:00 p. m.", 1);
         avisos.alRegistrarAsistencia(new AsistenciaRegistradaEvento(UUID.randomUUID(), ahora, r2, "ASISTIO"));
 
         ClienteContacto jorge = new ClienteContacto("41234567", "Jorge Luis", "Paredes Soto", "956789123",
                 "jorge.paredes@example.com");
         DatosReserva r3 = new DatosReserva(3L, "ALC-H5N2TB", 3L, "Cancha 3 · Fútbol 7", "FUTBOL_7", ahora.toLocalDate().plusDays(1),
-                LocalTime.of(19, 0), LocalTime.of(20, 0), dinero("120.00"), dinero("60.00"), BigDecimal.ZERO, jorge);
+                LocalTime.of(9, 0), LocalTime.of(20, 0), dinero("210.00"), dinero("105.00"), BigDecimal.ZERO, jorge,
+                "9:00–10:00 a. m. y 7:00–8:00 p. m.", 2);
         avisos.alRegistrarReserva(new ReservaRegistradaEvento(UUID.randomUUID(), ahora, r3, "WEB", "PLIN", ahora.plusMinutes(20)));
         avisos.alCancelarReserva(new ReservaCanceladaEvento(UUID.randomUUID(), ahora, r3, "SISTEMA",
                 "Venció el plazo para pagar", false, BigDecimal.ZERO));
@@ -77,7 +81,8 @@ public class DatosDemo implements ApplicationRunner {
 
     private static DatosReserva conPagado(DatosReserva r, BigDecimal pagado) {
         return new DatosReserva(r.idReserva(), r.codigoReserva(), r.idCancha(), r.nombreCancha(), r.deporte(), r.fecha(),
-                r.horaInicio(), r.horaFin(), r.montoTotal(), r.montoAdelanto(), pagado, r.cliente());
+                r.horaInicio(), r.horaFin(), r.montoTotal(), r.montoAdelanto(), pagado, r.cliente(), r.horarioTexto(),
+                r.cantidadTurnos());
     }
 
     private static BigDecimal dinero(String v) {

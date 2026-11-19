@@ -15,6 +15,7 @@ public class MensajeriaConfig {
     public static final String COLA_PAGO_VALIDADO = "reservas.pago-validado";
     public static final String COLA_PAGO_RECHAZADO = "reservas.pago-rechazado";
     public static final String COLA_CANCHA_ACTUALIZADA = "reservas.cancha-actualizada";
+    public static final String COLA_CALENDARIO_ACTUALIZADO = "reservas.calendario-actualizado";
 
     @Bean
     Queue colaPagoRegistrado() {
@@ -34,6 +35,16 @@ public class MensajeriaConfig {
     @Bean
     Queue colaCanchaActualizada() {
         return Eventos.cola(COLA_CANCHA_ACTUALIZADA);
+    }
+
+    @Bean
+    Queue colaCalendarioActualizado() {
+        return Eventos.cola(COLA_CALENDARIO_ACTUALIZADO);
+    }
+
+    @Bean
+    Binding enlaceCalendarioActualizado(Queue colaCalendarioActualizado, TopicExchange intercambioEventos) {
+        return Eventos.enlace(colaCalendarioActualizado, intercambioEventos, Eventos.CALENDARIO_ACTUALIZADO);
     }
 
     @Bean

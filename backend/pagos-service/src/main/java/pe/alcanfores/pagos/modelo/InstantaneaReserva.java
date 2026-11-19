@@ -32,7 +32,7 @@ public class InstantaneaReserva {
     @Column(name = "cliente_correo", length = 100)
     private String clienteCorreo;
 
-    /** «Alquiler de Cancha 2 · Fútbol 6 · vie 20/11/2026 7:00 p. m.–8:00 p. m.» */
+    /** «Alquiler de Cancha 2 · Fútbol 6 · vie 20/11/2026 7:00–8:00 p. m.» (o varios turnos: «… 9:00–10:00 a. m. y 7:00–8:00 p. m. (2 turnos)») */
     @Column(name = "concepto", nullable = false, length = 160)
     private String concepto;
 

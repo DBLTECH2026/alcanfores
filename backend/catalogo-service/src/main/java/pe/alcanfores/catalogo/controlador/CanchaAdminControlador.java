@@ -27,8 +27,15 @@ import pe.alcanfores.catalogo.dto.CanchaSolicitud;
 import pe.alcanfores.catalogo.dto.EstadoCanchaSolicitud;
 import pe.alcanfores.catalogo.dto.FotoActualizacionSolicitud;
 import pe.alcanfores.catalogo.dto.FotoRespuesta;
+import pe.alcanfores.catalogo.dto.HorarioDtos.HorarioCanchaRespuesta;
+import pe.alcanfores.catalogo.dto.HorarioDtos.HorarioSolicitud;
+import pe.alcanfores.catalogo.dto.HorarioDtos.TurnoVistaPrevia;
+import pe.alcanfores.catalogo.dto.ResenaAdminRespuesta;
+import pe.alcanfores.catalogo.dto.ResenaComplejoSolicitud;
 import pe.alcanfores.catalogo.servicio.CanchaServicio;
 import pe.alcanfores.catalogo.servicio.FotoServicio;
+import pe.alcanfores.catalogo.servicio.HorarioServicio;
+import pe.alcanfores.catalogo.servicio.ResenaServicio;
 
 import java.util.List;
 
@@ -37,11 +44,13 @@ import java.util.List;
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")
 @SecurityRequirement(name = "bearer")
-@Tag(name = "Canchas (panel)", description = "Alta, edición, estado y fotos de las canchas. Solo ADMIN.")
+@Tag(name = "Canchas (panel)", description = "Alta, edición, estado, fotos, horario y reseñas de cada cancha. Solo ADMIN.")
 public class CanchaAdminControlador {
 
     private final CanchaServicio canchas;
     private final FotoServicio fotos;
+    private final HorarioServicio horarios;
+    private final ResenaServicio resenas;
 
     @GetMapping
     @Operation(summary = "Listar todas las canchas", description = "Incluye las inactivas, con fotos y reseñas resumidas.")
@@ -72,6 +81,46 @@ public class CanchaAdminControlador {
     @Operation(summary = "Activar o desactivar", description = "INACTIVA bloquea en reservas los turnos futuros libres.")
     public CanchaDetalleRespuesta estado(@PathVariable Long id, @Valid @RequestBody EstadoCanchaSolicitud solicitud) {
         return canchas.cambiarEstado(id, solicitud.estado());
+    }
+
+    @GetMapping("/{id}/horario")
+    @Operation(summary = "Horario de la cancha", description = "Días, duración del turno, inicio de la noche y qué hace en feriado.")
+    public HorarioCanchaRespuesta horario(@PathVariable Long id) {
+        return horarios.horario(id);
+    }
+
+    @PutMapping("/{id}/horario")
+    @Operation(summary = "Guardar el horario", description = "Los 7 días; el cierre es la hora en que termina el último turno "
+            + "(24:00 = medianoche) y debe calzar con la duración. Publica cancha.actualizada: reservas regenera los "
+            + "turnos futuros sin tocar los que tienen reserva.")
+    public HorarioCanchaRespuesta guardarHorario(@PathVariable Long id, @Valid @RequestBody HorarioSolicitud solicitud) {
+        return horarios.guardar(id, solicitud);
+    }
+
+    @GetMapping("/{id}/horario/vista-previa")
+    @Operation(summary = "Turnos que salen un día", description = "Con el horario guardado; dia = 1 (lunes) … 7 (domingo).")
+    public List<TurnoVistaPrevia> vistaPrevia(@PathVariable Long id, @RequestParam int dia) {
+        return horarios.vistaPrevia(id, dia);
+    }
+
+    @PostMapping("/{id}/horario/vista-previa")
+    @Operation(summary = "Turnos que saldrían con un horario sin guardar", description = "Mismo cuerpo que el PUT; no guarda nada.")
+    public List<TurnoVistaPrevia> vistaPreviaSinGuardar(@PathVariable Long id, @RequestParam int dia,
+                                                        @Valid @RequestBody HorarioSolicitud solicitud) {
+        return horarios.vistaPrevia(id, dia, solicitud);
+    }
+
+    @GetMapping("/{id}/resenas")
+    @Operation(summary = "Reseñas de la cancha", description = "Todas: de clientes y del complejo, publicadas y ocultas.")
+    public List<ResenaAdminRespuesta> resenas(@PathVariable Long id) {
+        return resenas.listarDeCancha(id);
+    }
+
+    @PostMapping("/{id}/resenas")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Agregar una reseña del complejo", description = "Autor, estrellas, comentario y fecha (no futura).")
+    public ResenaAdminRespuesta crearResena(@PathVariable Long id, @Valid @RequestBody ResenaComplejoSolicitud solicitud) {
+        return resenas.crearDelComplejo(id, solicitud);
     }
 
     @PostMapping(path = "/{id}/fotos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

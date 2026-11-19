@@ -92,6 +92,42 @@ export interface CanchaDetalle extends CanchaResumen {
   caracteristicas: string[];
   fotos: FotoCancha[];
   resumenResenas: Calificacion & { distribucion: Record<'1' | '2' | '3' | '4' | '5', number> };
+  /** v2 (SPEC_V2 §A): horario propio de la cancha. */
+  horario?: HorarioPublico | null;
+  feriado?: FeriadoCancha | null;
+}
+
+// ------------------------------ v2: horario por cancha y calendario ------------------------------
+/** 1 = lunes … 7 = domingo (ISO). */
+export type DiaSemana = 1 | 2 | 3 | 4 | 5 | 6 | 7;
+export interface DiaHorario {
+  diaSemana: DiaSemana;
+  abierto: boolean;
+  /** 'HH:mm' */
+  apertura: string;
+  /** 'HH:mm'; hora en que TERMINA el último turno ('24:00' o '23:59' = medianoche). */
+  cierre: string;
+}
+export interface HorarioPublico {
+  duracionTurnoMin: number;
+  inicioNoche?: string;
+  dias: DiaHorario[];
+  /** «Lun a vie 8:00 a. m.–11:00 p. m. · Sáb y dom 7:00 a. m.–11:00 p. m.» */
+  texto: string;
+}
+export interface FeriadoCancha {
+  modo: 'ABIERTA' | 'CERRADA';
+  /** Adicional en soles POR TURNO cuando abre en feriado. */
+  recargo: number;
+}
+export type TipoDiaEspecial = 'FERIADO' | 'NO_LABORABLE';
+export interface DiaEspecial {
+  id?: number;
+  fecha: string;
+  tipo: TipoDiaEspecial;
+  nombre: string;
+  /** null = todas las canchas. */
+  canchas: number[] | null;
 }
 export interface Resena {
   id: number;
@@ -102,11 +138,14 @@ export interface Resena {
   respuesta: string | null;
   respondidoEn?: string | null;
   verificada: boolean;
+  /** v2: CLIENTE (reserva verificada) o COMPLEJO (agregada por el administrador). */
+  origen?: 'CLIENTE' | 'COMPLEJO';
 }
 export type OrdenResenas = 'recientes' | 'mejor' | 'peor';
 export interface NuevaResena {
   codigoReserva: string;
-  dni: string;
+  /** v1: DNI. v2: con sesión de cliente el DNI sale del token. */
+  dni?: string;
   puntuacion: number;
   comentario: string;
 }
@@ -121,6 +160,9 @@ export interface Turno {
   precio: number;
   franja: Franja;
   estado: EstadoTurnoPublico;
+  /** v2: turno en feriado (el precio ya incluye el recargo). */
+  feriado?: boolean;
+  recargo?: number;
 }
 export interface DisponibilidadCancha {
   idCancha: number;
@@ -152,7 +194,9 @@ export interface ClienteReserva {
   correo: string;
 }
 export interface NuevaReserva {
-  idTurno: number;
+  /** v1: un turno. v2: `idsTurno` (1 a 8 turnos de la misma cancha y fecha). */
+  idTurno?: number;
+  idsTurno?: number[];
   cliente: ClienteReserva;
   metodoPago: MetodoPagoWeb;
   aceptaTerminos: boolean;
@@ -170,6 +214,15 @@ export interface ReservaCreada {
   montoTotal: number;
   montoAdelanto: number;
   cliente: { nombres: string; apellidos: string; dniEnmascarado: string; telefono: string; correo: string };
+  /** v2: turnos de la reserva y texto del horario («7:00–9:00 p. m.»). */
+  turnos?: TurnoReserva[];
+  horarioTexto?: string;
+}
+export interface TurnoReserva {
+  idTurno: number;
+  horaInicio: string;
+  horaFin: string;
+  precio: number;
 }
 /**
  * Hito de la línea de tiempo (`reserva_historial`). Eventos reales del back: REGISTRADA, COMPROBANTE_RECIBIDO, OBSERVADO,
@@ -197,6 +250,37 @@ export interface ReservaDetalle extends ReservaCreada {
   puedeCancelar: boolean;
   puedeReenviarComprobante: boolean;
   puedeResenar: boolean;
+}
+
+// ------------------------------ v2: cuentas de clientes (SPEC_V2 §E) ------------------------------
+export interface CuentaCliente {
+  id: number;
+  dni: string;
+  nombres: string;
+  apellidos: string;
+  correo: string;
+  telefono: string;
+}
+export interface RespuestaLoginCliente {
+  token: string;
+  tipo: 'Bearer';
+  expiraEn: string;
+  cliente: CuentaCliente;
+}
+export interface RegistroCliente {
+  dni: string;
+  nombres: string;
+  apellidos: string;
+  correo: string;
+  telefono: string;
+  contrasena: string;
+  confirmacion: string;
+  aceptaTerminos: boolean;
+  aceptaPrivacidad: boolean;
+}
+/** Ítem de «Mis reservas» (GET /api/cliente/reservas). */
+export interface ReservaDeCliente extends ReservaDetalle {
+  resenada?: boolean;
 }
 
 export interface DocumentoDni {

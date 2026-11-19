@@ -2,7 +2,7 @@ package pe.alcanfores.catalogo.dto;
 
 import java.time.LocalDateTime;
 
-/** Reseña tal como la ve el portal: siempre verificada (solo la deja quien tuvo una reserva válida). */
+/** Reseña tal como la ve el portal; {@code verificada} = la dejó un cliente que jugó ({@code origen} CLIENTE). */
 public record ResenaPublicaRespuesta(
         Long id,
         String autor,
@@ -11,6 +11,7 @@ public record ResenaPublicaRespuesta(
         LocalDateTime fecha,
         String respuesta,
         LocalDateTime respondidoEn,
-        boolean verificada
+        boolean verificada,
+        String origen
 ) {
 }

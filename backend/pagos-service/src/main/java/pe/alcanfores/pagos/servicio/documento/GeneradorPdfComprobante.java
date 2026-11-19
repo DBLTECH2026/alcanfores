@@ -34,7 +34,7 @@ public class GeneradorPdfComprobante {
 
     private static final String FUENTES = "/documentos/fuentes/";
     private static final Pattern RANGO_HORAS = Pattern.compile(
-            "\\d{1,2}:\\d{2} [ap]\\. m\\.–\\d{1,2}:\\d{2} [ap]\\. m\\.");
+            "\\d{1,2}:\\d{2}( [ap]\\. m\\.)?–\\d{1,2}:\\d{2} [ap]\\. m\\.");
     private final TemplateEngine plantillas;
     private final String logo;
 
@@ -131,7 +131,7 @@ public class GeneradorPdfComprobante {
         };
     }
 
-    /** Descripción escapada para HTML con el rango «7:00 p. m.–8:00 p. m.» protegido para que no se parta entre líneas. */
+    /** Descripción escapada para HTML con cada rango de horas («7:00–8:00 p. m.», «11:00 a. m.–1:00 p. m.») protegido para que no se parta entre líneas. */
     static String descripcionHtml(String texto) {
         String escapado = HtmlUtils.htmlEscape(texto, "UTF-8");
         return RANGO_HORAS.matcher(escapado).replaceAll(r -> "<span style=\"white-space: nowrap;\">"

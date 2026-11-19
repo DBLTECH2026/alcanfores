@@ -2,11 +2,13 @@ import type { ComponentType } from 'react';
 import { Navigate, Outlet, createBrowserRouter, useRouteError, type RouteObject } from 'react-router-dom';
 import { RefreshCw } from 'lucide-react';
 import { AuthProvider } from '@/contexto/AuthContext';
+import { CuentaProvider } from '@/contexto/CuentaContext';
 import { ToastProvider } from '@/contexto/ToastContext';
 import { MarcoPortal } from '@/componentes/portal/MarcoPortal';
 import { PanelLayout } from '@/componentes/panel/PanelLayout';
 import { Vacio } from '@/componentes/ui/Datos';
 import { Boton } from '@/componentes/ui/Boton';
+import { AvisoReintento } from '@/componentes/ui/AvisoReintento';
 import Inicio from '@/paginas/portal/Inicio';
 import { NoEncontrada, Privacidad, Terminos } from '@/paginas/portal/Legales';
 import { RutaProtegida } from './RutaProtegida';
@@ -17,7 +19,10 @@ function Raiz() {
   return (
     <ToastProvider>
       <AuthProvider>
-        <Outlet />
+        <CuentaProvider>
+          <Outlet />
+          <AvisoReintento />
+        </CuentaProvider>
       </AuthProvider>
     </ToastProvider>
   );
@@ -68,7 +73,6 @@ const PAGINAS_PANEL: Record<string, Pick<RouteObject, 'lazy'>> = {
   '/admin/nueva-reserva': perezosa(() => import('@/paginas/panel/NuevaReserva')),
   '/admin/agenda': perezosa(() => import('@/paginas/panel/Agenda')),
   '/admin/canchas': perezosa(() => import('@/paginas/panel/Canchas')),
-  '/admin/resenas': perezosa(() => import('@/paginas/panel/Resenas')),
   '/admin/pagos': perezosa(() => import('@/paginas/panel/Pagos')),
   '/admin/clientes': perezosa(() => import('@/paginas/panel/Clientes')),
   '/admin/reportes': perezosa(() => import('@/paginas/panel/Reportes')),
@@ -92,6 +96,10 @@ export const router = createBrowserRouter([
           { path: '/canchas/:idOSlug', ...perezosa(() => import('@/paginas/portal/CanchaDetalle')) },
           { path: '/reservar/listo/:codigo', ...perezosa(() => import('@/paginas/portal/ReservaListo')) },
           { path: '/mi-reserva', ...perezosa(() => import('@/paginas/portal/MiReserva')) },
+          // v2: cuentas de clientes
+          { path: '/ingresar', ...perezosa(() => import('@/paginas/portal/cuenta/Ingresar')) },
+          { path: '/crear-cuenta', ...perezosa(() => import('@/paginas/portal/cuenta/CrearCuenta')) },
+          { path: '/mi-cuenta/*', ...perezosa(() => import('@/paginas/portal/cuenta/MiCuenta')) },
           { path: '/pago/resultado', ...perezosa(() => import('@/paginas/portal/PagoResultado')) },
           { path: '/terminos', element: <Terminos /> },
           { path: '/privacidad', element: <Privacidad /> },
@@ -113,8 +121,9 @@ export const router = createBrowserRouter([
             children: [
               { index: true, element: <Navigate to="/admin/hoy" replace /> },
               { path: '/admin/cuenta', ...perezosa(() => import('@/paginas/panel/Cuenta')) },
-              // WhatsApp vive como pestaña de Configuración (solo ADMIN).
-              { path: '/admin/whatsapp', element: <Navigate to="/admin/configuracion?pestana=whatsapp" replace /> },
+              // v2: WhatsApp es una tarjeta de Configuración y las reseñas viven en la ficha de cada cancha.
+              { path: '/admin/whatsapp', element: <Navigate to="/admin/configuracion/whatsapp" replace /> },
+              { path: '/admin/resenas/*', element: <Navigate to="/admin/canchas" replace /> },
               ...MENU_PANEL.map<RouteObject>((item) => ({
                 path: item.ruta,
                 element: <RutaProtegida roles={item.roles} />,

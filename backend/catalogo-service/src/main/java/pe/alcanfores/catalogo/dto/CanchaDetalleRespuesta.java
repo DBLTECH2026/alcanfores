@@ -6,7 +6,8 @@ import java.util.List;
 
 /**
  * Detalle de cancha. En el portal ({@code GET /api/catalogo/canchas/{idOSlug}}) {@code estado}, {@code orden},
- * {@code creadoEn} y {@code actualizadoEn} también se envían (siempre ACTIVA); el panel los usa para editar.
+ * {@code creadoEn} y {@code actualizadoEn} también se envían (siempre ACTIVA); el panel los usa para editar. Desde la v2
+ * trae el horario propio de la cancha ({@code horario}, con el resumen en {@code texto}) y qué hace en feriado ({@code feriado}).
  */
 public record CanchaDetalleRespuesta(
         Long id,
@@ -31,6 +32,8 @@ public record CanchaDetalleRespuesta(
         String estado,
         Integer orden,
         LocalDateTime creadoEn,
-        LocalDateTime actualizadoEn
+        LocalDateTime actualizadoEn,
+        HorarioDtos.HorarioRespuesta horario,
+        HorarioDtos.FeriadoRespuesta feriado
 ) {
 }

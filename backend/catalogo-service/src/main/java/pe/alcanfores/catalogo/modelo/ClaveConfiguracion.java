@@ -19,6 +19,8 @@ public enum ClaveConfiguracion {
     DURACION_MIN("duracion_min", Tipo.ENTERO, 30, 180, "60", "Duración de cada turno en minutos."),
     INICIO_NOCHE("inicio_noche", Tipo.HORA, 0, 0, "18:00", "Desde esta hora se cobra la tarifa de noche (HH:mm)."),
     DIAS_VISIBLES("dias_visibles", Tipo.ENTERO, 1, 60, "14", "Días hacia adelante que se pueden reservar."),
+    DIAS_GENERADOS("dias_generados", Tipo.ENTERO, 14, 365, "120",
+            "Días hacia adelante con turnos ya creados (14 a 365, al menos los días visibles)."),
     MINUTOS_PARA_PAGAR("minutos_para_pagar", Tipo.ENTERO, 5, 1440, "20",
             "Minutos que tiene el cliente para enviar el comprobante del adelanto."),
     RECORDATORIO_HORAS("recordatorio_horas", Tipo.ENTERO, 1, 48, "2",

@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "dev:mock": "vite --mode mock",
+    "dev:v2": "vite --mode v2",
     "build": "tsc -b && vite build",
     "lint": "eslint . --max-warnings 0",
     "preview": "vite preview --port 5186",

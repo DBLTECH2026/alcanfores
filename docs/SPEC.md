@@ -8,6 +8,10 @@ El profesor califica sobre todo **que la app funcione y que TODOS los campos est
 Este documento es el **contrato** entre servicios y con el front. Si algo no está aquí, decide lo más sensato y
 anótalo en `docs/DECISIONES.md` (una línea por decisión).
 
+> **Versión 2 (19-nov-2026)**: horario propio de cada cancha, feriados y días no laborables, turnos automáticos, reservas
+> de varios turnos y cuentas de clientes con «Mis reservas». Detalle completo en `docs/SPEC_V2.md` y en
+> `docs/SPEC_V2_CAMBIOS.md` (precisiones del back-end); abajo se marcan con **(v2)** los puntos que cambiaron.
+
 ---------------------------------------------------------------------------------------------------------------
 ## 0. Reglas generales
 
@@ -77,15 +81,17 @@ React (Vite)  ──HTTPS──>  api-gateway :8086  ──lb://──>  auth-se
 ### 1.1 Rutas del gateway (prefijo → servicio)
 | Prefijo | Servicio |
 |---|---|
-| `/api/auth/**`, `/api/admin/usuarios/**`, `/api/admin/bitacora/**` | auth-service |
-| `/api/catalogo/**`, `/api/admin/canchas/**`, `/api/admin/resenas/**`, `/api/admin/configuracion/**` | catalogo-service |
-| `/api/disponibilidad/**`, `/api/reservas/**`, `/api/documentos/**`, `/api/admin/reservas/**`, `/api/admin/turnos/**`, `/api/admin/clientes/**`, `/api/admin/dashboard/**`, `/api/admin/reportes/reservas/**` | reservas-service |
+| `/api/auth/**` (incluye `/api/auth/clientes/**` **(v2)**), `/api/admin/usuarios/**`, `/api/admin/bitacora/**` | auth-service |
+| `/api/catalogo/**`, `/api/admin/canchas/**`, `/api/admin/resenas/**`, `/api/admin/configuracion/**`, `/api/admin/calendario/**` **(v2)** | catalogo-service |
+| `/api/disponibilidad/**`, `/api/reservas/**`, `/api/documentos/**`, `/api/cliente/**` **(v2)**, `/api/admin/reservas/**`, `/api/admin/turnos/**`, `/api/admin/clientes/**`, `/api/admin/dashboard/**`, `/api/admin/reportes/reservas/**` | reservas-service |
 | `/api/pagos/**`, `/api/pasarela/**`, `/api/webhooks/**`, `/api/comprobantes/**`, `/api/admin/pagos/**`, `/api/admin/comprobantes/**`, `/api/admin/reportes/ingresos/**` | pagos-service |
 | `/api/admin/notificaciones/**`, `/api/admin/recordatorios/**`, `/api/admin/whatsapp/**` | notificaciones-service |
 | `/api/estado` | gateway (consulta `/actuator/health` de cada servicio vía Eureka y devuelve `{ servicios: [{ nombre, estado: "UP|DOWN", instancias, latenciaMs }] }`) |
 
 Límites (token bucket en memoria, por IP): `POST /api/auth/login` 10/min, `/api/documentos/**` 20/min,
-`POST /api/reservas` 10/min, `/api/pasarela/**` 30/min → 429 con el cuerpo de error estándar.
+`POST /api/reservas` 10/min, `/api/pasarela/**` 30/min, **(v2)** `POST /api/auth/clientes/registro` 5/min y
+`POST /api/auth/clientes/login` 10/min → 429 con el cuerpo de error estándar. **(v2)** El gateway exige JWT en
+`/api/cliente/**` (401 sin token) y responde 403 `SIN_PERMISO` a un token CLIENTE en `/api/admin/**`.
 Tamaño máximo de cuerpo 6 MB. CORS: `FRONT_URL` (lista separada por comas; en local por defecto `http://localhost:5186,http://localhost:5187`); un `Origin` no permitido recibe 403 `ORIGEN_NO_PERMITIDO` con el cuerpo de error estándar. `/api/documentos/**` tiene 20 s de respuesta (las demás rutas 10 s). Fallback del circuit breaker →
 503 `{codigo:"SERVICIO_NO_DISPONIBLE", mensaje:"El servicio de <x> no responde. Intenta en unos segundos."}`.
 
@@ -94,6 +100,10 @@ Tamaño máximo de cuerpo 6 MB. CORS: `FRONT_URL` (lista separada por comas; en 
 
 - JWT **HS256** firmado con `JWT_SECRETO`, emitido por auth-service. Claims: `sub` (idAdministrador), `usuario`,
   `nombre`, `rol` (`ADMIN` | `RECEPCION`), `iat`, `exp` (8 h). Cabecera `Authorization: Bearer <token>`.
+- **(v2) Cuentas de clientes**: rol `CLIENTE` con `sub` = id de la cuenta, `usuario` = correo, `nombre` y el claim **`dni`**
+  (`comun.UsuarioToken` agrega `dni`, nulo para administradores). Solo abre `/api/cliente/**`, `/api/auth/clientes/yo`,
+  `/api/auth/clientes/cambiar-contrasena` y la reseña de `POST /api/catalogo/canchas/{id}/resenas`; en `/api/admin/**`,
+  `/api/auth/yo` y `/api/auth/cambiar-contrasena` recibe 403. Reservar sin cuenta sigue igual.
 - El gateway valida el token en `/api/admin/**` (401 temprano) y CADA servicio lo vuelve a validar con `JwtFiltro`
   de `comun` (defensa en profundidad) → `ROLE_ADMIN` / `ROLE_RECEPCION`; `@PreAuthorize` en los métodos solo-ADMIN.
 - Contraseñas BCrypt (fuerza 12). Login: 5 intentos fallidos → bloqueo 15 min (mensaje con minutos restantes).
@@ -142,7 +152,8 @@ Las anotaciones reutilizables viven en `comun`: `@Dni`, `@Ruc`, `@Celular`, `@No
 
 Todos los eventos llevan `idEvento` (UUID), `ocurridoEn` (fecha-hora) y el `codigoReserva` cuando aplique.
 Registros (records) en `pe.alcanfores.comun.eventos`. `ClienteContacto = { dni, nombres, apellidos, telefono, correo }`.
-`DatosReserva = { idReserva, codigoReserva, idCancha, nombreCancha, deporte, fecha, horaInicio, horaFin, montoTotal, montoAdelanto, montoPagado, cliente: ClienteContacto }`.
+`DatosReserva = { idReserva, codigoReserva, idCancha, nombreCancha, deporte, fecha, horaInicio, horaFin, montoTotal, montoAdelanto, montoPagado, cliente: ClienteContacto, horarioTexto, cantidadTurnos }`
+(**(v2)** `horaInicio` = primer turno, `horaFin` = último, `horarioTexto` «7:00–9:00 p. m.» o «9:00–10:00 a. m. y 7:00–8:00 p. m.»).
 
 | Routing key | Record | Lo publica | Lo consumen |
 |---|---|---|---|
@@ -154,7 +165,8 @@ Registros (records) en `pe.alcanfores.comun.eventos`. `ClienteContacto = { dni, 
 | `pago.validado` | `PagoValidadoEvento(idEvento, ocurridoEn, idPago, codigoReserva, metodo, canal, monto, tipoPago (ADELANTO/TOTAL/SALDO), validadoPor)` | pagos | reservas (confirma o suma saldo) |
 | `pago.rechazado` | `PagoRechazadoEvento(idEvento, ocurridoEn, idPago, codigoReserva, observacion, rechazadoPor)` | pagos | reservas (estadoPago=OBSERVADO, nuevo plazo), notificaciones (aviso con la observación y enlace para reenviar) |
 | `comprobante.emitido` | `ComprobanteEmitidoEvento(idEvento, ocurridoEn, idComprobante, codigoReserva, tipo (BOLETA/FACTURA/NOTA_CREDITO), serieNumero, total, cliente: ClienteContacto)` | pagos | notificaciones (envía el PDF por correo y WhatsApp) |
-| `cancha.actualizada` | `CanchaActualizadaEvento(idEvento, ocurridoEn, idCancha, nombre, deporte, precioDia, precioNoche, estado)` | catalogo | reservas (repone precio de turnos futuros DISPONIBLES; si INACTIVA bloquea turnos futuros libres con motivo «Cancha inactiva»; si vuelve a ACTIVA los desbloquea) |
+| `cancha.actualizada` | `CanchaActualizadaEvento(idEvento, ocurridoEn, idCancha, nombre, deporte, precioDia, precioNoche, estado, duracionTurnoMin, inicioNoche, dias: [HorarioDia(diaSemana, abierto, apertura, cierre)], feriadoModo, recargoFeriado)` **(v2: horario)** | catalogo (crear, editar, estado y horario) | reservas (regenera los turnos futuros de esa cancha con su horario: borra los libres que ya no calzan, crea los nuevos y reprecia; conserva los que tienen reserva vigente y los bloqueos manuales; INACTIVA bloquea los libres con «Cancha inactiva») |
+| `calendario.actualizado` **(v2)** | `CalendarioActualizadoEvento(idEvento, ocurridoEn, fecha, tipo (FERIADO/NO_LABORABLE), nombre, canchas, eliminado)` | catalogo | reservas (reevalúa los turnos de esa fecha: feriado → recargo o bloqueo según la cancha; no laborable → bloqueo; eliminado → quita ambos) |
 | `auditoria.accion` | `AccionAuditadaEvento(idEvento, ocurridoEn, servicio, idActor, actor, rol, accion, entidad, idEntidad, detalle, ip)` | todos | auth (tabla `bitacora`) |
 
 ---------------------------------------------------------------------------------------------------------------
@@ -166,6 +178,7 @@ Tablas: `administrador(id_administrador PK, nombres, apellidos, usuario UQ, corr
 Semilla (claves por variables `SEED_CLAVE_ADMIN`, `SEED_CLAVE_RECEPCION`, `SEED_CLAVE_DOCENTE`; por defecto local
 `Alcanfores2026`, `Recepcion2026`, `UTP2026`): `rhuaman` Rosa Huamán ADMIN · `mtorres` Marco Torres RECEPCION · `docente` Docente UTP ADMIN.
 Las claves se cargan con un `CommandLineRunner` (BCrypt) si la tabla está vacía; nunca en el SQL.
+**(v2)** `cuenta_cliente(id, dni CHAR(8) UQ, nombres, apellidos, correo UQ, telefono CHAR(9), contrasena_hash, estado, intentos_fallidos, bloqueado_hasta, creado_en, ultimo_acceso)`.
 
 | Método | Ruta | Acceso | Cuerpo → Respuesta |
 |---|---|---|---|
@@ -177,11 +190,19 @@ Las claves se cargan con un `CommandLineRunner` (BCrypt) si la tabla está vací
 | PATCH | `/api/admin/usuarios/{id}/estado` | ADMIN | `{estado}` |
 | POST | `/api/admin/usuarios/{id}/restablecer-contrasena` | ADMIN | `{nueva}` |
 | GET | `/api/admin/bitacora` | ADMIN | `?servicio&actor&accion&desde&hasta&page&size` |
+| POST | `/api/auth/clientes/registro` **(v2)** | público | `{dni, nombres, apellidos, correo, telefono, contrasena, confirmacion, aceptaTerminos, aceptaPrivacidad}` → 201 con sesión (cuerpo del login) · 409 `DNI_REGISTRADO` / `CORREO_REGISTRADO` |
+| POST | `/api/auth/clientes/login` **(v2)** | público | `{usuario (DNI o correo), contrasena}` → `{token, tipo, expiraEn, cliente:{id, dni, nombres, apellidos, correo, telefono}}` · 401 · 423 (5 intentos → 15 min) |
+| GET/PUT | `/api/auth/clientes/yo` **(v2)** | CLIENTE | cuenta / editar `{nombres, apellidos, correo, telefono}` (el DNI no cambia) |
+| POST | `/api/auth/clientes/cambiar-contrasena` **(v2)** | CLIENTE | `{actual, nueva, confirmacion}` |
 
 ### 5.2 catalogo-service (BD `alcanfores_catalogo`)
 Tablas: `cancha(id_cancha PK, slug UQ, nombre UQ, deporte ENUM('FUTBOL_5','FUTBOL_6','FUTBOL_7','VOLEY','BASQUET','MULTIUSO'), superficie, capacidad, descripcion VARCHAR(255), descripcion_larga TEXT, techada, iluminacion_led, medidas VARCHAR(40), caracteristicas JSON (lista de textos), precio_dia, precio_noche, estado ENUM('ACTIVA','INACTIVA'), orden, creado_en, actualizado_en)`,
 `cancha_foto(id_foto PK, id_cancha FK, archivo, leyenda, orden, principal, ancho, alto, creado_en)`,
-`resena(id_resena PK, id_cancha FK, codigo_reserva UQ, autor VARCHAR(60) (p. ej. «Diego R.»), puntuacion TINYINT, comentario VARCHAR(500), estado ENUM('PUBLICADA','OCULTA'), respuesta VARCHAR(500), respondido_en, creado_en)`,
+`resena(id_resena PK, id_cancha FK, codigo_reserva UQ NULL, autor VARCHAR(60) (p. ej. «Diego R.»), puntuacion TINYINT, comentario VARCHAR(500), estado ENUM('PUBLICADA','OCULTA'), respuesta VARCHAR(500), respondido_en, creado_en, origen ENUM('CLIENTE','COMPLEJO') (v2), id_cuenta_cliente NULL (v2))`,
+**(v2)** `cancha` agrega `duracion_turno_min` (30–240, múltiplo de 15; 60), `inicio_noche`, `feriado_modo` ENUM('ABIERTA','CERRADA'), `recargo_feriado`;
+`cancha_horario(id_cancha, dia_semana 1..7, abierto, apertura, cierre, PK(id_cancha, dia_semana))` (cierre de medianoche = 23:59:59);
+`dia_especial(id, fecha UQ, tipo ENUM('FERIADO','NO_LABORABLE'), nombre, canchas JSON NULL, creado_en, actualizado_en)` con los feriados de Perú 2026 y 2027;
+clave de configuración `dias_generados` (120),
 `configuracion(clave PK, valor, descripcion)` (`adelanto_pct`=50, `devolucion_horas`=24, `primer_turno`=08:00,
 `ultimo_turno`=23:00 (inicio del último turno = 22:00), `duracion_min`=60, `inicio_noche`=18:00, `dias_visibles`=14,
 `minutos_para_pagar`=20, `recordatorio_horas`=2, `yape_numero`, `yape_titular`, `plin_numero`, `whatsapp`, `correo`,
@@ -210,6 +231,18 @@ copiados por la semilla desde `src/main/resources/semilla/fotos/`). 4–6 reseñ
 | GET/PUT | `/api/admin/configuracion` | GET token, PUT ADMIN | todas las claves `{clave: valor}` validadas |
 | GET | `/interno/canchas`, `/interno/canchas/{id}`, `/interno/configuracion` | interno | para reservas y pagos |
 | GET | `/interno/resenas/{codigoReserva}` | interno | `{codigoReserva, existe}` (reservas lo usa para `puedeResenar`) |
+| GET/PUT | `/api/admin/canchas/{id}/horario` **(v2)** | ADMIN | `{duracionTurnoMin, inicioNoche, dias:[{diaSemana, abierto, apertura, cierre}], feriado:{modo, recargo}}` (+ `texto` en la respuesta); valida que `(cierre − apertura)` sea múltiplo de la duración («… sobra 1 hora: ajusta el cierre …»). Publica `cancha.actualizada`. |
+| GET/POST | `/api/admin/canchas/{id}/horario/vista-previa?dia=1..7` **(v2)** | ADMIN | turnos que saldrían `[{horaInicio, horaFin, precio, franja}]` (POST con el cuerpo del PUT, sin guardar) |
+| GET/POST/PUT/DELETE | `/api/admin/calendario[?anio]`, `/api/admin/calendario/{id}` **(v2)** | GET token, resto ADMIN | días especiales `{fecha, tipo, nombre, canchas?}` · 409 `DIA_ESPECIAL_DUPLICADO` · 409 `DIA_CON_RESERVAS` (consulta `GET /interno/reservas/vigentes`) · publica `calendario.actualizado` |
+| POST | `/api/admin/calendario/feriados-peru?anio=` **(v2)** | ADMIN | carga los feriados nacionales del año sin duplicar → `{creados, existentes}` |
+| GET | `/api/catalogo/calendario?desde&hasta` **(v2)** | público | `[{id, fecha, tipo, nombre, canchas}]` |
+| GET/POST | `/api/admin/canchas/{id}/resenas` **(v2)** | ADMIN | todas las reseñas de la cancha (incluidas ocultas) / crear reseña del complejo `{autor, puntuacion, comentario, fecha}` |
+| PUT/DELETE | `/api/admin/resenas/{id}` **(v2)** | ADMIN | solo reseñas de origen COMPLEJO (422 `RESENA_DE_CLIENTE`) |
+| GET | `/interno/calendario?desde&hasta` **(v2)** | interno | lo mismo que el público (reservas lo usa al generar turnos) |
+
+**(v2)** El detalle de cancha agrega `horario:{duracionTurnoMin, inicioNoche, dias, texto}` y `feriado:{modo, recargo}`; `/interno/canchas`
+agrega el horario. `POST /api/catalogo/canchas/{id}/resenas` ahora es `{codigoReserva, puntuacion, comentario}` con token CLIENTE
+(el DNI sale del token; 401 sin sesión). El ítem público de reseña agrega `origen`.
 
 ### 5.3 reservas-service (BD `alcanfores_reservas`)
 Tablas (respetan el diccionario del informe y lo amplían):
@@ -220,8 +253,11 @@ Tablas (respetan el diccionario del informe y lo amplían):
 - `cancelacion(id_cancelacion PK, id_reserva FK UQ, id_administrador NULL, cancelado_por ENUM('CLIENTE','ADMINISTRADOR','SISTEMA'), motivo, devolucion BOOLEAN, monto_devolucion, fecha_cancelacion)`
 - `consulta_documento(tipo ENUM('DNI','RUC'), numero, respuesta JSON, fuente, consultado_en, PK(tipo, numero))` (caché 30 días; el «no encontrado» 1 día con `fuente = NO_ENCONTRADO`)
 - `evento_procesado`.
+- **(v2)** `turno` agrega `feriado`, `recargo` (el `precio` ya lo incluye) y `tipo_bloqueo` ENUM('MANUAL','FERIADO','NO_LABORABLE','CANCHA_INACTIVA','FUERA_DE_HORARIO');
+  `reserva_turno(id_reserva, id_turno, precio, vigente, turno_activo GENERATED (id_turno si vigente) STORED UQ, PK(id_reserva, id_turno))`
+  = garantía de no doble reserva por turno en las reservas de varios turnos (`reserva.id_turno` queda como el primer turno).
 Código de reserva: `ALC-` + 6 caracteres de `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (SecureRandom; reintenta si existe).
-Montos: `monto_total` = precio del turno; `monto_adelanto` = total × adelantoPct / 100 (redondeo a 0.50 hacia arriba no; HALF_UP a 2 decimales).
+Montos: `monto_total` = precio del turno (**(v2)** suma de los precios de sus turnos, con recargo de feriado); `monto_adelanto` = total × adelantoPct / 100 (redondeo a 0.50 hacia arriba no; HALF_UP a 2 decimales).
 Semilla: clientes y reservas ficticias de los últimos 45 días y próximos 7 (para que el dashboard, la agenda y los reportes tengan datos; incluye canceladas, no-show y pendientes por validar), turnos generados para hoy + 14 días.
 
 Públicos:
@@ -229,7 +265,7 @@ Públicos:
 |---|---|---|
 | GET | `/api/disponibilidad?fecha=YYYY-MM-DD[&idCancha=]` | `{fecha, canchas:[{idCancha, nombre, deporte, turnos:[{idTurno, horaInicio, horaFin, precio, franja, estado:"DISPONIBLE|OCUPADO|BLOQUEADO|PASADO"}]}]}` (OCUPADO si tiene reserva vigente; PASADO si empieza en < 30 min) |
 | GET | `/api/disponibilidad/calendario?desde=&dias=14[&idCancha=]` | `[{fecha, libres, total}]` para pintar el calendario |
-| POST | `/api/reservas` | `{idTurno, cliente:{dni, nombres, apellidos, telefono, correo}, metodoPago, aceptaTerminos, aceptaPrivacidad}` → 201 `{codigoReserva, estado, estadoPago, venceEn, cancha:{id, nombre, deporte}, fecha, horaInicio, horaFin, montoTotal, montoAdelanto, cliente:{nombres, apellidos, dniEnmascarado, telefono, correo}}`. Transacción: upsert del cliente por DNI (actualiza teléfono/correo; los nombres de un cliente existente solo los cambia la reserva manual si no está verificado por RENIEC), bloquea el turno, crea la reserva PENDIENTE/SIN_PAGO con `venceEn = ahora + minutosParaPagar`, publica `reserva.registrada` (tras commit: `@TransactionalEventListener(AFTER_COMMIT)`). 409 `TURNO_OCUPADO` si choca. |
+| POST | `/api/reservas` | `{idTurno` o **(v2)** `idsTurno:[1..8 de la misma cancha y fecha]`, `cliente:{dni, nombres, apellidos, telefono, correo}, metodoPago, aceptaTerminos, aceptaPrivacidad}` (con token CLIENTE el DNI sale del token) → 201 `{codigoReserva, estado, estadoPago, venceEn, cancha:{id, nombre, deporte}, fecha, horaInicio, horaFin, montoTotal, montoAdelanto, cliente:{nombres, apellidos, dniEnmascarado, telefono, correo}}`. Transacción: upsert del cliente por DNI (actualiza teléfono/correo; los nombres de un cliente existente solo los cambia la reserva manual si no está verificado por RENIEC), bloquea el turno, crea la reserva PENDIENTE/SIN_PAGO con `venceEn = ahora + minutosParaPagar`, publica `reserva.registrada` (tras commit: `@TransactionalEventListener(AFTER_COMMIT)`). 409 `TURNO_OCUPADO` si choca. |
 | GET | `/api/reservas/{codigo}?dni=` | detalle para el cliente: lo anterior + `asistencia, montoPagado, saldo, cancelacion:{canceladoPor, motivo, fecha, devolucion, montoDevolucion}, linea:[{evento, fecha, detalle}]` (línea de tiempo), `puedeCancelar`, `puedeReenviarComprobante`, `puedeResenar` (falso si la reserva ya tiene reseña en catálogo). 404 si código+DNI no calzan (mismo mensaje para ambos casos). Cancelada con devolución → `estadoPago: REEMBOLSADO`, `montoPagado` neto y `saldo: 0` (toda CANCELADA tiene `saldo: 0`). |
 | POST | `/api/reservas/{codigo}/cancelar` | `{dni, motivo}` → reglas: solo PENDIENTE/CONFIRMADA y antes del inicio; `devolucion = true` si faltan ≥ `devolucionHoras` y hubo pago; publica `reserva.cancelada`. |
 | GET | `/api/reservas/{codigo}/constancia.pdf?dni=` | **Constancia de reserva PDF** (logo, código grande, QR con el código, cancha, fecha, hora, montos, estado, condiciones, dirección y mapa). |
@@ -252,12 +288,19 @@ Administración (token):
 | POST | `/api/admin/turnos/{id}/bloquear` · `/desbloquear` | `{motivo}` (no si tiene reserva vigente) |
 | POST | `/api/admin/turnos/bloquear-rango` | `{idCancha, fecha, horaDesde, horaHasta, motivo}` |
 | GET | `/api/admin/clientes` · `/api/admin/clientes/{dni}` | lista con `totalReservas, asistidas, noShows, ultimaReserva` · historial |
+| POST | `/api/admin/turnos/bloquear-rango` · `/desbloquear-rango` **(v2)** | `{idsCancha:[..], fecha, fechaHasta?, horaDesde, horaHasta, motivo}` → `{bloqueados, omitidosConReserva}` / `{desbloqueados}` (solo bloqueos MANUALES) |
+| GET | `/api/cliente/reservas?estado&page&size` · `/api/cliente/reservas/{codigo}` **(v2)** | rol CLIENTE: todas las reservas del DNI del token (incluidas las hechas antes de crear la cuenta) con `puedeCancelar, puedeReenviarComprobante, puedeResenar, resenada` |
+
+**(v2)** Toda respuesta de reserva agrega `turnos:[{idTurno, horaInicio, horaFin, precio}]`, `horarioTexto` y `cantidadTurnos`;
+la disponibilidad y la agenda agregan `feriado` y `recargo` por turno (la agenda además `tipoBloqueo`).
 | GET | `/api/admin/reportes/reservas?desde&hasta` | ADMIN · `{totales:{registradas, confirmadas, canceladas, pendientes, asistidas, noAsistio, tasaNoShowPct, ocupacionPct}, porCancha:[{idCancha, cancha, reservas, ocupacionPct}], porDia:[{fecha, registradas, confirmadas, canceladas}], porHora:[{hora, reservas}], porOrigen:[{origen, reservas}], cancelaciones:{porActor:{…}, motivosFrecuentes:[…]}, topClientes:[…5]}` |
 | GET | `/api/admin/reportes/reservas.xlsx?desde&hasta` | ADMIN · Excel (Apache POI) |
 
 Internos: `GET /interno/reservas/{codigo}` (DatosReserva + estado, estadoPago, montoPagado, saldo, inicio), `GET /interno/reservas/{codigo}/elegible-resena?dni&idCancha` → `{elegible, motivo, autor}`, `GET /interno/reservas/{codigo}/constancia.pdf`, `GET /interno/reservas/proximas?desde&hasta` (confirmadas por empezar).
-Tareas programadas (`@Scheduled`, zona Lima): generar turnos de hoy + `diasVisibles` (00:05 y al arrancar) · **expirar reservas** PENDIENTE/SIN_PAGO (u OBSERVADO) con `venceEn < ahora` cada minuto → cancelación SISTEMA «Venció el plazo para pagar» + `reserva.cancelada`.
-Consumidores: `pago.registrado`, `pago.validado` (ADELANTO→ADELANTO_PAGADO, TOTAL→PAGADO_TOTAL, SALDO→suma y PAGADO_TOTAL si completa; ADELANTO/TOTAL → estado CONFIRMADA + `reserva.confirmada`), `pago.rechazado` (OBSERVADO, `venceEn = min(ahora + 12 h, inicio − 1 h)`), `cancha.actualizada`.
+Tareas programadas (`@Scheduled`, zona Lima): generar turnos de hoy + `diasVisibles` (00:05 y al arrancar; **(v2)** hasta hoy + `dias_generados`
+con el horario de CADA cancha y el calendario de catálogo; una fecha visible sin turnos se genera al vuelo) · **expirar reservas** PENDIENTE/SIN_PAGO (u OBSERVADO) con `venceEn < ahora` cada minuto → cancelación SISTEMA «Venció el plazo para pagar» + `reserva.cancelada`.
+Internos **(v2)**: `GET /interno/reservas/vigentes?fecha&idsCancha` → `{codigos}`; `GET /interno/reservas/{codigo}` agrega `horarioTexto, cantidadTurnos, turnos`.
+Consumidores: `calendario.actualizado` **(v2)**, `pago.registrado`, `pago.validado` (ADELANTO→ADELANTO_PAGADO, TOTAL→PAGADO_TOTAL, SALDO→suma y PAGADO_TOTAL si completa; ADELANTO/TOTAL → estado CONFIRMADA + `reserva.confirmada`), `pago.rechazado` (OBSERVADO, `venceEn = min(ahora + 12 h, inicio − 1 h)`), `cancha.actualizada`.
 
 ### 5.4 pagos-service (BD `alcanfores_pagos`)
 Tablas:
@@ -270,7 +313,7 @@ Tablas:
 - `evento_procesado`.
 IGV 18 % **incluido** en el precio: `op_gravada = round(total / 1.18, 2)`, `igv = total − op_gravada`. Emisor ficticio: RUC `20000000001`
 (válido por módulo 11 y claramente ficticio; el anterior, 20612345679, existía en SUNAT y se reemplazó con migraciones), razón social «Los Alcanfores Sport E.I.R.L. (ficticia)», dirección real del complejo.
-**Un comprobante por cada cobro validado** (adelanto, total o saldo). Boleta al DNI del cliente si no pidió factura.
+**Un comprobante por cada cobro validado** (adelanto, total o saldo). **(v2)** La descripción usa `horarioTexto` y «(N turnos)» si son varios. Boleta al DNI del cliente si no pidió factura.
 
 Públicos:
 | Método | Ruta | Notas |
@@ -334,7 +377,7 @@ Tablas: `notificacion(id PK, codigo_reserva, evento, canal ENUM('WHATSAPP','CORR
   `reserva.confirmada` (confirmación + constancia PDF + saldo a pagar en el complejo + cómo llegar) · `comprobante.emitido` (boleta/factura PDF) ·
   `reserva.cancelada` (motivo, devolución) · recordatorio («tu partido es en 2 horas…», dirección, mapa, saldo) · `reserva.asistencia` ASISTIO (enlace para calificar).
   Cada aviso por los DOS canales (correo con PDF adjunto y WhatsApp con PDF como documento).
-- **Recordatorio (cron)**: al consumir `reserva.confirmada` crea `recordatorio` con `enviar_en = inicio − recordatorioHoras`.
+- **Recordatorio (cron)**: al consumir `reserva.confirmada` crea `recordatorio` con `enviar_en = inicio − recordatorioHoras` (**(v2)** inicio del PRIMER turno; los textos usan `horarioTexto`).
   `@Scheduled(cron = "0 * * * * *", zone = "America/Lima")` envía los vencidos; si faltan < 30 min para el inicio → OMITIDO.
   `reserva.cancelada` → CANCELADO. Reintentos: FALLIDO con `intentos < 3` se reintenta cada 5 min.
 | Método | Ruta | Acceso |

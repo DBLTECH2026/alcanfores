@@ -7,18 +7,23 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import pe.alcanfores.catalogo.dto.EstadoResenaSolicitud;
 import pe.alcanfores.catalogo.dto.RespuestaResenaSolicitud;
 import pe.alcanfores.catalogo.dto.ResenaAdminRespuesta;
+import pe.alcanfores.catalogo.dto.ResenaComplejoSolicitud;
 import pe.alcanfores.catalogo.modelo.EstadoResena;
 import pe.alcanfores.catalogo.servicio.ResenaServicio;
 import pe.alcanfores.comun.util.PaginaRespuesta;
@@ -28,7 +33,7 @@ import pe.alcanfores.comun.util.PaginaRespuesta;
 @RequiredArgsConstructor
 @PreAuthorize("hasRole('ADMIN')")
 @SecurityRequirement(name = "bearer")
-@Tag(name = "Reseñas (panel)", description = "Moderación y respuesta a las reseñas. Solo ADMIN.")
+@Tag(name = "Reseñas (panel)", description = "Moderación, respuesta y reseñas del complejo. Solo ADMIN.")
 public class ResenaAdminControlador {
 
     private final ResenaServicio resenas;
@@ -50,6 +55,19 @@ public class ResenaAdminControlador {
     @Operation(summary = "Ocultar o publicar una reseña")
     public ResenaAdminRespuesta estado(@PathVariable Long id, @Valid @RequestBody EstadoResenaSolicitud solicitud) {
         return resenas.cambiarEstado(id, solicitud.estado());
+    }
+
+    @PutMapping("/{id}")
+    @Operation(summary = "Editar una reseña del complejo", description = "422 RESENA_DE_CLIENTE si es de un cliente.")
+    public ResenaAdminRespuesta editar(@PathVariable Long id, @Valid @RequestBody ResenaComplejoSolicitud solicitud) {
+        return resenas.editarDelComplejo(id, solicitud);
+    }
+
+    @DeleteMapping("/{id}")
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Borrar una reseña del complejo", description = "422 RESENA_DE_CLIENTE si es de un cliente (esas se ocultan).")
+    public void borrar(@PathVariable Long id) {
+        resenas.eliminarDelComplejo(id);
     }
 
     @PostMapping("/{id}/respuesta")

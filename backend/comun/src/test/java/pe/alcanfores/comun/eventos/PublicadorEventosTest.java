@@ -17,6 +17,7 @@ import java.net.ConnectException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.UUID;
 import java.util.stream.Stream;
 
@@ -112,7 +113,7 @@ class PublicadorEventosTest {
         ClienteContacto cliente = new ClienteContacto("70123321", "Rosa", "Huamán", "987654321", "rosa@correo.pe");
         DatosReserva reserva = new DatosReserva(1L, "ALC-7K3M9P", 2L, "Cancha 1", "FUTBOL", LocalDate.of(2026, 11, 20),
                 LocalTime.of(19, 0), LocalTime.of(20, 0), new BigDecimal("80.00"), new BigDecimal("40.00"),
-                new BigDecimal("40.00"), cliente);
+                new BigDecimal("40.00"), cliente, "7:00–8:00 p. m.", 1);
         UUID id = UUID.fromString("00000000-0000-0000-0000-000000000001");
         return Stream.of(
                 new ReservaRegistradaEvento(id, AHORA, reserva, "WEB", "YAPE", AHORA.plusMinutes(30)),
@@ -126,6 +127,12 @@ class PublicadorEventosTest {
                         new BigDecimal("80.00"), cliente),
                 new CanchaActualizadaEvento(id, AHORA, 2L, "Cancha 1", "FUTBOL", new BigDecimal("80.00"),
                         new BigDecimal("100.00"), "ACTIVA"),
+                new CanchaActualizadaEvento(id, AHORA, 2L, "Cancha 1", "FUTBOL", new BigDecimal("80.00"),
+                        new BigDecimal("100.00"), "ACTIVA", 90, LocalTime.of(18, 0),
+                        List.of(new HorarioDia(1, true, LocalTime.of(8, 0), LocalTime.of(23, 0)),
+                                new HorarioDia(7, false, null, null)), "ABIERTA", new BigDecimal("10.00")),
+                new CalendarioActualizadoEvento(id, AHORA, LocalDate.of(2026, 12, 8), CalendarioActualizadoEvento.NO_LABORABLE,
+                        "Mantenimiento del grass", List.of(1L, 3L), false),
                 new AccionAuditadaEvento(id, AHORA, "reservas-service", 7L, "rhuaman", "ADMIN", "VALIDAR_PAGO", "pago",
                         "5", "S/ 40.00", "203.0.113.5"));
     }

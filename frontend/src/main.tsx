@@ -24,6 +24,12 @@ import './utilidades/fecha';
 import { router } from './rutas/router';
 
 async function prepararMocks() {
+  // Modo híbrido de desarrollo: solo los endpoints nuevos de la v2 simulados (ver src/mocks/v2.ts).
+  if (import.meta.env.VITE_MOCK === 'v2') {
+    const { iniciarMocksV2 } = await import('./mocks/v2');
+    await iniciarMocksV2();
+    return;
+  }
   if (import.meta.env.VITE_MOCK !== 'true') return;
   const { iniciarMocks } = await import('./mocks/navegador');
   await iniciarMocks();

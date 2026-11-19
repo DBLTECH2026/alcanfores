@@ -18,6 +18,7 @@ import pe.alcanfores.reservas.repositorio.TurnoRepositorio;
 import pe.alcanfores.reservas.servicio.ComplejoServicio;
 import pe.alcanfores.reservas.servicio.DisponibilidadServicio;
 import pe.alcanfores.reservas.servicio.ReglasReserva;
+import pe.alcanfores.reservas.servicio.TurnoServicio;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -38,9 +39,10 @@ public class DisponibilidadServicioImpl implements DisponibilidadServicio {
 
     private final TurnoRepositorio turnos;
     private final ComplejoServicio complejo;
+    private final TurnoServicio turnoServicio;
 
     @Override
-    @Transactional(readOnly = true)
+    @Transactional
     public DisponibilidadRespuesta disponibilidad(LocalDate fecha, Long idCancha) {
         ParametrosComplejo p = complejo.parametros();
         LocalDate hoy = Tiempo.hoy();
@@ -48,14 +50,19 @@ public class DisponibilidadServicioImpl implements DisponibilidadServicio {
             throw NegocioExcepcion.validacion("fecha", Mensajes.rangoFecha(p.diasVisibles()));
         }
         List<CanchaCatalogo> canchas = canchasVisibles(idCancha);
+        if (!turnos.existsByFecha(fecha)) {
+            // Fecha dentro de los días visibles que aún no tiene turnos: se generan al vuelo.
+            turnoServicio.generarRango(fecha, fecha, List.of());
+        }
         Map<Long, List<Turno>> porCancha = turnos.findByFechaOrderByIdCanchaAscHoraInicioAsc(fecha).stream()
+                .filter(Turno::visible)
                 .collect(Collectors.groupingBy(Turno::getIdCancha));
         LocalDateTime limite = Tiempo.ahora().plusMinutes(ReglasReserva.MINUTOS_ANTICIPACION);
         List<CanchaDisponibilidad> resultado = new ArrayList<>();
         for (CanchaCatalogo c : canchas) {
             List<TurnoDisponibilidad> ts = porCancha.getOrDefault(c.id(), List.of()).stream()
                     .map(t -> new TurnoDisponibilidad(t.getId(), t.getHoraInicio(), t.getHoraFin(), t.getPrecio(), t.getFranja(),
-                            estadoPublico(t, limite)))
+                            estadoPublico(t, limite), t.isFeriado(), t.getRecargo()))
                     .toList();
             resultado.add(new CanchaDisponibilidad(c.id(), c.nombre(), c.deporte(), ts));
         }
@@ -77,7 +84,7 @@ public class DisponibilidadServicioImpl implements DisponibilidadServicio {
         Set<Long> ids = canchasVisibles(idCancha).stream().map(CanchaCatalogo::id).collect(Collectors.toSet());
         LocalDateTime limite = Tiempo.ahora().plusMinutes(ReglasReserva.MINUTOS_ANTICIPACION);
         Map<LocalDate, List<Turno>> porFecha = turnos.findByFechaBetweenOrderByFechaAscIdCanchaAscHoraInicioAsc(inicio, fin)
-                .stream().filter(t -> ids.contains(t.getIdCancha()))
+                .stream().filter(t -> ids.contains(t.getIdCancha())).filter(Turno::visible)
                 .collect(Collectors.groupingBy(Turno::getFecha));
         List<DiaCalendario> calendario = new ArrayList<>();
         for (LocalDate f = inicio; !f.isAfter(fin); f = f.plusDays(1)) {

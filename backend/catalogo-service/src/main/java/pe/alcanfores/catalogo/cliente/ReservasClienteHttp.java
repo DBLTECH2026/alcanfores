@@ -10,8 +10,12 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 import pe.alcanfores.comun.error.NegocioExcepcion;
 
+import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 /**
  * Cliente HTTP de reservas-service con circuit breaker. Un 4xx de reservas (reserva inexistente, DNI que no calza…)
@@ -62,6 +66,29 @@ public class ReservasClienteHttp implements ReservasCliente {
                     }
                     return r;
                 }));
+    }
+
+    @Override
+    public List<String> reservasVigentes(LocalDate fecha, List<Long> idsCancha) {
+        String ids = idsCancha == null ? "" : idsCancha.stream().map(String::valueOf).collect(Collectors.joining(","));
+        return ejecutar(() -> {
+            JsonNode cuerpo = rest.get()
+                    .uri(u -> {
+                        u.path("/interno/reservas/vigentes").queryParam("fecha", fecha);
+                        if (!ids.isEmpty()) {
+                            u.queryParam("idsCancha", ids);
+                        }
+                        return u.build();
+                    })
+                    .retrieve()
+                    .body(JsonNode.class);
+            if (cuerpo == null || !cuerpo.path("codigos").isArray()) {
+                throw new IllegalStateException("reservas-service respondió sin la lista de códigos");
+            }
+            List<String> codigos = new ArrayList<>();
+            cuerpo.get("codigos").forEach(c -> codigos.add(c.asText()));
+            return codigos;
+        });
     }
 
     /** Corre la llamada dentro del circuito conservando el X-Request-Id (MDC) del hilo original. */

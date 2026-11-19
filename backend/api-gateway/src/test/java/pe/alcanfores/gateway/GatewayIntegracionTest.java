@@ -251,6 +251,99 @@ class GatewayIntegracionTest {
                 .expectBody().jsonPath("$.ruta").isEqualTo("/api/admin/usuarios");
     }
 
+    // ---------------------------------------------------------------- v2: cuentas de clientes
+
+    private final UsuarioToken lucia = new UsuarioToken(9L, "lucia@correo.pe", "Lucía Mendoza", UsuarioToken.CLIENTE, "70123456");
+
+    @Test
+    void misReservasSinTokenResponde401() {
+        web.get().uri("/api/cliente/reservas")
+                .exchange()
+                .expectStatus().isUnauthorized()
+                .expectBody()
+                .jsonPath("$.codigo").isEqualTo("NO_AUTENTICADO")
+                .jsonPath("$.ruta").isEqualTo("/api/cliente/reservas");
+        web.get().uri("/api/cliente/reservas").header(HttpHeaders.AUTHORIZATION, "Bearer abc.def.ghi")
+                .exchange()
+                .expectStatus().isUnauthorized()
+                .expectBody().jsonPath("$.mensaje").isEqualTo("El token de sesión no es válido.");
+    }
+
+    @Test
+    void misReservasConTokenDeClienteVanAReservas() {
+        web.get().uri("/api/cliente/reservas?page=0").header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt.generar(lucia))
+                .exchange()
+                .expectStatus().isEqualTo(503)
+                .expectBody().jsonPath("$.mensaje").value(containsString("servicio de reservas "));
+    }
+
+    @Test
+    void unTokenDeClienteEnElPanelResponde403() {
+        web.get().uri("/api/admin/usuarios").header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt.generar(lucia))
+                .exchange()
+                .expectStatus().isForbidden()
+                .expectBody()
+                .jsonPath("$.codigo").isEqualTo("SIN_PERMISO")
+                .jsonPath("$.ruta").isEqualTo("/api/admin/usuarios");
+    }
+
+    @Test
+    void elCalendarioDelPanelVaACatalogo() {
+        web.get().uri("/api/admin/calendario?anio=2026").header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt.generar(rosa))
+                .exchange()
+                .expectStatus().isEqualTo(503)
+                .expectBody().jsonPath("$.mensaje").value(containsString("servicio de catálogo "));
+    }
+
+    @Test
+    void laCuentaDelClienteLlegaAAuthConSuToken() {
+        String token = "Bearer " + jwt.generar(lucia);
+        web.get().uri("/api/auth/clientes/yo").header(HttpHeaders.AUTHORIZATION, token)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.ruta").isEqualTo("/api/auth/clientes/yo")
+                .jsonPath("$.autorizacion").isEqualTo(token);
+    }
+
+    @Test
+    void elSextoRegistroDeClienteEnUnMinutoResponde429() {
+        for (int i = 0; i < 5; i++) {
+            web.post().uri("/api/auth/clientes/registro").header("X-Forwarded-For", "203.0.113.21")
+                    .contentType(MediaType.APPLICATION_JSON).bodyValue("{}")
+                    .exchange().expectStatus().isOk()
+                    .expectHeader().valueEquals("X-RateLimit-Limit", "5");
+        }
+        web.post().uri("/api/auth/clientes/registro").header("X-Forwarded-For", "203.0.113.21")
+                .contentType(MediaType.APPLICATION_JSON).bodyValue("{}")
+                .exchange()
+                .expectStatus().isEqualTo(429)
+                .expectBody().jsonPath("$.codigo").isEqualTo("DEMASIADAS_SOLICITUDES");
+        // El login de clientes de esa IP tiene su propio cupo.
+        web.post().uri("/api/auth/clientes/login").header("X-Forwarded-For", "203.0.113.21")
+                .contentType(MediaType.APPLICATION_JSON).bodyValue("{}")
+                .exchange().expectStatus().isOk();
+    }
+
+    @Test
+    void elUndecimoLoginDeClienteEnUnMinutoResponde429() {
+        for (int i = 0; i < 10; i++) {
+            web.post().uri("/api/auth/clientes/login").header("X-Forwarded-For", "203.0.113.22")
+                    .contentType(MediaType.APPLICATION_JSON).bodyValue("{}")
+                    .exchange().expectStatus().isOk()
+                    .expectHeader().valueEquals("X-RateLimit-Limit", "10");
+        }
+        web.post().uri("/api/auth/clientes/login").header("X-Forwarded-For", "203.0.113.22")
+                .contentType(MediaType.APPLICATION_JSON).bodyValue("{}")
+                .exchange()
+                .expectStatus().isEqualTo(429)
+                .expectHeader().exists(HttpHeaders.RETRY_AFTER);
+        // El login del panel de esa IP no se ve afectado.
+        web.post().uri("/api/auth/login").header("X-Forwarded-For", "203.0.113.22")
+                .contentType(MediaType.APPLICATION_JSON).bodyValue("{}")
+                .exchange().expectStatus().isOk();
+    }
+
     // ---------------------------------------------------------------- límite de solicitudes
 
     @Test

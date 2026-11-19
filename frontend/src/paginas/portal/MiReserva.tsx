@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -48,12 +48,12 @@ import { Ilustracion, IconoDeporte } from '@/componentes/ui/Marca';
 import { Modal } from '@/componentes/ui/Modal';
 import { CodigoReserva, LineaTiempo } from '@/componentes/ui/Reserva';
 import { SubidaImagen } from '@/componentes/ui/SubidaImagen';
-import { HeroEstado, estadoCliente, hitosDeReserva } from '@/componentes/portal/EstadoReserva';
+import { HeroEstado, estadoCliente, hitosDeReserva, horarioDeReserva } from '@/componentes/portal/EstadoReserva';
 import { esquemaCancelacion, esquemaConsulta, type ConsultaEntrada, type DatosCancelacion } from '@/esquemas/otros';
 import { esquemaReenvio, type DatosReenvio, type ReenvioEntrada } from '@/esquemas/reserva';
 import { rucValido } from '@/utilidades/documentos';
 import { aplicarErroresServidor } from '@/hooks/useErroresServidor';
-import { ahoraLima, deLima, fmtDuracion, fmtFecha, fmtFechaHora, fmtRango12 } from '@/utilidades/fecha';
+import { ahoraLima, deLima, fmtDuracion, fmtFecha, fmtFechaHora } from '@/utilidades/fecha';
 import { enmascararCelular, fmtSoles, nombreConDeporte, normalizarCodigo } from '@/utilidades/formato';
 
 const CLAVE = 'alc-mi-reserva';
@@ -216,7 +216,7 @@ function ModalCancelar({ abierto, alCerrar, reserva, dni, devolucionHoras, alCan
       abierto={abierto}
       alCerrar={alCerrar}
       titulo="¿Cancelar tu reserva?"
-      subtitulo={`${reserva.cancha.nombre} · ${fmtFecha(reserva.fecha)} · ${fmtRango12(reserva.horaInicio, reserva.horaFin)}`}
+      subtitulo={`${reserva.cancha.nombre} · ${fmtFecha(reserva.fecha)} · ${horarioDeReserva(reserva)}`}
       icono={CalendarX}
       tono="peligro"
       variante="hoja"
@@ -588,7 +588,7 @@ function Detalle({ consulta, inicial, alSalir }: { consulta: Consulta; inicial: 
               <span className="resumen-ico">
                 <CalendarDays className="ico" aria-hidden />
               </span>
-              <b className="tnum">{`${fmtFecha(reserva.fecha)} · ${fmtRango12(reserva.horaInicio, reserva.horaFin)}`}</b>
+              <b className="tnum">{`${fmtFecha(reserva.fecha)} · ${horarioDeReserva(reserva)}`}</b>
             </div>
           </div>
           <div className="resumen-montos">
@@ -694,7 +694,9 @@ export default function MiReserva() {
   useTituloPagina('Mi reserva');
   const [params, setParams] = useSearchParams();
   const delParam = params.get('codigo') ? normalizarCodigo(params.get('codigo') ?? '') : '';
-  const guardada = leerConsulta();
+  // v2: desde «Mi cuenta» llega el DNI en el estado de la navegación (no en la URL).
+  const dniCuenta = (useLocation().state as { dni?: string } | null)?.dni;
+  const guardada = delParam && dniCuenta ? { codigo: delParam, dni: dniCuenta } : leerConsulta();
   const [consulta, setConsulta] = useState<Consulta | null>(guardada && (!delParam || guardada.codigo === delParam) ? guardada : null);
   const [inicial, setInicial] = useState<ReservaDetalle | null>(null);
   const carga = useCarga(() => reservasApi.detalle(consulta?.codigo ?? '', consulta?.dni ?? ''), consulta && !inicial ? consulta.codigo : null);

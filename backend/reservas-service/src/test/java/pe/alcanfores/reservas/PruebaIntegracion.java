@@ -82,6 +82,7 @@ public abstract class PruebaIntegracion {
     @BeforeEach
     void prepararBase() {
         jdbc.update("DELETE FROM reserva_historial");
+        jdbc.update("DELETE FROM reserva_turno");
         jdbc.update("DELETE FROM cancelacion");
         jdbc.update("DELETE FROM reserva");
         jdbc.update("DELETE FROM turno");
@@ -92,6 +93,7 @@ public abstract class PruebaIntegracion {
         when(catalogo.configuracion()).thenReturn(Map.of());
         when(catalogo.canchas()).thenReturn(CanchaCatalogo.semilla());
         complejo.refrescar();
+        complejo.refrescarCalendario();
     }
 
     @AfterEach
@@ -133,6 +135,30 @@ public abstract class PruebaIntegracion {
             throw new IllegalStateException("No se pudo reservar: " + r.getResponse().getContentAsString());
         }
         return json.readTree(r.getResponse().getContentAsByteArray());
+    }
+
+    protected static String cuerpoReservaVarios(List<Long> ids, String dni) {
+        String lista = ids.stream().map(String::valueOf).reduce((a, b) -> a + ", " + b).orElse("");
+        return """
+                {"idsTurno": [%s], "cliente": {"dni": "%s", "nombres": "diego  armando", "apellidos": "ramos quispe",
+                 "telefono": "+51 987 654 321", "correo": "Diego.Ramos@Example.com"},
+                 "metodoPago": "YAPE", "aceptaTerminos": true, "aceptaPrivacidad": true}
+                """.formatted(lista, dni);
+    }
+
+    /** Registra una reserva web de varios turnos por la API y devuelve el JSON de respuesta. */
+    protected JsonNode reservarWebVarios(List<Long> ids, String dni) throws Exception {
+        MvcResult r = mvc.perform(post("/api/reservas").contentType(MediaType.APPLICATION_JSON)
+                .content(cuerpoReservaVarios(ids, dni))).andReturn();
+        if (r.getResponse().getStatus() != 201) {
+            throw new IllegalStateException("No se pudo reservar: " + r.getResponse().getContentAsString());
+        }
+        return json.readTree(r.getResponse().getContentAsByteArray());
+    }
+
+    /** Token de un cliente con cuenta (rol CLIENTE y su DNI). */
+    protected String tokenCliente(String dni) {
+        return "Bearer " + jwt.generar(new UsuarioToken(30L, "cliente@example.com", "Cliente Prueba", UsuarioToken.CLIENTE, dni));
     }
 
     /** Flyway limpia y migra la BD de pruebas una vez por contexto. */

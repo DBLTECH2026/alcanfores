@@ -37,6 +37,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 /** Comprobante Yape/Plin → validar → boleta/factura → eventos; rechazo, caja, anulación, descargas y permisos. */
 class FlujoComprobanteYapeTest extends IntegracionBase {
 
+    static final String DOS_TURNOS = "ALC-DSTRNS";
+
     @Autowired
     ObjectMapper json;
 
@@ -164,6 +166,24 @@ class FlujoComprobanteYapeTest extends IntegracionBase {
                 .andExpect(status().isNotFound());
         mvc.perform(get("/api/comprobantes/B001-00000001.pdf").param("codigo", CODIGO))
                 .andExpect(status().isBadRequest()).andExpect(jsonPath("$.errores[0].campo").value("dni"));
+    }
+
+    @Test
+    void reservaDeDosTurnosNoSeguidosDescribeAmbosEnElComprobante() throws Exception {
+        reservaDisponible(reservaDosTurnos(DOS_TURNOS));
+        mvc.perform(post("/api/admin/pagos/caja").header("Authorization", tokenAdmin()).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"codigoReserva\":\"" + DOS_TURNOS + "\",\"tipoPago\":\"TOTAL\",\"metodo\":\"EFECTIVO\",\"monto\":160.00}"))
+                .andExpect(status().isCreated());
+        String descripcion = jdbc.queryForObject("SELECT descripcion FROM comprobante", String.class);
+        assertThat(descripcion).startsWith("Alquiler de Cancha 2 · Fútbol 6 · ")
+                .endsWith(" 9:00–10:00 a. m. y 7:00–8:00 p. m. (2 turnos) · Pago total");
+        assertThat(jdbc.queryForObject("SELECT CAST(total * 100 AS SIGNED) FROM comprobante", Integer.class)).isEqualTo(16000);
+        String serie = jdbc.queryForObject("SELECT CONCAT(serie, '-', LPAD(correlativo, 8, '0')) FROM comprobante", String.class);
+        byte[] xml = mvc.perform(get("/api/comprobantes/" + serie + ".xml").param("codigo", DOS_TURNOS).param("dni", DNI))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsByteArray();
+        assertThat(new String(xml, StandardCharsets.UTF_8)).contains("9:00–10:00 a. m. y 7:00–8:00 p. m. (2 turnos)");
+        mvc.perform(get("/api/comprobantes/" + serie + ".pdf").param("codigo", DOS_TURNOS).param("dni", DNI))
+                .andExpect(status().isOk()).andExpect(content().contentType(MediaType.APPLICATION_PDF));
     }
 
     @Test

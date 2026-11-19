@@ -82,6 +82,8 @@ export function numeroDia(fecha: string): number {
 /** '20:00' → «8:00 p. m.» (el portal usa 12 h). */
 export function fmtHora12(h: string | null | undefined): string {
   if (!h) return '';
+  // v2: un cierre a medianoche llega como 23:59(:59) o 24:00.
+  if (h.startsWith('23:59') || h.startsWith('24:00')) return '12:00 a. m.';
   const [H = 0, M = 0] = h.split(':').map(Number);
   const s = H >= 12 ? 'p. m.' : 'a. m.';
   const h12 = H % 12 === 0 ? 12 : H % 12;
@@ -90,6 +92,7 @@ export function fmtHora12(h: string | null | undefined): string {
 /** '8:00' → '08:00' (el panel usa 24 h). */
 export function fmtHora24(h: string | null | undefined): string {
   if (!h) return '';
+  if (h.startsWith('23:59') || h.startsWith('24:00')) return '24:00';
   const [H = 0, M = 0] = h.split(':').map(Number);
   return `${String(H).padStart(2, '0')}:${String(M).padStart(2, '0')}`;
 }
@@ -127,4 +130,20 @@ export function fmtHace(iso: string): string {
   const min = ahoraLima().diff(deLima(iso), 'minute');
   if (min < 1) return 'hace un momento';
   return `hace ${fmtDuracion(min)}`;
+}
+
+/**
+ * v2: texto del horario de varios turnos, uniendo los seguidos (igual que `horarioTexto` del back):
+ * [19–20, 20–21] → «7:00–9:00 p. m.» · [9–10, 19–20] → «9:00–10:00 a. m. y 7:00–8:00 p. m.» (h24 → «19:00–21:00»).
+ */
+export function textoHorario(turnos: Array<{ horaInicio: string; horaFin: string }>, h24 = false): string {
+  const orden = [...turnos].sort((a, b) => a.horaInicio.localeCompare(b.horaInicio));
+  const tramos: Array<[string, string]> = [];
+  for (const t of orden) {
+    const ultimo = tramos[tramos.length - 1];
+    if (ultimo && ultimo[1] === t.horaInicio) ultimo[1] = t.horaFin;
+    else tramos.push([t.horaInicio, t.horaFin]);
+  }
+  const txt = tramos.map(([a, b]) => (h24 ? fmtRango24(a, b) : fmtRango12(a, b)));
+  return txt.length <= 1 ? (txt[0] ?? '') : `${txt.slice(0, -1).join(', ')} y ${txt[txt.length - 1]}`;
 }

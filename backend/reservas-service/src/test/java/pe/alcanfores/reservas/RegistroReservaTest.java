@@ -81,7 +81,7 @@ class RegistroReservaTest extends PruebaIntegracion {
         mvc.perform(post("/api/reservas").contentType(MediaType.APPLICATION_JSON).content(malo))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.codigo").value("VALIDACION"))
-                .andExpect(jsonPath("$.errores[*].campo", hasItems("idTurno", "cliente.dni", "cliente.nombres",
+                .andExpect(jsonPath("$.errores[*].campo", hasItems("cliente.dni", "cliente.nombres",
                         "cliente.apellidos", "cliente.telefono", "cliente.correo", "metodoPago", "aceptaTerminos",
                         "aceptaPrivacidad")))
                 .andExpect(jsonPath("$.errores[?(@.campo=='cliente.dni')].mensaje").value("El DNI debe tener 8 dígitos."))

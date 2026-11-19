@@ -9,6 +9,13 @@ import type {
   ConexionWhatsapp,
   Dashboard,
   DetalleNotificacion,
+  DiaEspecialAdmin,
+  HorarioAdmin,
+  ResultadoRango,
+  SolicitudDiaEspecial,
+  SolicitudRango,
+  SolicitudResenaComplejo,
+  TurnoVistaPrevia,
   DetallePago,
   EntradaBitacora,
   EstadoSistema,
@@ -72,8 +79,10 @@ export const turnosApi = {
   agenda: (fecha: string, idCancha?: number) => d(http.get<AgendaDia>('/admin/turnos', { params: limpiar({ fecha, idCancha }), ...S })),
   bloquear: (idTurno: number, motivo: string) => d(http.post<TurnoAgenda>(`/admin/turnos/${idTurno}/bloquear`, { motivo }, S)),
   desbloquear: (idTurno: number, motivo?: string) => d(http.post<TurnoAgenda>(`/admin/turnos/${idTurno}/desbloquear`, limpiar({ motivo }))),
-  bloquearRango: (datos: { idCancha: number; fecha: string; horaDesde: string; horaHasta: string; motivo: string }) =>
-    d(http.post<{ bloqueados: number; omitidos: number; horasOmitidas: string[] }>('/admin/turnos/bloquear-rango', datos, S)),
+  /** v2: varias canchas, desde–hasta (hora) y opcionalmente varios días. */
+  bloquearRango: (datos: SolicitudRango) => d(http.post<ResultadoRango>('/admin/turnos/bloquear-rango', datos, S)),
+  desbloquearRango: (datos: SolicitudRango) => d(http.post<ResultadoRango>('/admin/turnos/desbloquear-rango', datos, S)),
+  /** Solo soporte: el panel v2 ya no muestra «Generar turnos». */
   generar: (datos: { desde: string; hasta: string; idsCancha?: number[] }) => d(http.post<{ creados: number; existentes: number }>('/admin/turnos/generar', datos, S)),
 };
 
@@ -123,12 +132,34 @@ export const canchasAdminApi = {
   editarFoto: (id: number, idFoto: number, datos: { leyenda?: string; orden?: number; principal?: boolean }) =>
     d(http.patch<FotoAdmin>(`/admin/canchas/${id}/fotos/${idFoto}`, datos, S)),
   borrarFoto: (id: number, idFoto: number) => d(http.delete<void>(`/admin/canchas/${id}/fotos/${idFoto}`)),
+  // v2 (SPEC_V2 §A)
+  horario: (id: number) => d(http.get<HorarioAdmin>(`/admin/canchas/${id}/horario`, S)),
+  guardarHorario: (id: number, datos: HorarioAdmin) => d(http.put<HorarioAdmin>(`/admin/canchas/${id}/horario`, datos, S)),
+  /** Turnos que saldrían con el horario escrito (sin guardar). */
+  vistaPrevia: (id: number, dia: number, datos: HorarioAdmin) =>
+    d(http.post<TurnoVistaPrevia[]>(`/admin/canchas/${id}/horario/vista-previa`, datos, { params: { dia }, ...S })),
+  // v2 (SPEC_V2 §E): reseñas de la cancha
+  resenas: (id: number) =>
+    d(http.get<ResenaAdmin[] | Pagina<ResenaAdmin>>(`/admin/canchas/${id}/resenas`, { params: { size: 100 }, ...S })).then((r) => (Array.isArray(r) ? r : r.contenido)),
+  crearResena: (id: number, datos: SolicitudResenaComplejo) => d(http.post<ResenaAdmin>(`/admin/canchas/${id}/resenas`, datos, S)),
 };
 
 export const resenasAdminApi = {
   listar: (f: Parametros) => d(http.get<Pagina<ResenaAdmin>>('/admin/resenas', { params: limpiar(f), ...S })),
   estado: (id: number, estado: 'PUBLICADA' | 'OCULTA') => d(http.patch<ResenaAdmin>(`/admin/resenas/${id}`, { estado })),
   responder: (id: number, respuesta: string) => d(http.post<ResenaAdmin>(`/admin/resenas/${id}/respuesta`, { respuesta }, S)),
+  // v2
+  editar: (id: number, datos: Partial<SolicitudResenaComplejo>) => d(http.put<ResenaAdmin>(`/admin/resenas/${id}`, datos, S)),
+  borrar: (id: number) => d(http.delete<void>(`/admin/resenas/${id}`)),
+};
+
+/** v2 (SPEC_V2 §B): feriados y días no laborables. */
+export const calendarioApi = {
+  listar: (anio: number) => d(http.get<DiaEspecialAdmin[]>('/admin/calendario', { params: { anio }, ...S })),
+  crear: (datos: SolicitudDiaEspecial) => d(http.post<DiaEspecialAdmin>('/admin/calendario', datos, S)),
+  editar: (id: number, datos: SolicitudDiaEspecial) => d(http.put<DiaEspecialAdmin>(`/admin/calendario/${id}`, datos, S)),
+  borrar: (id: number) => d(http.delete<void>(`/admin/calendario/${id}`, S)),
+  cargarFeriadosPeru: (anio: number) => d(http.post<DiaEspecialAdmin[] | { creados: number }>('/admin/calendario/feriados-peru', {}, { params: { anio }, ...S })),
 };
 
 export const configuracionApi = {

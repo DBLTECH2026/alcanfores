@@ -19,9 +19,12 @@ public final class DisponibilidadDtos {
     public record CanchaDisponibilidad(Long idCancha, String nombre, String deporte, List<TurnoDisponibilidad> turnos) {
     }
 
-    /** estado: DISPONIBLE | OCUPADO | BLOQUEADO | PASADO (empieza en menos de 30 minutos). */
+    /**
+     * estado: DISPONIBLE | OCUPADO | BLOQUEADO | PASADO (empieza en menos de 30 minutos). {@code precio} ya incluye el
+     * {@code recargo} de feriado.
+     */
     public record TurnoDisponibilidad(Long idTurno, LocalTime horaInicio, LocalTime horaFin, BigDecimal precio, Franja franja,
-                                      String estado) {
+                                      String estado, boolean feriado, BigDecimal recargo) {
     }
 
     public record DiaCalendario(LocalDate fecha, long libres, long total) {

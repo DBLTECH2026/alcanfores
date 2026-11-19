@@ -27,8 +27,9 @@ import static pe.alcanfores.catalogo.modelo.ClaveConfiguracion.*;
 @RequiredArgsConstructor
 public class ConfiguracionServicioImpl implements ConfiguracionServicio {
 
-    /** Claves que intervienen en las reglas entre valores (horario). */
-    private static final Set<ClaveConfiguracion> DEL_HORARIO = Set.of(PRIMER_TURNO, ULTIMO_TURNO, INICIO_NOCHE, DURACION_MIN);
+    /** Claves que intervienen en las reglas entre valores (horario y días hacia adelante). */
+    private static final Set<ClaveConfiguracion> DEL_HORARIO = Set.of(PRIMER_TURNO, ULTIMO_TURNO, INICIO_NOCHE, DURACION_MIN,
+            DIAS_VISIBLES, DIAS_GENERADOS);
 
     private final ConfiguracionRepositorio repositorio;
     private final ValidadorConfiguracion validador;

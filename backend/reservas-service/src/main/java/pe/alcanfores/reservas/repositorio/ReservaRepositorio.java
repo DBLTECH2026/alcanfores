@@ -30,13 +30,6 @@ public interface ReservaRepositorio extends JpaRepository<Reserva, Long>, JpaSpe
 
     boolean existsByCodigoReserva(String codigoReserva);
 
-    @Query("select r from Reserva r where r.turno.id = :idTurno and r.estado in :estados")
-    List<Reserva> deTurnoEnEstados(@Param("idTurno") Long idTurno, @Param("estados") Collection<EstadoReserva> estados);
-
-    @EntityGraph(attributePaths = {"turno", "cliente"})
-    @Query("select r from Reserva r where r.turno.id in :ids and r.estado in :estados")
-    List<Reserva> deTurnosEnEstados(@Param("ids") Collection<Long> ids, @Param("estados") Collection<EstadoReserva> estados);
-
     /** Reservas cuyo plazo para pagar ya venció (las expira la tarea programada). */
     @Query("select r.id from Reserva r where r.estado = :estado and r.estadoPago in :estadosPago and r.venceEn < :ahora")
     List<Long> idsVencidas(@Param("estado") EstadoReserva estado, @Param("estadosPago") Collection<EstadoPago> estadosPago,
@@ -61,6 +54,12 @@ public interface ReservaRepositorio extends JpaRepository<Reserva, Long>, JpaSpe
     @EntityGraph(attributePaths = {"turno", "cliente"})
     @Query("select r from Reserva r where r.cliente.id in :ids order by r.turno.fecha desc, r.turno.horaInicio desc")
     List<Reserva> deClientes(@Param("ids") Collection<Long> idsClientes);
+
+    /** «Mis reservas»: todas las del DNI (estado opcional). */
+    @EntityGraph(attributePaths = {"turno", "cliente"})
+    @Query(value = "select r from Reserva r where r.cliente.dni = :dni and (:estado is null or r.estado = :estado)",
+            countQuery = "select count(r) from Reserva r where r.cliente.dni = :dni and (:estado is null or r.estado = :estado)")
+    Page<Reserva> deDni(@Param("dni") String dni, @Param("estado") EstadoReserva estado, Pageable pagina);
 
     @EntityGraph(attributePaths = {"turno", "cliente"})
     @Query("select r from Reserva r where r.esSemilla = true order by r.fechaRegistro")

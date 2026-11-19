@@ -97,11 +97,11 @@ export function crearEsquemaCaja(saldo: number) {
     });
 }
 
-/** Reserva manual (POST /api/admin/reservas): cliente + turno + origen + nota + pago inicial opcional. */
+/** Reserva manual (POST /api/admin/reservas): cliente + turnos (v2: 1 a 8 de la misma cancha y fecha) + origen + nota + pago inicial opcional. */
 export function crearEsquemaManual(total: number) {
   return z
     .object({
-      idTurno: z.number({ invalid_type_error: MSJ_PANEL.turno, required_error: MSJ_PANEL.turno }).int().positive(MSJ_PANEL.turno),
+      idsTurno: z.array(z.number().int().positive()).min(1, MSJ_PANEL.turno).max(8, 'Elige como máximo 8 turnos.'),
       dni: esquemaDni,
       nombres: esquemaNombre,
       apellidos: esquemaNombre,
@@ -133,22 +133,26 @@ export function crearEsquemaManual(total: number) {
 // ------------------------------ agenda ------------------------------
 export const esquemaMotivoBloqueo = z.string().trim().min(3, MSJ_PANEL.bloqueo).max(120, MSJ_PANEL.bloqueo);
 export const esquemaBloqueo = z.object({ motivo: esquemaMotivoBloqueo });
+/** v2: bloqueo / desbloqueo por rango (varias canchas, desde–hasta y opcionalmente varios días). */
 export const esquemaRango = z
   .object({
-    idCancha: z.string().min(1, 'Elige la cancha.'),
-    fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Elige la fecha.'),
+    modo: z.enum(['bloquear', 'desbloquear']),
+    idsCancha: z.array(z.number()).min(1, 'Elige al menos una cancha.'),
+    fecha: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Elige el día.'),
+    variosDias: z.boolean(),
+    fechaHasta: z.string().optional().default(''),
     horaDesde: z.string().regex(/^\d{2}:\d{2}$/, 'Elige la hora inicial.'),
     horaHasta: z.string().regex(/^\d{2}:\d{2}$/, 'Elige la hora final.'),
-    motivo: esquemaMotivoBloqueo,
+    motivo: z.string().trim().optional().default(''),
   })
-  .refine((d) => d.horaHasta > d.horaDesde, { path: ['horaHasta'], message: MSJ_PANEL.rangoHoras });
-export const esquemaGenerar = z
-  .object({
-    desde: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Elige la fecha inicial.'),
-    hasta: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Elige la fecha final.'),
-    idsCancha: z.array(z.number()),
-  })
-  .refine((d) => d.hasta >= d.desde, { path: ['hasta'], message: MSJ_PANEL.rangoFechas });
+  .superRefine((d, ctx) => {
+    if (d.horaHasta <= d.horaDesde) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['horaHasta'], message: MSJ_PANEL.rangoHoras });
+    if (d.variosDias) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(d.fechaHasta)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['fechaHasta'], message: 'Elige el último día.' });
+      else if (d.fechaHasta < d.fecha) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['fechaHasta'], message: MSJ_PANEL.rangoFechas });
+    }
+    if (d.modo === 'bloquear' && !esquemaMotivoBloqueo.safeParse(d.motivo).success) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['motivo'], message: MSJ_PANEL.bloqueo });
+  });
 
 // ------------------------------ catálogo ------------------------------
 const RE_MEDIDAS = /^$|^\d{1,3}([.,]\d{1,2})? ?x ?\d{1,3}([.,]\d{1,2})? ?m$/;
@@ -231,16 +235,20 @@ export interface DefClave {
   sufijo?: string;
   ayuda?: string;
 }
+/**
+ * v2: cada grupo es una tarjeta de Configuración con su propia pantalla. El horario ya no es global (vive en cada
+ * cancha, SPEC_V2 §A), así que primer_turno, ultimo_turno, duracion_min e inicio_noche no se muestran aquí.
+ */
 export const GRUPOS_CONFIG: Array<{ id: string; titulo: string; claves: DefClave[] }> = [
   {
     id: 'complejo',
-    titulo: 'Complejo',
+    titulo: 'Datos del complejo',
     claves: [
       { clave: 'nombre_complejo', etiqueta: 'Nombre comercial', tipo: 'TEXTO', min: 3, max: 80 },
-      { clave: 'lema', etiqueta: 'Lema del portal', tipo: 'TEXTO', min: 3, max: 120 },
+      { clave: 'lema', etiqueta: 'Frase del portal', tipo: 'TEXTO', min: 3, max: 120, ayuda: 'Se ve debajo del logo en el inicio' },
       { clave: 'direccion', etiqueta: 'Dirección', tipo: 'TEXTO', min: 5, max: 200 },
-      { clave: 'referencia', etiqueta: 'Referencia', tipo: 'TEXTO', min: 5, max: 200 },
-      { clave: 'mapa_url', etiqueta: 'Enlace del mapa', tipo: 'URL', max: 500 },
+      { clave: 'referencia', etiqueta: 'Referencia', tipo: 'TEXTO', min: 5, max: 200, ayuda: 'Cómo llegar en una línea' },
+      { clave: 'mapa_url', etiqueta: 'Enlace de Google Maps', tipo: 'URL', max: 500 },
       { clave: 'latitud', etiqueta: 'Latitud', tipo: 'LATITUD', min: -90, max: 90 },
       { clave: 'longitud', etiqueta: 'Longitud', tipo: 'LONGITUD', min: -180, max: 180 },
     ],
@@ -249,34 +257,30 @@ export const GRUPOS_CONFIG: Array<{ id: string; titulo: string; claves: DefClave
     id: 'contacto',
     titulo: 'Contacto y pagos',
     claves: [
-      { clave: 'whatsapp', etiqueta: 'WhatsApp de atención', tipo: 'CELULAR' },
+      { clave: 'whatsapp', etiqueta: 'WhatsApp de atención', tipo: 'CELULAR', ayuda: 'Botón «Ayuda» del portal' },
       { clave: 'correo', etiqueta: 'Correo de informes', tipo: 'CORREO', max: 100 },
-      { clave: 'yape_numero', etiqueta: 'Yape (número)', tipo: 'CELULAR' },
-      { clave: 'yape_titular', etiqueta: 'Yape (titular)', tipo: 'TEXTO', min: 3, max: 60 },
-      { clave: 'plin_numero', etiqueta: 'Plin (número)', tipo: 'CELULAR' },
-      { clave: 'ruc_emisor', etiqueta: 'RUC emisor (ficticio)', tipo: 'RUC' },
-      { clave: 'razon_social_emisor', etiqueta: 'Razón social (ficticia)', tipo: 'TEXTO', min: 3, max: 150 },
-    ],
-  },
-  {
-    id: 'horario',
-    titulo: 'Horario',
-    claves: [
-      { clave: 'primer_turno', etiqueta: 'Primer turno', tipo: 'HORA' },
-      { clave: 'ultimo_turno', etiqueta: 'Cierre', tipo: 'HORA', ayuda: 'El último turno empieza una duración antes' },
-      { clave: 'duracion_min', etiqueta: 'Duración del turno', tipo: 'ENTERO', min: 30, max: 180, sufijo: 'min' },
-      { clave: 'inicio_noche', etiqueta: 'Tarifa de noche desde', tipo: 'HORA' },
-      { clave: 'dias_visibles', etiqueta: 'Días para reservar', tipo: 'ENTERO', min: 1, max: 60, sufijo: 'días' },
+      { clave: 'yape_numero', etiqueta: 'Número de Yape', tipo: 'CELULAR', ayuda: 'Al que el cliente envía el adelanto' },
+      { clave: 'yape_titular', etiqueta: 'Titular de Yape', tipo: 'TEXTO', min: 3, max: 60, ayuda: 'El nombre que ve el cliente al yapear' },
+      { clave: 'plin_numero', etiqueta: 'Número de Plin', tipo: 'CELULAR' },
     ],
   },
   {
     id: 'reglas',
-    titulo: 'Reglas',
+    titulo: 'Reglas de reserva',
     claves: [
-      { clave: 'adelanto_pct', etiqueta: 'Adelanto', tipo: 'PORCENTAJE', min: 0, max: 100, sufijo: '%' },
-      { clave: 'minutos_para_pagar', etiqueta: 'Plazo para pagar', tipo: 'ENTERO', min: 5, max: 1440, sufijo: 'min' },
-      { clave: 'devolucion_horas', etiqueta: 'Devolución si cancela antes de', tipo: 'ENTERO', min: 1, max: 168, sufijo: 'h' },
-      { clave: 'recordatorio_horas', etiqueta: 'Recordatorio antes del partido', tipo: 'ENTERO', min: 1, max: 48, sufijo: 'h' },
+      { clave: 'adelanto_pct', etiqueta: 'Adelanto', tipo: 'PORCENTAJE', min: 0, max: 100, sufijo: '%', ayuda: 'Parte del total que se paga al reservar' },
+      { clave: 'minutos_para_pagar', etiqueta: 'Tiempo para pagar', tipo: 'ENTERO', min: 5, max: 1440, sufijo: 'min', ayuda: 'El horario se guarda ese tiempo; luego se libera' },
+      { clave: 'devolucion_horas', etiqueta: 'Devolución si cancela con', tipo: 'ENTERO', min: 1, max: 168, sufijo: 'h', ayuda: 'Horas de anticipación para devolver lo pagado' },
+      { clave: 'recordatorio_horas', etiqueta: 'Recordatorio', tipo: 'ENTERO', min: 1, max: 48, sufijo: 'h', ayuda: 'Horas antes del partido' },
+      { clave: 'dias_visibles', etiqueta: 'Días para reservar', tipo: 'ENTERO', min: 1, max: 60, sufijo: 'días', ayuda: 'Cuántos días adelante ve el portal' },
+    ],
+  },
+  {
+    id: 'comprobantes',
+    titulo: 'Comprobantes',
+    claves: [
+      { clave: 'ruc_emisor', etiqueta: 'RUC del emisor', tipo: 'RUC', ayuda: 'Ficticio: el proyecto no emite ante SUNAT' },
+      { clave: 'razon_social_emisor', etiqueta: 'Razón social', tipo: 'TEXTO', min: 3, max: 150, ayuda: 'Sale en boletas y facturas' },
     ],
   },
 ];
@@ -330,22 +334,13 @@ export function validarClave(def: DefClave, valor: string): string | null {
   }
 }
 
-/** Esquema Zod de la configuración completa (por clave + reglas entre claves del back). */
-export const esquemaConfiguracion = z.record(z.string()).superRefine((c, ctx) => {
-  for (const def of DEFS_CONFIG) {
-    const m = validarClave(def, c[def.clave] ?? '');
-    if (m) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [def.clave], message: m });
-  }
-  const p = c.primer_turno ?? '';
-  const u = c.ultimo_turno ?? '';
-  const n = c.inicio_noche ?? '';
-  const dur = Number(c.duracion_min);
-  if (!RE_HORA.test(p) || !RE_HORA.test(u) || !RE_HORA.test(n) || !Number.isInteger(dur)) return;
-  if (dur % 15 !== 0) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['duracion_min'], message: 'La duración debe ser múltiplo de 15 minutos.' });
-  if (u <= p) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['ultimo_turno'], message: 'La hora de cierre debe ser posterior al primer turno.' });
-  else {
-    const min = (h: string) => Number(h.slice(0, 2)) * 60 + Number(h.slice(3));
-    if (min(u) - min(p) < dur) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['duracion_min'], message: 'Entre el primer turno y el cierre no entra ni un turno de esa duración.' });
-    if (n < p || n > u) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['inicio_noche'], message: 'La tarifa de noche debe empezar entre el primer turno y la hora de cierre.' });
-  }
-});
+/** v2: esquema de UNA tarjeta de Configuración (solo sus claves). */
+export function esquemaGrupoConfig(defs: DefClave[]) {
+  return z.record(z.string()).superRefine((c, ctx) => {
+    for (const def of defs) {
+      const m = validarClave(def, c[def.clave] ?? '');
+      if (m) ctx.addIssue({ code: z.ZodIssueCode.custom, path: [def.clave], message: m });
+    }
+  });
+}
+

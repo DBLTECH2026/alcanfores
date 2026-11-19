@@ -15,11 +15,11 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import type { EventoLinea, ReservaCreada, ReservaDetalle } from '@/api/tipos';
-import type { TurnoElegido } from '@/contexto/ReservaContext';
+import type { SeleccionTurnos } from '@/contexto/ReservaContext';
 import { Ilustracion, PatronCancha } from '@/componentes/ui/Marca';
 import { InsigniaEstado } from '@/componentes/ui/Estados';
 import type { Hito } from '@/componentes/ui/Reserva';
-import { ahoraLima, deLima, fmtFecha, fmtRango12 } from '@/utilidades/fecha';
+import { ahoraLima, deLima, fmtFecha, fmtRango12, fmtRango24, textoHorario } from '@/utilidades/fecha';
 import { cx } from '@/utilidades/cx';
 import type { IdIlustracion } from '@/utilidades/recursos';
 
@@ -83,8 +83,19 @@ export function HeroEstado({ clave, titulo, sub, extra }: { clave: ClaveCliente;
 }
 
 /** Convierte una reserva del back al formato del resumen lateral. */
-export function turnoDeReserva(r: ReservaCreada): TurnoElegido {
+/** v2: texto del horario de una reserva (varios turnos: «7:00–9:00 p. m.»). */
+export function horarioDeReserva(r: { horaInicio: string; horaFin: string; horarioTexto?: string; turnos?: Array<{ horaInicio: string; horaFin: string }> }, h24 = false): string {
+  if (!h24 && r.horarioTexto) return r.horarioTexto;
+  if (r.turnos && r.turnos.length > 1) return textoHorario(r.turnos, h24);
+  return h24 ? fmtRango24(r.horaInicio, r.horaFin) : fmtRango12(r.horaInicio, r.horaFin);
+}
+
+export function turnoDeReserva(r: ReservaCreada): SeleccionTurnos {
+  const partes = (r.turnos ?? []).map((t) => ({ idTurno: t.idTurno, idCancha: r.cancha.id, nombreCancha: r.cancha.nombre, deporte: r.cancha.deporte, fecha: r.fecha, horaInicio: t.horaInicio, horaFin: t.horaFin, precio: t.precio, franja: 'DIA' as const }));
   return {
+    idsTurno: partes.map((t) => t.idTurno),
+    partes,
+    horarioTexto: horarioDeReserva(r),
     idTurno: 0,
     idCancha: r.cancha.id,
     nombreCancha: r.cancha.nombre,

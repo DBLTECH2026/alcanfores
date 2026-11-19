@@ -14,6 +14,8 @@ import pe.alcanfores.reservas.dto.ReservaDtos.CancelacionInfo;
 import pe.alcanfores.reservas.dto.ReservaDtos.ClienteSolicitud;
 import pe.alcanfores.reservas.dto.ReservaDtos.EventoLinea;
 import pe.alcanfores.reservas.dto.ReservaDtos.ReservaCreadaRespuesta;
+import pe.alcanfores.reservas.dto.ReservaDtos.TurnoReserva;
+import pe.alcanfores.reservas.dto.ReservaDtos.TurnosPedidos;
 import pe.alcanfores.reservas.modelo.Asistencia;
 import pe.alcanfores.reservas.modelo.EstadoPago;
 import pe.alcanfores.reservas.modelo.EstadoReserva;
@@ -52,11 +54,17 @@ public final class AdminDtos {
     }
 
     public record ReservaManualSolicitud(
-            @NotNull(message = Mensajes.ELEGIR_TURNO) @Positive(message = Mensajes.ELEGIR_TURNO) Long idTurno,
+            @Positive(message = Mensajes.ELEGIR_TURNO) Long idTurno,
+            @Size(max = Mensajes.MAX_TURNOS, message = Mensajes.TURNOS_CANTIDAD)
+            List<@NotNull(message = Mensajes.ELEGIR_TURNO) @Positive(message = Mensajes.ELEGIR_TURNO) Long> idsTurno,
             @NotNull(message = Mensajes.DATOS_CLIENTE) @Valid ClienteSolicitud cliente,
             @NotNull(message = Mensajes.ORIGEN) @Pattern(regexp = "PRESENCIAL|TELEFONICA", message = Mensajes.ORIGEN) String origen,
             @Size(max = 255, message = Mensajes.NOTA) String nota,
             @Valid PagoInicialSolicitud pagoInicial) {
+
+        public TurnosPedidos turnos() {
+            return TurnosPedidos.de(idTurno, idsTurno);
+        }
     }
 
     /** Respuesta de la reserva manual: la reserva creada + si el cobro inicial quedó registrado en pagos-service. */
@@ -79,7 +87,8 @@ public final class AdminDtos {
 
     public record ReservaFila(String codigoReserva, ClienteFila cliente, String cancha, LocalDate fecha, LocalTime horaInicio,
                               LocalTime horaFin, EstadoReserva estado, EstadoPago estadoPago, Asistencia asistencia,
-                              Origen origen, BigDecimal montoTotal, BigDecimal montoPagado, LocalDateTime fechaRegistro) {
+                              Origen origen, BigDecimal montoTotal, BigDecimal montoPagado, LocalDateTime fechaRegistro,
+                              List<TurnoReserva> turnos, String horarioTexto, int cantidadTurnos) {
     }
 
     /** Página de reservas + conteos por estado (PENDIENTE, CONFIRMADA, CANCELADA y EN_REVISION) para las pestañas. */
@@ -98,7 +107,8 @@ public final class AdminDtos {
                                       BigDecimal saldo, LocalDateTime venceEn, LocalDateTime fechaRegistro,
                                       LocalDateTime confirmadaEn, Long registradoPor, String nota, ClienteCompleto cliente,
                                       CancelacionInfo cancelacion, List<EventoLinea> linea, boolean puedeCancelar,
-                                      boolean puedeMarcarAsistencia, boolean puedeCobrarSaldo) {
+                                      boolean puedeMarcarAsistencia, boolean puedeCobrarSaldo, List<TurnoReserva> turnos,
+                                      String horarioTexto, int cantidadTurnos) {
     }
 
     public record ClienteResumen(Long idCliente, String dni, String nombres, String apellidos, String telefono,

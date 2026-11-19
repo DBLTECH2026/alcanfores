@@ -66,7 +66,8 @@ class CancelacionYSemillaTest extends IntegracionBase {
     private static ReservaCanceladaEvento cancelada(String codigo, boolean devolucion) {
         DatosReserva d = new DatosReserva(10L, codigo, 2L, "Cancha 2", "FUTBOL_6", LocalDate.now().plusDays(3),
                 LocalTime.of(19, 0), LocalTime.of(20, 0), new BigDecimal("90.00"), new BigDecimal("45.00"),
-                new BigDecimal("90.00"), new ClienteContacto(DNI, "Diego", "Ramos", "987654321", "d@correo.pe"));
+                new BigDecimal("90.00"), new ClienteContacto(DNI, "Diego", "Ramos", "987654321", "d@correo.pe"),
+                "7:00–8:00 p. m.", 1);
         return new ReservaCanceladaEvento(UUID.randomUUID(), Tiempo.ahora(), d, "CLIENTE", "Se lesionó un jugador del equipo",
                 devolucion, devolucion ? new BigDecimal("90.00") : BigDecimal.ZERO);
     }

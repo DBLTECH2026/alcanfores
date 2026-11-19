@@ -1,174 +1,169 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link, Navigate, useParams, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
 import {
-  ArrowRight,
-  Building2,
   CalendarClock,
+  ChevronRight,
   CircleCheck,
-  Clock,
   Link2Off,
   MessageCircle,
   QrCode,
   RefreshCw,
   RotateCcw,
   Save,
-  ScrollText,
   Send,
   Server,
-  Settings,
   Smartphone,
   TriangleAlert,
-  Wallet,
-  type LucideIcon,
 } from 'lucide-react';
 import { configuracionApi, whatsappApi } from '@/api/admin';
-import type { Configuracion as Conf, ConexionWhatsapp, DetalleNotificacion } from '@/api/admin/tipos';
+import type { ConexionWhatsapp, DetalleNotificacion } from '@/api/admin/tipos';
 import { esErrorApi } from '@/api/cliente';
 import { useToast } from '@/contexto/ToastContext';
 import { useCarga } from '@/hooks/useCarga';
 import { useTituloPagina } from '@/hooks/useTituloPagina';
 import { aplicarErroresServidor } from '@/hooks/useErroresServidor';
 import { CabeceraPagina } from '@/componentes/panel/PanelLayout';
-import { ErrorCarga, Estado, ModalConfirmar, useFiltrosUrl } from '@/componentes/panel/Herramientas';
+import { ErrorCarga, Estado, ModalConfirmar } from '@/componentes/panel/Herramientas';
 import { Boton } from '@/componentes/ui/Boton';
 import { AreaTexto, CampoTexto } from '@/componentes/ui/Campo';
-import { Cargando, Pestanas, Spinner } from '@/componentes/ui/Datos';
+import { Cargando, Spinner } from '@/componentes/ui/Datos';
 import { Alerta } from '@/componentes/ui/Estados';
+import { Ilustracion } from '@/componentes/ui/Marca';
 import { Modal } from '@/componentes/ui/Modal';
 import { fmtCelular } from '@/utilidades/formato';
 import { normalizarCelular } from '@/utilidades/documentos';
-import { DEFS_CONFIG, GRUPOS_CONFIG, esquemaConectarWa, esquemaConfiguracion, esquemaPruebaWa, type DefClave } from './esquemasPanel';
+import type { IdIlustracion } from '@/utilidades/recursos';
+import { GRUPOS_CONFIG, esquemaConectarWa, esquemaGrupoConfig, esquemaPruebaWa, type DefClave } from './esquemasPanel';
 import { TextoWhatsapp } from './Notificaciones';
+import Feriados from './Feriados';
 
-const ICONO_GRUPO: Record<string, LucideIcon> = { complejo: Building2, contacto: Wallet, horario: Clock, reglas: ScrollText };
+/** Tarjetas de Configuración (SPEC_V2 §F): ilustración + una línea; cada una abre su pantalla. */
+interface Tarjeta {
+  id: string;
+  titulo: string;
+  texto: string;
+  ilustracion: IdIlustracion;
+}
+const TARJETAS: Tarjeta[] = [
+  { id: 'complejo', titulo: 'Datos del complejo', texto: 'Nombre, dirección y mapa del portal', ilustracion: 'ARQ-03-canchas-techadas' },
+  { id: 'contacto', titulo: 'Contacto y pagos', texto: 'WhatsApp, correo, Yape y Plin', ilustracion: 'IL-21-compartir' },
+  { id: 'reglas', titulo: 'Reglas de reserva', texto: 'Adelanto, plazo para pagar y devoluciones', ilustracion: 'ARQ-02-planificando' },
+  { id: 'feriados', titulo: 'Feriados y días no laborables', texto: 'Calendario del año y días cerrados', ilustracion: 'IL-26-sin-turnos' },
+  { id: 'comprobantes', titulo: 'Comprobantes', texto: 'Emisor de boletas y facturas', ilustracion: 'ARQ-06-datos-ordenados' },
+  { id: 'whatsapp', titulo: 'WhatsApp', texto: 'Conecta el número con el QR', ilustracion: 'IL-04-paso3-comprobante' },
+];
 
-/** /admin/configuracion — datos del complejo y reglas (todas las claves) + conexión del WhatsApp (Evolution API). Solo ADMIN. */
+/** /admin/configuracion[/{tarjeta}] — solo ADMIN. */
 export default function Configuracion() {
+  const sub = useParams()['*'] ?? '';
+  const [sp] = useSearchParams();
+  // Enlace antiguo: ?pestana=whatsapp
+  if (!sub && sp.get('pestana') === 'whatsapp') return <Navigate to="/admin/configuracion/whatsapp" replace />;
+  const tarjeta = TARJETAS.find((t) => t.id === sub);
+  if (!tarjeta) return <Tarjetas />;
+  if (tarjeta.id === 'feriados') return <Feriados />;
+  return <PantallaTarjeta tarjeta={tarjeta} />;
+}
+
+function Tarjetas() {
   useTituloPagina('Configuración');
-  const f = useFiltrosUrl();
-  const pestana = f.leer('pestana') === 'whatsapp' ? 'whatsapp' : 'datos';
   return (
     <>
-      <CabeceraPagina titulo="Configuración" subtitulo="Datos del complejo, reglas de reserva y WhatsApp" busto="BU-rosa-agenda" />
-      <Pestanas
-        etiqueta="Sección"
-        activa={pestana}
-        alCambiar={(p) => f.poner({ pestana: p === 'datos' ? null : p })}
-        items={[
-          { valor: 'datos', texto: 'Complejo y reglas', icono: Settings },
-          { valor: 'whatsapp', texto: 'WhatsApp', icono: MessageCircle },
-        ]}
-      />
-      {pestana === 'datos' ? <DatosComplejo /> : <Whatsapp />}
+      <CabeceraPagina titulo="Configuración" subtitulo="Elige qué quieres cambiar" busto="BU-rosa-agenda" />
+      <div className="conf-tarjetas">
+        {TARJETAS.map((t) => (
+          <Link key={t.id} to={`/admin/configuracion/${t.id}`} className="conf-tarjeta">
+            <span className="conf-tarjeta-il">
+              <Ilustracion id={t.ilustracion} />
+            </span>
+            <span className="conf-tarjeta-txt">
+              <b>{t.titulo}</b>
+              <span>{t.texto}</span>
+            </span>
+            <ChevronRight className="ico conf-tarjeta-ir" aria-hidden />
+          </Link>
+        ))}
+      </div>
     </>
   );
 }
 
-// ------------------------------ datos y reglas ------------------------------
-function DatosComplejo() {
+function PantallaTarjeta({ tarjeta }: { tarjeta: Tarjeta }) {
+  useTituloPagina(tarjeta.titulo);
+  return (
+    <>
+      <CabeceraPagina titulo={tarjeta.titulo} subtitulo={tarjeta.texto} busto="BU-rosa-agenda" volver="/admin/configuracion" />
+      {tarjeta.id === 'whatsapp' ? <Whatsapp /> : <FormGrupo id={tarjeta.id} ilustracion={tarjeta.ilustracion} />}
+    </>
+  );
+}
+
+// ------------------------------ formulario de una tarjeta ------------------------------
+function FormGrupo({ id, ilustracion }: { id: string; ilustracion: IdIlustracion }) {
   const toast = useToast();
+  const defs = GRUPOS_CONFIG.find((g) => g.id === id)?.claves ?? [];
   const conf = useCarga(() => configuracionApi.obtener(), 'configuracion');
-  const [confirmar, setConfirmar] = useState<Array<[string, string, string]> | null>(null);
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
+  const valoresDe = (c: Record<string, string>) => Object.fromEntries(defs.map((d) => [d.clave, c[d.clave] ?? '']));
   const {
     register,
     handleSubmit,
     reset,
     setError,
-    getValues,
-    formState: { errors, isDirty },
-  } = useForm<z.infer<typeof esquemaConfiguracion>>({ resolver: zodResolver(esquemaConfiguracion), mode: 'onTouched' });
+    formState: { errors, isDirty, isSubmitting },
+  } = useForm<Record<string, string>>({ resolver: zodResolver(esquemaGrupoConfig(defs)), mode: 'onTouched' });
   useEffect(() => {
-    if (conf.datos) reset(conf.datos);
+    if (conf.datos) reset(valoresDe(conf.datos));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conf.datos, reset]);
 
-  const cambios = (valores: Conf) => DEFS_CONFIG.filter((d) => (valores[d.clave] ?? '').trim() !== (conf.datos?.[d.clave] ?? '')).map((d) => [d.clave, conf.datos?.[d.clave] ?? '', (valores[d.clave] ?? '').trim()] as [string, string, string]);
-  const revisar = handleSubmit((v) => {
-    const c = cambios(v);
-    if (!c.length) return toast.info('Sin cambios');
-    setConfirmar(c);
-  });
-  const guardar = async () => {
-    if (!confirmar) return;
+  const guardar = handleSubmit(async (v) => {
     setErrorGeneral(null);
+    const cambios = Object.fromEntries(defs.filter((d) => (v[d.clave] ?? '').trim() !== (conf.datos?.[d.clave] ?? '')).map((d) => [d.clave, (v[d.clave] ?? '').trim()]));
+    if (!Object.keys(cambios).length) return toast.info('Sin cambios');
     try {
-      const r = await configuracionApi.guardar(Object.fromEntries(confirmar.map(([k, , n]) => [k, n])));
+      const r = await configuracionApi.guardar(cambios);
       conf.setDatos(r);
-      reset(r);
-      toast.exito('Configuración guardada');
-      setConfirmar(null);
+      reset(valoresDe(r));
+      toast.exito('Guardado');
     } catch (e) {
-      setConfirmar(null);
-      const { aplicados } = aplicarErroresServidor(e, setError, DEFS_CONFIG.map((d) => d.clave));
+      const { aplicados } = aplicarErroresServidor(e, setError, defs.map((d) => d.clave));
       if (!aplicados) setErrorGeneral(esErrorApi(e) ? e.message : 'No se pudo guardar.');
     }
-  };
-  const etiqueta = (k: string) => DEFS_CONFIG.find((d) => d.clave === k)?.etiqueta ?? k;
+  });
 
   if (conf.error) return <ErrorCarga alReintentar={conf.recargar} />;
-  if (!conf.datos) return <Cargando texto="Cargando configuración…" />;
+  if (!conf.datos) return <Cargando texto="Cargando…" />;
   const campo = (d: DefClave) => {
-    const err = errors[d.clave]?.message;
-    const comun = { label: d.etiqueta, requerido: true, error: err, ayuda: d.ayuda, ...register(d.clave) };
-    if (d.tipo === 'HORA') return <CampoTexto key={d.clave} type="time" step={900} icono={Clock} {...comun} />;
+    const comun = { label: d.etiqueta, requerido: true, error: errors[d.clave]?.message, ayuda: d.ayuda, ...register(d.clave) };
     if (d.tipo === 'CELULAR') return <CampoTexto key={d.clave} prefijo="+51" inputMode="tel" maxLength={15} {...comun} />;
     if (d.tipo === 'ENTERO' || d.tipo === 'PORCENTAJE') return <CampoTexto key={d.clave} inputMode="numeric" sufijo={d.sufijo} maxLength={5} {...comun} />;
     if (d.tipo === 'LATITUD' || d.tipo === 'LONGITUD') return <CampoTexto key={d.clave} inputMode="decimal" maxLength={13} {...comun} />;
     if (d.tipo === 'RUC') return <CampoTexto key={d.clave} inputMode="numeric" maxLength={11} {...comun} />;
-    if (d.clave === 'direccion' || d.clave === 'referencia' || d.clave === 'lema') return <AreaTexto key={d.clave} rows={2} maxLength={d.max} {...comun} />;
+    if (d.clave === 'direccion' || d.clave === 'referencia') return <AreaTexto key={d.clave} rows={2} maxLength={d.max} {...comun} />;
     return <CampoTexto key={d.clave} type={d.tipo === 'CORREO' ? 'email' : d.tipo === 'URL' ? 'url' : 'text'} maxLength={d.max} {...comun} />;
   };
 
   return (
-    <form className="grid gap-4" onSubmit={revisar} noValidate>
-      <div className="grid gap-4 xl:grid-cols-2 xl:items-start">
-        {GRUPOS_CONFIG.map((g) => {
-          const I = ICONO_GRUPO[g.id] ?? Settings;
-          return (
-            <section key={g.id} className="pc">
-              <div className="pc-cab">
-                <h2>
-                  <I className="ico" aria-hidden />
-                  {g.titulo}
-                </h2>
-              </div>
-              <div className="pc-cuerpo form-2">{g.claves.map(campo)}</div>
-            </section>
-          );
-        })}
+    <form className="pc conf-form" onSubmit={guardar} noValidate>
+      <div className="conf-form-il solo-tablet-arriba" aria-hidden>
+        <Ilustracion id={ilustracion} />
       </div>
-      {errorGeneral && <Alerta tipo="error">{errorGeneral}</Alerta>}
-      <div className="flex flex-wrap gap-2 justify-end sticky bottom-0 bg-[#F5F7F6] py-3 border-t border-borde-panel">
-        <Boton variante="secundario" icono={RotateCcw} disabled={!isDirty} onClick={() => conf.datos && reset(conf.datos)}>
-          Deshacer
-        </Boton>
-        <Boton type="submit" icono={Save} disabled={!isDirty}>
-          Guardar cambios
-        </Boton>
+      <div className="pc-cuerpo grid gap-4 min-w-0">
+        <div className="form-2">{defs.map(campo)}</div>
+        {errorGeneral && <Alerta tipo="error">{errorGeneral}</Alerta>}
+        <div className="flex flex-wrap gap-2 justify-end">
+          <Boton variante="fantasma" icono={RotateCcw} disabled={!isDirty} onClick={() => conf.datos && reset(valoresDe(conf.datos))}>
+            Deshacer
+          </Boton>
+          <Boton type="submit" icono={Save} disabled={!isDirty} cargando={isSubmitting} textoCargando="Guardando…">
+            Guardar
+          </Boton>
+        </div>
       </div>
-      <ModalConfirmar
-        abierto={confirmar !== null}
-        alCerrar={() => setConfirmar(null)}
-        titulo="Guardar configuración"
-        subtitulo={`${confirmar?.length ?? 0} cambios · se aplican al portal y a las reservas nuevas`}
-        busto="BU-rosa-agenda"
-        textoConfirmar="Guardar"
-        iconoConfirmar={Save}
-        alConfirmar={guardar}
-      >
-        <ul className="grid gap-2">
-          {(confirmar ?? []).map(([k, a, n]) => (
-            <li key={k} className="caja-osc !min-h-0 py-2 flex-wrap">
-              <b className="text-[13px]">{etiqueta(k)}</b>
-              <span className="text-[#A9B9B1] text-[13px] line-through">{a || '—'}</span>
-              <ArrowRight className="ico" aria-hidden />
-              <span className="text-[13px] text-[#6FD06A]">{n || getValues(k)}</span>
-            </li>
-          ))}
-        </ul>
-      </ModalConfirmar>
     </form>
   );
 }

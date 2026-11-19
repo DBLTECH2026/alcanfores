@@ -13,12 +13,15 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
+import pe.alcanfores.auth.mapeador.CuentaClienteMapeador;
 import pe.alcanfores.auth.mapeador.UsuarioMapeador;
 import pe.alcanfores.auth.modelo.Administrador;
+import pe.alcanfores.auth.modelo.CuentaCliente;
 import pe.alcanfores.auth.modelo.EstadoUsuario;
 import pe.alcanfores.auth.modelo.Rol;
 import pe.alcanfores.auth.repositorio.AdministradorRepositorio;
 import pe.alcanfores.auth.repositorio.BitacoraRepositorio;
+import pe.alcanfores.auth.repositorio.CuentaClienteRepositorio;
 import pe.alcanfores.auth.repositorio.EventoProcesadoRepositorio;
 import pe.alcanfores.comun.config.AlcanforesPropiedades;
 import pe.alcanfores.comun.seguridad.JwtServicio;
@@ -39,6 +42,8 @@ public abstract class PruebaIntegracion {
     @Autowired
     protected AdministradorRepositorio administradores;
     @Autowired
+    protected CuentaClienteRepositorio cuentas;
+    @Autowired
     protected BitacoraRepositorio bitacoras;
     @Autowired
     protected EventoProcesadoRepositorio eventosProcesados;
@@ -58,6 +63,7 @@ public abstract class PruebaIntegracion {
         bitacoras.deleteAllInBatch();
         eventosProcesados.deleteAllInBatch();
         administradores.deleteAllInBatch();
+        cuentas.deleteAllInBatch();
     }
 
     @AfterEach
@@ -83,6 +89,22 @@ public abstract class PruebaIntegracion {
 
     protected String bearer(Administrador a) {
         return "Bearer " + jwt.generar(UsuarioMapeador.aToken(a));
+    }
+
+    protected CuentaCliente crearCuenta(String dni, String correo, String clave) {
+        CuentaCliente c = new CuentaCliente();
+        c.setDni(dni);
+        c.setNombres("Lucía");
+        c.setApellidos("Mendoza Paredes");
+        c.setCorreo(correo);
+        c.setTelefono("987654321");
+        c.setEstado(EstadoUsuario.ACTIVO);
+        c.setContrasenaHash(codificador.encode(clave));
+        return cuentas.save(c);
+    }
+
+    protected String bearer(CuentaCliente c) {
+        return "Bearer " + jwt.generar(CuentaClienteMapeador.aToken(c));
     }
 
     protected String bearerVencido(Administrador a) {

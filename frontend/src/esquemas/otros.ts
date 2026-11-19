@@ -1,6 +1,9 @@
 import { z } from 'zod';
 import {
   MSJ,
+  esquemaAcepta,
+  esquemaCorreo,
+  esquemaNombre,
   esquemaCelular,
   esquemaCodigoReserva,
   esquemaComentarioResena,
@@ -26,6 +29,34 @@ export const esquemaResena = z.object({
   comentario: esquemaComentarioResena,
 });
 export type ResenaEntrada = z.input<typeof esquemaResena>;
+
+/** v2: reseña con sesión de cliente (el DNI sale del token). */
+export const esquemaResenaCuenta = z.object({
+  codigoReserva: esquemaCodigoReserva,
+  puntuacion: z.number({ invalid_type_error: MSJ.puntuacion }).int(MSJ.puntuacion).min(1, MSJ.puntuacion).max(5, MSJ.puntuacion),
+  comentario: esquemaComentarioResena,
+});
+export type ResenaCuentaEntrada = z.input<typeof esquemaResenaCuenta>;
+
+// ------------------------------ v2: cuentas de clientes ------------------------------
+/** Contraseña del cliente: misma regla que la del personal (8 a 64, mayúscula, minúscula y número). */
+export const MSJ_CLAVE_CLIENTE = 'Usa de 8 a 64 caracteres, con una mayúscula, una minúscula y un número.';
+export const esquemaClaveCliente = z
+  .string()
+  .min(8, MSJ_CLAVE_CLIENTE)
+  .max(64, MSJ_CLAVE_CLIENTE)
+  .refine((v) => /[A-Z]/.test(v) && /[a-z]/.test(v) && /\d/.test(v), MSJ_CLAVE_CLIENTE);
+
+/** Ingreso del cliente: DNI o correo + contraseña. */
+export const esquemaIngresoCliente = z.object({
+  usuario: z
+    .string()
+    .trim()
+    .min(1, 'Escribe tu DNI o tu correo.')
+    .refine((v) => /^\d{8}$/.test(v) || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), 'Escribe tu DNI (8 dígitos) o tu correo.'),
+  contrasena: z.string().min(1, MSJ.contrasena).max(64, MSJ.contrasena),
+});
+export type IngresoClienteEntrada = z.input<typeof esquemaIngresoCliente>;
 
 /** Ingreso al panel. */
 export const esquemaLogin = z.object({
@@ -66,3 +97,30 @@ export const esquemaYapeBeta = z.object({
   codigoAprobacion: z.string().trim().regex(/^\d{6}$/, MSJ.codigoAprobacion),
 });
 export type YapeBetaEntrada = z.input<typeof esquemaYapeBeta>;
+
+
+/** Crear cuenta: DNI (RENIEC), nombres, celular, correo, contraseña + confirmación y aceptación. */
+export const esquemaRegistroCliente = z
+  .object({
+    dni: esquemaDni,
+    nombres: esquemaNombre,
+    apellidos: esquemaNombre,
+    telefono: esquemaCelular,
+    correo: esquemaCorreo,
+    contrasena: esquemaClaveCliente,
+    confirmacion: z.string(),
+    aceptaTerminos: esquemaAcepta,
+    aceptaPrivacidad: esquemaAcepta,
+  })
+  .refine((d) => d.contrasena === d.confirmacion, { path: ['confirmacion'], message: 'Las contraseñas no coinciden.' });
+export type RegistroClienteEntrada = z.input<typeof esquemaRegistroCliente>;
+
+/** Mis datos: celular y correo (nombres y DNI vienen de RENIEC). */
+export const esquemaDatosCuenta = z.object({ telefono: esquemaCelular, correo: esquemaCorreo });
+export type DatosCuentaEntrada = z.input<typeof esquemaDatosCuenta>;
+
+/** Cambiar contraseña del cliente. */
+export const esquemaCambioClaveCliente = z
+  .object({ actual: z.string().min(1, MSJ.contrasena), nueva: esquemaClaveCliente, confirmacion: z.string() })
+  .refine((d) => d.nueva === d.confirmacion, { path: ['confirmacion'], message: 'Las contraseñas no coinciden.' });
+export type CambioClaveClienteEntrada = z.input<typeof esquemaCambioClaveCliente>;

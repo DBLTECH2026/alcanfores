@@ -8,11 +8,13 @@ Contrato con el back: `docs/SPEC.md` (§3 validaciones, §5 endpoints, §6 front
 
 ```bash
 npm install
-npm run dev:mock     # http://localhost:5186 con el back-end SIMULADO (MSW, VITE_MOCK=true)
+npm run dev:mock     # http://localhost:5186 con el back-end SIMULADO (MSW, VITE_MOCK=true; solo v1)
+npm run dev:v2       # modo HÍBRIDO de desarrollo: MSW simula solo los endpoints NUEVOS de la v2 y el resto va al back real
 npm run dev          # http://localhost:5186 contra el back real (proxy /api → http://localhost:8086)
 npm run build        # tsc -b (estricto) + vite build → dist/
 npm run lint         # ESLint sin advertencias
 npm run capturas     # (con dev:mock corriendo) recorre todo y guarda capturas 390/1440 en ../docs/capturas-front
+node scripts/capturas-v2.mjs [panel|portal|todo] [DNI]   # (con npm run dev y el back v2) capturas reales de la v2 en ../docs/capturas-reales/v2
 ```
 
 Variables (`.env.example`): `VITE_MOCK` (true = MSW) y `VITE_API_URL` (por defecto `/api`).
@@ -38,8 +40,8 @@ src/
   hooks/        useCarga · useDatosPublicos (complejo, canchas, métodos) · useCuentaRegresiva · useErroresServidor · useTituloPagina
   mocks/        bd.ts (datos simulados) · manejadores.ts (MSW) · navegador.ts
   paginas/portal/  Inicio · Canchas · CanchaDetalle · reservar/(Reservar, Paso1, Paso2, Paso3) · ReservaListo · MiReserva · Pasarela · PagoResultado · Legales
-  paginas/panel/   Login · Hoy · Reservas (+ReservaDetalle) · NuevaReserva · Agenda · Canchas (+CanchaFormulario) · Resenas · Pagos · Clientes ·
-                   Reportes · Notificaciones · Configuracion (pestaña WhatsApp) · Usuarios · Bitacora · EstadoSistema · Cuenta · esquemasPanel.ts
+  paginas/panel/   Login · Hoy · Reservas (+ReservaDetalle) · NuevaReserva · Agenda · Canchas (+CanchaFormulario) · Pagos · Clientes ·
+                   Reportes · Notificaciones · Configuracion (tarjetas) · Feriados · cancha/ (ficha de 3 apartados) · Usuarios · Bitacora · EstadoSistema · Cuenta · esquemasPanel.ts
   rutas/        router.tsx · RutaProtegida.tsx · menuPanel.ts (menú, roles y bustos del panel)
   estilos/      tailwind.css · alcanfores.css + panel.css (portados del prototipo) · app.css (piezas nuevas) · utilidades.css
   utilidades/   fecha.ts (Lima) · formato.ts · documentos.ts (RUC módulo 11, Luhn, marcas, bytes mágicos) · recursos.ts · cx.ts
@@ -98,7 +100,7 @@ Hooks: `useCarga(fn, clave)` (carga con `datos/error/cargando/recargar`), `useCu
 ## Cómo agregar una pantalla del panel (siguiente agente)
 
 1. El menú, los roles y los bustos ya están en `src/rutas/menuPanel.ts` (Hoy, Reservas, Agenda, Nueva reserva, Pagos y comprobantes,
-   Clientes, Notificaciones, Canchas, Reseñas, Reportes, WhatsApp, Usuarios, Bitácora, Configuración, Estado del sistema).
+   Clientes, Notificaciones, Canchas, Reportes, Usuarios, Bitácora, Configuración, Estado del sistema).
 2. Crea la página en `src/paginas/panel/` y regístrala en `PAGINAS_PANEL` de `src/rutas/router.tsx` con su `ruta`
    (`'/admin/reservas': perezosa(() => import('@/paginas/panel/Reservas'))`). Las subrutas (`/admin/reservas/ALC-XXXXXX`) caen en la misma
    página (ruta `*`): léelas con `useParams()['*']` o agrega rutas hijas.
@@ -114,7 +116,7 @@ Hooks: `useCarga(fn, clave)` (carga con `datos/error/cargando/recargar`), `useCu
   `useFiltrosUrl` con filtros en la URL), `ModalesReserva.tsx` (validar, rechazar, cobrar en caja, cancelar), `VisorComprobante`,
   `BloqueComprobante` (boleta/factura con lupa SUNAT) y `panel-extra.css` (se carga desde `PanelLayout`).
 - Esquemas Zod del panel: `paginas/panel/esquemasPanel.ts`, con los mensajes que devuelve el back (comprobados contra el back real).
-- WhatsApp ya no es ítem del menú: es la pestaña de Configuración (`/admin/whatsapp` redirige ahí).
+- WhatsApp ya no es ítem del menú: es una tarjeta de Configuración (`/admin/whatsapp` redirige a `/admin/configuracion/whatsapp`).
 - El gateway solo acepta el `Origin` de `FRONT_URL` (5186). Si corres el panel en otro puerto, el proxy debe enviar `Origin: http://localhost:5186`.
 - Capturas reales: `../docs/capturas-reales/panel/INDICE.md`. Pendientes del back: `../docs/PENDIENTES_BACK.md` (sección «Panel»).
 
@@ -166,3 +168,31 @@ Se guardan en `localStorage` (`alc-mock-bd`) y se regeneran cada día. Consola: 
   tras subir un comprobante, pagar en la pasarela o cancelar (nota de crédito).
 - Capturas con el back real: `docs/capturas-reales/portal/` (índice en `INDICE.md`).
 - Ruta del panel para la reserva manual: `/admin/nueva-reserva`; cambio de contraseña: `/admin/cuenta`.
+
+## Versión 2 (SPEC_V2, 19-nov-2026)
+
+Regla de oro: equilibrar funcionalidad con simpleza (una acción principal por pantalla, lo avanzado plegado en «Más opciones»).
+
+| Punto | Dónde |
+|---|---|
+| Barra lateral rediseñada (grupos, activo con raya verde, pie = tarjeta del usuario + «Plegar menú»; plegada = íconos con tooltip en portal) | `componentes/panel/PanelLayout.tsx` (`Navegacion`, `pie`) · estilos al final de `panel-extra.css` |
+| Menú sin «Reseñas» (`/admin/resenas` → `/admin/canchas`) | `rutas/menuPanel.ts`, `rutas/router.tsx` |
+| Campana: modal «Te falta revisar estos comprobantes» con «Validar» directo | `componentes/panel/ModalAvisos.tsx` (pagos PENDIENTE + reservas EN_REVISION para cancha y horario) |
+| Configuración en tarjetas con ilustración → `/admin/configuracion/{complejo,contacto,reglas,feriados,comprobantes,whatsapp}` | `paginas/panel/Configuracion.tsx` (grupos en `esquemasPanel.ts` → `GRUPOS_CONFIG`) |
+| Feriados y días no laborables (calendario anual, feriados de Perú, días con motivo y canchas) | `paginas/panel/Feriados.tsx` |
+| Canchas en tarjetas + ficha de 3 apartados `/admin/canchas/{id}[/horario|/configuracion]` | `paginas/panel/Canchas.tsx` y `paginas/panel/cancha/*` |
+| Editor VISUAL: el detalle público real (`FichaCancha`, `data-edit`) escalado + panel derecho por parte; reseñas de la cancha | `cancha/EditorVisual.tsx`, `cancha/PanelesEditor.tsx`, `componentes/portal/FichaCancha.tsx` |
+| Horario por día, duración, precios, «copiar a todos», vista previa (POST vista-previa; si falla, cálculo local) y feriados | `cancha/HorarioCancha.tsx`, `utilidades/horario.ts` |
+| Agenda: sin «Generar turnos»; «Bloquear horas» (varias canchas, desde–hasta, varios días, también desbloquear); feriados y reservas de varios turnos («1 de 2») | `paginas/panel/Agenda.tsx` |
+| Varios turnos (portal y panel): `idsTurno`, total = suma, `horarioTexto` | `contexto/ReservaContext.tsx` (`turnos[]` → `turno` compuesto), `Paso1.tsx`, `NuevaReserva.tsx`, `utilidades/fecha.ts → textoHorario` |
+| Paso 1: tarjeta de la cancha elegida + modal de tarjetas; tira de días con flechas + calendario de mes con feriados y cerrados | `componentes/portal/SelectorCancha.tsx` (también en «Nueva reserva»), `componentes/portal/Fechas.tsx` |
+| Cuentas de clientes: `/ingresar`, `/crear-cuenta`, `/mi-cuenta[/resenas|/datos]`; paso 2 lleno con la cuenta; reseña con sesión | `contexto/CuentaContext.tsx`, `paginas/portal/cuenta/*`, `paginas/portal/CanchaDetalle.tsx` |
+| Reintentos: un GET con 502/503/504 o sin red se reintenta 3 veces (0,8 · 1,6 · 3,2 s) y se ve «Actualizando el sistema, un momento…» | `api/cliente.ts` (`reintentable`), `componentes/ui/AvisoReintento.tsx` |
+
+Decisiones v2:
+- Dos sesiones que no se mezclan: la del panel (`alc-sesion`) y la del cliente (`alc-cuenta`). El token del cliente solo viaja a
+  `/auth/clientes/**`, `/cliente/**`, `POST /reservas` y `POST /catalogo/canchas/{id}/resenas` (`rutaDeCliente` en `api/cliente.ts`).
+- «Mis reservas» abre el detalle de siempre (`/mi-reserva`) pasando el DNI de la cuenta en el estado de la navegación (no en la URL).
+- El editor visual pinta el detalle a 980 px de ancho y lo escala con `zoom` (sin iframe); en < 1280 px el panel es una hoja inferior.
+- Un solo «Publicar cambios» a la vista: con un panel de texto abierto vive en su pie; fotos y reseñas se guardan al instante.
+- Capturas reales de la v2: `../docs/capturas-reales/v2/INDICE.md`. Pendientes del back: `../docs/PENDIENTES_BACK.md` (sección «v2»).

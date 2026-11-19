@@ -12,6 +12,10 @@ declare module 'axios' {
   interface AxiosRequestConfig {
     /** No mostrar el toast automático de error (la pantalla lo maneja: errores por campo, 409, DNI…). */
     silenciarToast?: boolean;
+    /** Qué sesión puso el token (lo llena el interceptor). */
+    tipoToken?: 'panel' | 'cliente' | null;
+    /** Reintentos ya hechos de este GET (503 / sin red). */
+    reintentos?: number;
   }
 }
 
@@ -40,6 +44,8 @@ type Notificar = (mensaje: string) => void;
 let notificarError: Notificar | null = null;
 let alExpirarSesion: (() => void) | null = null;
 let leerToken: () => string | null = () => null;
+let alExpirarCliente: (() => void) | null = null;
+let leerTokenCliente: () => string | null = () => null;
 
 export function registrarNotificador(fn: Notificar | null) {
   notificarError = fn;
@@ -47,6 +53,18 @@ export function registrarNotificador(fn: Notificar | null) {
 export function registrarSesion(opciones: { token: () => string | null; alExpirar: () => void } | null) {
   leerToken = opciones?.token ?? (() => null);
   alExpirarSesion = opciones?.alExpirar ?? null;
+}
+/** Sesión del CLIENTE del portal (v2): su token solo va a sus rutas, nunca al panel. */
+export function registrarSesionCliente(opciones: { token: () => string | null; alExpirar: () => void } | null) {
+  leerTokenCliente = opciones?.token ?? (() => null);
+  alExpirarCliente = opciones?.alExpirar ?? null;
+}
+
+/** Rutas que usan el token del cliente: su cuenta, sus reservas, reservar y reseñar. */
+function rutaDeCliente(url: string, metodo: string): boolean {
+  if (/^\/(auth\/clientes|cliente)(\/|$)/.test(url)) return true;
+  if (metodo !== 'post') return false;
+  return /^\/reservas\/?$/.test(url) || /^\/catalogo\/canchas\/[^/]+\/resenas\/?$/.test(url);
 }
 
 function uuid(): string {
@@ -61,7 +79,11 @@ export const http = axios.create({
 });
 
 http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
-  const token = leerToken();
+  const url = String(config.url ?? '');
+  const deCliente = rutaDeCliente(url, String(config.method ?? 'get').toLowerCase());
+  const esLogin = /\/login$|\/registro$/.test(url);
+  const token = esLogin ? null : deCliente ? leerTokenCliente() : leerToken();
+  config.tipoToken = token ? (deCliente ? 'cliente' : 'panel') : null;
   if (token) config.headers.set('Authorization', `Bearer ${token}`);
   config.headers.set('X-Request-Id', uuid());
   return config;
@@ -81,14 +103,46 @@ function aCuerpo(error: AxiosError): CuerpoError {
   return { status: 0, codigo: 'SIN_CONEXION', mensaje: MENSAJE_SIN_CONEXION };
 }
 
+// ------------------------------ reintentos (despliegues que reinician los servicios) ------------------------------
+/** Un GET que falla con 502/503/504 o sin red se reintenta hasta 3 veces (0,8 s · 1,6 s · 3,2 s). */
+const MAX_REINTENTOS = 3;
+let enReintento = 0;
+/** Evento global para el aviso «Actualizando el sistema, un momento…» (lo escucha `AvisoReintento`). */
+export const EVENTO_REINTENTO = 'alc:reintento';
+function avisarReintento(delta: number) {
+  enReintento = Math.max(0, enReintento + delta);
+  window.dispatchEvent(new CustomEvent(EVENTO_REINTENTO, { detail: enReintento > 0 }));
+}
+function reintentable(error: AxiosError, config: AxiosRequestConfig | undefined): boolean {
+  if (!config || String(config.method ?? 'get').toLowerCase() !== 'get') return false;
+  if ((config.reintentos ?? 0) >= MAX_REINTENTOS) return false;
+  // RENIEC / SUNAT: su 503 es «el servicio externo no responde»; la pantalla ya ofrece escribir a mano.
+  if (String(config.url ?? '').startsWith('/documentos/')) return false;
+  const st = error.response?.status;
+  if (st === 502 || st === 503 || st === 504) return true;
+  return !error.response && error.code !== 'ECONNABORTED';
+}
+
 http.interceptors.response.use(
   (r) => r,
-  (error: AxiosError) => {
+  async (error: AxiosError) => {
     if (axios.isCancel(error)) return Promise.reject(error);
-    const cuerpo = aCuerpo(error);
     const config = error.config as AxiosRequestConfig | undefined;
-    const conToken = Boolean(config?.headers && (config.headers as Record<string, unknown>).Authorization);
-    if (cuerpo.status === 401 && conToken && !String(config?.url ?? '').includes('/auth/login')) {
+    if (config && reintentable(error, config)) {
+      const n = (config.reintentos ?? 0) + 1;
+      avisarReintento(1);
+      try {
+        await new Promise((ok) => setTimeout(ok, 800 * 2 ** (n - 1)));
+        return await http({ ...config, reintentos: n });
+      } finally {
+        avisarReintento(-1);
+      }
+    }
+    const cuerpo = aCuerpo(error);
+    if (cuerpo.status === 401 && config?.tipoToken === 'cliente') {
+      alExpirarCliente?.();
+      if (!config.silenciarToast) notificarError?.('Tu sesión terminó. Ingresa de nuevo.');
+    } else if (cuerpo.status === 401 && config?.tipoToken === 'panel') {
       alExpirarSesion?.();
     } else if (!config?.silenciarToast) {
       notificarError?.(cuerpo.mensaje);

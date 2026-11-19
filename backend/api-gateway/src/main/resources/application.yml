@@ -49,7 +49,7 @@ spring:
             - id: catalogo
               uri: lb://catalogo-service
               predicates:
-                - Path=/api/catalogo/**,/api/admin/canchas/**,/api/admin/resenas/**,/api/admin/configuracion/**
+                - Path=/api/catalogo/**,/api/admin/canchas/**,/api/admin/resenas/**,/api/admin/configuracion/**,/api/admin/calendario/**
               filters:
                 - name: CircuitBreaker
                   args: { name: catalogo, fallbackUri: "forward:/fallback/catalogo" }
@@ -79,7 +79,7 @@ spring:
             - id: reservas
               uri: lb://reservas-service
               predicates:
-                - Path=/api/disponibilidad/**,/api/reservas/**,/api/documentos/**,/api/admin/reservas/**,/api/admin/turnos/**,/api/admin/clientes/**,/api/admin/dashboard/**,/api/admin/reportes/reservas/**
+                - Path=/api/disponibilidad/**,/api/reservas/**,/api/documentos/**,/api/admin/reservas/**,/api/admin/turnos/**,/api/admin/clientes/**,/api/admin/dashboard/**,/api/admin/reportes/reservas/**,/api/cliente/**
               filters:
                 - name: CircuitBreaker
                   args: { name: reservas, fallbackUri: "forward:/fallback/reservas" }
@@ -155,6 +155,8 @@ alcanfores:
       - notificaciones-service
     limites:
       - { nombre: login, metodo: POST, rutas: [ "/api/auth/login" ], por-minuto: 10 }
+      - { nombre: registro-clientes, metodo: POST, rutas: [ "/api/auth/clientes/registro" ], por-minuto: 5 }
+      - { nombre: login-clientes, metodo: POST, rutas: [ "/api/auth/clientes/login" ], por-minuto: 10 }
       - { nombre: documentos, rutas: [ "/api/documentos/**" ], por-minuto: 20 }
       - { nombre: reservas, metodo: POST, rutas: [ "/api/reservas" ], por-minuto: 10 }
       - { nombre: pasarela, rutas: [ "/api/pasarela/**" ], por-minuto: 30 }

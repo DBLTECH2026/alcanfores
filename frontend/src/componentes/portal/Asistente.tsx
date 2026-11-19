@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import {
   Banknote,
   CalendarClock,
@@ -23,12 +23,12 @@ import {
   TriangleAlert,
   type LucideIcon,
 } from 'lucide-react';
-import type { CanchaResumen, DiaCalendario, Turno } from '@/api/tipos';
-import type { TurnoElegido } from '@/contexto/ReservaContext';
+import type { Turno } from '@/api/tipos';
+import type { SeleccionTurnos } from '@/contexto/ReservaContext';
 import { IconoDeporte } from '@/componentes/ui/Marca';
 import { cx } from '@/utilidades/cx';
-import { diaSemanaCorto, fmtFecha, fmtHora12, fmtRango12, hoyLima, numeroDia } from '@/utilidades/fecha';
-import { fmtCelular, fmtSoles, nombreConDeporte } from '@/utilidades/formato';
+import { fmtFecha, fmtHora12 } from '@/utilidades/fecha';
+import { fmtCelular, fmtSoles, nombreConDeporte, plural } from '@/utilidades/formato';
 
 /** Adelanto = total × pct / 100 con HALF_UP a 2 decimales (igual que el back). */
 export function calcularAdelanto(total: number, pct: number): number {
@@ -79,74 +79,6 @@ export function Stepper({ actual, completados = [], alIr }: { actual: 1 | 2 | 3;
   );
 }
 
-// ------------------------------ Selector de canchas ------------------------------
-export function SelectorCanchas({ canchas, activa, alElegir }: { canchas: CanchaResumen[]; activa: number | null; alElegir: (id: number) => void }) {
-  const mover = (e: KeyboardEvent, i: number) => {
-    const d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
-    if (!d) return;
-    e.preventDefault();
-    const sig = canchas[(i + d + canchas.length) % canchas.length];
-    if (sig) {
-      alElegir(sig.id);
-      (e.currentTarget.parentElement?.children[(i + d + canchas.length) % canchas.length] as HTMLElement | undefined)?.focus();
-    }
-  };
-  return (
-    <div className="chips scroll" role="radiogroup" aria-label="Elige la cancha">
-      {canchas.map((c, i) => (
-        <button
-          key={c.id}
-          type="button"
-          role="radio"
-          aria-checked={c.id === activa}
-          tabIndex={c.id === activa || (!activa && i === 0) ? 0 : -1}
-          className={cx('chip-cancha', c.id === activa && 'activo')}
-          onClick={() => alElegir(c.id)}
-          onKeyDown={(e) => mover(e, i)}
-        >
-          <span className="chip-cancha-ico">
-            <IconoDeporte deporte={c.deporte} />
-          </span>
-          <span>
-            <span className="chip-cancha-nom">{c.nombre}</span>
-            <span className="chip-cancha-dep">{c.deporteTexto}</span>
-          </span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-// ------------------------------ Tira de fechas (14 días) ------------------------------
-/** Calendario de 14 días con los turnos libres de cada día. */
-export function TiraFechas({ dias, seleccionada, alElegir }: { dias: DiaCalendario[]; seleccionada: string | null; alElegir: (f: string) => void }) {
-  const hoy = hoyLima();
-  return (
-    <div className="date-strip" role="radiogroup" aria-label="Elige la fecha">
-      {dias.map((d) => {
-        const cerrado = d.fecha === hoy && d.libres === 0;
-        const lleno = d.libres === 0 && !cerrado;
-        const sel = d.fecha === seleccionada;
-        return (
-          <button
-            key={d.fecha}
-            type="button"
-            role="radio"
-            aria-checked={sel}
-            aria-label={`${fmtFecha(d.fecha, 'larga')}, ${cerrado ? 'ya no quedan horarios' : lleno ? 'sin horarios libres' : `${d.libres} horarios libres`}`}
-            className={cx('dia', d.fecha === hoy && 'dia-hoy', sel && 'dia-sel', lleno && 'dia-lleno', cerrado && !sel && 'dia-off')}
-            onClick={() => alElegir(d.fecha)}
-          >
-            <span className="dia-sem">{d.fecha === hoy ? 'Hoy' : diaSemanaCorto(d.fecha)}</span>
-            <span className="dia-num">{numeroDia(d.fecha)}</span>
-            <span className="dia-mes tnum">{cerrado ? 'Cerrado' : lleno ? 'Lleno' : `${d.libres} libres`}</span>
-          </button>
-        );
-      })}
-    </div>
-  );
-}
-
 // ------------------------------ Turnos ------------------------------
 function Rayas() {
   return (
@@ -163,16 +95,16 @@ function Rayas() {
 
 const ETQ: Record<Turno['estado'], string> = { DISPONIBLE: 'disponible', OCUPADO: 'ocupado, no disponible', BLOQUEADO: 'en mantenimiento, no disponible', PASADO: 'ya pasó, no disponible' };
 
-/** Chip de turno del portal (12 h, precio). Ocupado / mantenimiento / pasado no se pueden elegir. */
+/** Chip de turno del portal (12 h, precio). Ocupado / mantenimiento / pasado no se pueden elegir. v2: se marcan varios. */
 export function ChipTurno({ turno, seleccionado, alElegir }: { turno: Turno; seleccionado: boolean; alElegir: (t: Turno) => void }) {
   const clase = turno.estado === 'OCUPADO' ? 'ct-ocupado' : turno.estado === 'BLOQUEADO' ? 'ct-mantenimiento' : turno.estado === 'PASADO' ? 'ct-pasado' : seleccionado ? 'ct-seleccionado' : 'ct-disponible';
   const noSel = turno.estado !== 'DISPONIBLE';
-  const sub = turno.estado === 'OCUPADO' ? 'Ocupado' : turno.estado === 'BLOQUEADO' ? 'Mantenimiento' : turno.estado === 'PASADO' ? 'Pasado' : fmtSoles(turno.precio, { decimales: 0 });
+  const sub = turno.estado === 'OCUPADO' ? 'Ocupado' : turno.estado === 'BLOQUEADO' ? 'No disponible' : turno.estado === 'PASADO' ? 'Pasado' : `${fmtSoles(turno.precio, { decimales: 0 })}${turno.feriado ? ' · feriado' : ''}`;
   const Marca = seleccionado && !noSel ? Check : turno.estado === 'OCUPADO' ? Lock : turno.estado === 'BLOQUEADO' ? Wrench : null;
   return (
     <button
       type="button"
-      role="radio"
+      role="checkbox"
       aria-checked={seleccionado}
       aria-disabled={noSel || undefined}
       aria-label={`${fmtHora12(turno.horaInicio)}, ${fmtSoles(turno.precio)}, ${seleccionado ? 'seleccionado' : ETQ[turno.estado]}`}
@@ -191,14 +123,14 @@ export function ChipTurno({ turno, seleccionado, alElegir }: { turno: Turno; sel
   );
 }
 
-/** Turnos en dos franjas (Día · Noche) dentro de UN grupo de opciones para el teclado. */
-export function GrillaTurnos({ turnos, seleccionado, alElegir }: { turnos: Turno[]; seleccionado: number | null; alElegir: (t: Turno) => void }) {
+/** Turnos en dos franjas (Día · Noche). v2: se pueden marcar varios (`seleccionados`). */
+export function GrillaTurnos({ turnos, seleccionados, alElegir }: { turnos: Turno[]; seleccionados: number[]; alElegir: (t: Turno) => void }) {
   const franjas: Array<{ clave: Turno['franja']; texto: string; icono: LucideIcon }> = [
     { clave: 'DIA', texto: 'Día', icono: Sun },
     { clave: 'NOCHE', texto: 'Noche', icono: Moon },
   ];
   return (
-    <div className="grid gap-5" role="radiogroup" aria-label="Horarios">
+    <div className="grid gap-5" role="group" aria-label="Horarios (puedes marcar varios)">
       {franjas.map(({ clave, texto, icono: Icono }) => {
         const lista = turnos.filter((t) => t.franja === clave);
         if (!lista.length) return null;
@@ -210,7 +142,7 @@ export function GrillaTurnos({ turnos, seleccionado, alElegir }: { turnos: Turno
             </h3>
             <div className="grilla-turnos">
               {lista.map((t) => (
-                <ChipTurno key={t.idTurno} turno={t} seleccionado={t.idTurno === seleccionado} alElegir={alElegir} />
+                <ChipTurno key={t.idTurno} turno={t} seleccionado={seleccionados.includes(t.idTurno)} alElegir={alElegir} />
               ))}
             </div>
           </section>
@@ -232,7 +164,7 @@ export function LeyendaTurnos({ extra }: { extra?: ReactNode }) {
       <span className="leyenda-item">{mue('')}Disponible</span>
       <span className="leyenda-item">{mue('sel', Check, 'text-white')}Seleccionado</span>
       <span className="leyenda-item">{mue('ocu', Lock, 'text-gris')}Ocupado</span>
-      <span className="leyenda-item">{mue('man', Wrench, 'text-profundo')}Mantenimiento</span>
+      <span className="leyenda-item">{mue('man', Wrench, 'text-profundo')}No disponible</span>
       <span className="leyenda-item">{mue('pas', History, 'text-gris')}Pasado</span>
       {extra}
     </div>
@@ -241,7 +173,7 @@ export function LeyendaTurnos({ extra }: { extra?: ReactNode }) {
 
 // ------------------------------ Resumen ------------------------------
 export interface DatosResumen {
-  turno: TurnoElegido | null;
+  turno: SeleccionTurnos | null;
   adelantoPct: number;
   montoAdelanto?: number;
   cliente?: { nombres: string; apellidos: string; telefono: string; correo: string } | null;
@@ -314,7 +246,7 @@ export function ResumenReserva({
       <div className="resumen-cuerpo">
         <Fila icono={<IconoDeporte deporte={t.deporte} />} dato={nombreConDeporte(t.nombreCancha, t.deporte)} etiqueta="Cancha" />
         <Fila icono={<CalendarDays className="ico" aria-hidden />} dato={fmtFecha(t.fecha)} etiqueta="Fecha" />
-        <Fila icono={<Clock className="ico" aria-hidden />} dato={fmtRango12(t.horaInicio, t.horaFin)} etiqueta="Hora" />
+        <Fila icono={<Clock className="ico" aria-hidden />} dato={t.partes.length > 1 ? `${t.horarioTexto} · ${plural(t.partes.length, 'turno', 'turnos')}` : t.horarioTexto} etiqueta="Hora" />
       </div>
       {datos.cliente && (
         <div className="px-[18px] py-3 border-t border-borde grid gap-1 text-[13.5px] font-semibold">
@@ -362,9 +294,10 @@ export function BarraResumen({ datos, cta, ayuda, completo }: { datos: DatosResu
         <div className="barra-resumen-txt">
           {t ? (
             <>
-              <b>{`${t.nombreCancha} · ${fmtFecha(t.fecha)} · ${fmtRango12(t.horaInicio, t.horaFin)}`}</b>
+              <b>{`${t.nombreCancha} · ${fmtFecha(t.fecha)} · ${t.horarioTexto}`}</b>
               <span>
                 Adelanto <b>{fmtSoles(adelanto)}</b> · Total {fmtSoles(t.precio)}
+                {t.partes.length > 1 ? ` · ${t.partes.length} turnos` : ''}
                 {completo && (
                   <button type="button" className="barra-toggle ml-2" aria-expanded={abierto} onClick={() => setAbierto((a) => !a)}>
                     {abierto ? 'Ocultar' : 'Ver detalle'}

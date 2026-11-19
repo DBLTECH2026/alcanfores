@@ -50,8 +50,11 @@ public final class Tiempo {
         return fecha.format(FECHA_LARGA);
     }
 
-    /** «7:00 p. m.» */
+    /** «7:00 p. m.»; el fin del día (23:59:59, así se guarda el cierre a medianoche) se muestra «12:00 a. m.». */
     public static String horaAmPm(LocalTime hora) {
+        if (Horarios.esFinDelDia(hora)) {
+            return "12:00 a. m.";
+        }
         int h = hora.getHour();
         int h12 = h % 12 == 0 ? 12 : h % 12;
         String sufijo = h < 12 ? "a. m." : "p. m.";

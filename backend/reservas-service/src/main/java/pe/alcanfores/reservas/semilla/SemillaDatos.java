@@ -15,6 +15,7 @@ import pe.alcanfores.reservas.cliente.ParametrosComplejo;
 import pe.alcanfores.reservas.config.ReservasPropiedades;
 import pe.alcanfores.reservas.modelo.Asistencia;
 import pe.alcanfores.reservas.modelo.Cancelacion;
+import pe.alcanfores.reservas.modelo.TipoBloqueo;
 import pe.alcanfores.reservas.modelo.CanceladoPor;
 import pe.alcanfores.reservas.modelo.Cliente;
 import pe.alcanfores.reservas.modelo.EstadoPago;
@@ -265,8 +266,8 @@ public class SemillaDatos implements CommandLineRunner {
         Reserva r = new Reserva();
         r.setCodigoReserva(ctx.codigo());
         r.setCliente(c);
-        r.setTurno(t);
         r.setEstado(EstadoReserva.PENDIENTE);
+        r.agregarTurno(t, Dinero.redondear(t.getPrecio()));
         r.setEstadoPago(EstadoPago.SIN_PAGO);
         r.setOrigen(origen);
         r.setMetodoPagoPrevisto(metodo);
@@ -341,8 +342,7 @@ public class SemillaDatos implements CommandLineRunner {
         int bloqueados = 0;
         for (Turno t : turnos.findByFechaOrderByIdCanchaAscHoraInicioAsc(fecha)) {
             if (t.getIdCancha() == 3L && t.getHoraInicio().getHour() < 10 && t.getEstado() == EstadoTurno.DISPONIBLE) {
-                t.setEstado(EstadoTurno.BLOQUEADO);
-                t.setMotivoBloqueo("Mantenimiento del grass sintético");
+                t.bloquear(TipoBloqueo.MANUAL, "Mantenimiento del grass sintético");
                 bloqueados++;
             }
         }

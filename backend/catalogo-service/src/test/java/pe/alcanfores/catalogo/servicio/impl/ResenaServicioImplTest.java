@@ -20,6 +20,7 @@ import pe.alcanfores.catalogo.repositorio.CanchaRepositorio;
 import pe.alcanfores.catalogo.repositorio.ResenaRepositorio;
 import pe.alcanfores.comun.auditoria.Auditor;
 import pe.alcanfores.comun.error.NegocioExcepcion;
+import pe.alcanfores.comun.seguridad.UsuarioToken;
 
 import java.util.List;
 import java.util.Optional;
@@ -54,6 +55,10 @@ class ResenaServicioImplTest {
         cancha.setId(1L);
         cancha.setNombre("Cancha 1 · Fútbol 5");
         cancha.setEstado(EstadoCancha.ACTIVA);
+    }
+
+    static UsuarioToken cliente(String dni) {
+        return new UsuarioToken(15L, "lucia@correo.pe", "Lucía Mendoza", UsuarioToken.CLIENTE, dni);
     }
 
     static Object[] fila(Object... valores) {
@@ -102,12 +107,15 @@ class ResenaServicioImplTest {
         when(reservas.elegibleResena("ALC-QW3RT7", "45678912", 1L)).thenReturn(new ElegibilidadResena(true, null, "Diego R."));
         when(resenas.saveAndFlush(any(Resena.class))).thenAnswer(i -> i.getArgument(0));
 
-        ResenaPublicaRespuesta r = servicio.crear(1L,
-                new ResenaSolicitud(" alc-qw3rt7 ", "45678912", 5, "Muy  buena   cancha, volveremos."));
+        ResenaPublicaRespuesta r = servicio.crear(1L, new ResenaSolicitud(" alc-qw3rt7 ", 5, "Muy  buena   cancha, volveremos."), cliente("45678912"));
 
         assertThat(r.autor()).isEqualTo("Diego R.");
         assertThat(r.comentario()).isEqualTo("Muy buena cancha, volveremos.");
         assertThat(r.verificada()).isTrue();
+        assertThat(r.origen()).isEqualTo("CLIENTE");
+        org.mockito.ArgumentCaptor<Resena> guardada = org.mockito.ArgumentCaptor.forClass(Resena.class);
+        verify(resenas).saveAndFlush(guardada.capture());
+        assertThat(guardada.getValue().getIdCuentaCliente()).isEqualTo(15L);
         verify(auditor).registrarComo(org.mockito.ArgumentMatchers.eq("Diego R."), org.mockito.ArgumentMatchers.eq("CLIENTE"),
                 org.mockito.ArgumentMatchers.eq("CREAR_RESENA"), anyString(), any(), anyString());
     }
@@ -117,7 +125,7 @@ class ResenaServicioImplTest {
         when(canchas.findById(1L)).thenReturn(Optional.of(cancha));
         when(reservas.elegibleResena(anyString(), anyString(), any())).thenReturn(new ElegibilidadResena(true, null, "  "));
         when(resenas.saveAndFlush(any(Resena.class))).thenAnswer(i -> i.getArgument(0));
-        assertThat(servicio.crear(1L, new ResenaSolicitud("ALC-QW3RT7", "45678912", 4, "Todo bien en la cancha.")).autor())
+        assertThat(servicio.crear(1L, new ResenaSolicitud("ALC-QW3RT7", 4, "Todo bien en la cancha."), cliente("45678912")).autor())
                 .isEqualTo("Cliente verificado");
     }
 
@@ -126,7 +134,7 @@ class ResenaServicioImplTest {
         when(canchas.findById(1L)).thenReturn(Optional.of(cancha));
         when(reservas.elegibleResena("ALC-QW3RT7", "45678912", 1L)).thenReturn(new ElegibilidadResena(true, null, "Carla M."));
         when(resenas.existsByCodigoReserva("ALC-QW3RT7")).thenReturn(true);
-        assertThatThrownBy(() -> servicio.crear(1L, new ResenaSolicitud("ALC-QW3RT7", "45678912", 4, "Todo bien en la cancha.")))
+        assertThatThrownBy(() -> servicio.crear(1L, new ResenaSolicitud("ALC-QW3RT7", 4, "Todo bien en la cancha."), cliente("45678912")))
                 .isInstanceOf(NegocioExcepcion.class)
                 .satisfies(e -> assertThat(((NegocioExcepcion) e).getCodigo()).isEqualTo("RESENA_DUPLICADA"));
     }
@@ -136,7 +144,7 @@ class ResenaServicioImplTest {
         when(canchas.findById(1L)).thenReturn(Optional.of(cancha));
         when(reservas.elegibleResena("ALC-QW3RT7", "99019999", 1L))
                 .thenReturn(new ElegibilidadResena(false, "No encontramos una reserva con ese código y DNI.", null));
-        assertThatThrownBy(() -> servicio.crear(1L, new ResenaSolicitud("ALC-QW3RT7", "99019999", 4, "Todo bien en la cancha.")))
+        assertThatThrownBy(() -> servicio.crear(1L, new ResenaSolicitud("ALC-QW3RT7", 4, "Todo bien en la cancha."), cliente("99019999")))
                 .isInstanceOf(NegocioExcepcion.class)
                 .satisfies(e -> assertThat(((NegocioExcepcion) e).getCodigo()).isEqualTo("RESENA_NO_ELEGIBLE"));
         verify(resenas, never()).existsByCodigoReserva(anyString());
@@ -153,7 +161,7 @@ class ResenaServicioImplTest {
     void noElegibleSinMotivoUsaUnMensajeAmable() {
         when(canchas.findById(1L)).thenReturn(Optional.of(cancha));
         when(reservas.elegibleResena(anyString(), anyString(), any())).thenReturn(new ElegibilidadResena(false, null, null));
-        assertThatThrownBy(() -> servicio.crear(1L, new ResenaSolicitud("ALC-QW3RT7", "45678912", 4, "Todo bien en la cancha.")))
+        assertThatThrownBy(() -> servicio.crear(1L, new ResenaSolicitud("ALC-QW3RT7", 4, "Todo bien en la cancha."), cliente("45678912")))
                 .isInstanceOf(NegocioExcepcion.class)
                 .hasMessage("Esta reserva todavía no permite dejar una reseña.")
                 .satisfies(e -> assertThat(((NegocioExcepcion) e).getStatus()).isEqualTo(422));
@@ -164,7 +172,7 @@ class ResenaServicioImplTest {
         when(canchas.findById(1L)).thenReturn(Optional.of(cancha));
         when(reservas.elegibleResena(anyString(), anyString(), any())).thenReturn(new ElegibilidadResena(true, null, "Ana P."));
         when(resenas.saveAndFlush(any(Resena.class))).thenThrow(new DataIntegrityViolationException("uq_resena_codigo_reserva"));
-        assertThatThrownBy(() -> servicio.crear(1L, new ResenaSolicitud("ALC-QW3RT7", "45678912", 4, "Todo bien en la cancha.")))
+        assertThatThrownBy(() -> servicio.crear(1L, new ResenaSolicitud("ALC-QW3RT7", 4, "Todo bien en la cancha."), cliente("45678912")))
                 .satisfies(e -> assertThat(((NegocioExcepcion) e).getStatus()).isEqualTo(409));
     }
 
@@ -172,7 +180,7 @@ class ResenaServicioImplTest {
     void canchaInactivaNoRecibeResenas() {
         cancha.setEstado(EstadoCancha.INACTIVA);
         when(canchas.findById(1L)).thenReturn(Optional.of(cancha));
-        assertThatThrownBy(() -> servicio.crear(1L, new ResenaSolicitud("ALC-QW3RT7", "45678912", 4, "Todo bien en la cancha.")))
+        assertThatThrownBy(() -> servicio.crear(1L, new ResenaSolicitud("ALC-QW3RT7", 4, "Todo bien en la cancha."), cliente("45678912")))
                 .satisfies(e -> assertThat(((NegocioExcepcion) e).getStatus()).isEqualTo(404));
     }
 

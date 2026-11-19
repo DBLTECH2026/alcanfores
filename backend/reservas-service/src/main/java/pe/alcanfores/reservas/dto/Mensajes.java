@@ -27,6 +27,12 @@ public final class Mensajes {
     public static final String FECHA = "Elige una fecha válida.";
     public static final String HORA = "Elige una hora válida.";
     public static final String CANCHA = "Elige una cancha.";
+    public static final String TURNOS_CANTIDAD = "Elige entre 1 y 8 turnos.";
+    public static final String TURNOS_REPETIDOS = "No repitas el mismo turno.";
+    public static final String TURNOS_MISMO_DIA = "Los turnos deben ser de la misma cancha y del mismo día.";
+    public static final String ESTADO = "Elige un estado válido: PENDIENTE, CONFIRMADA o CANCELADA.";
+    /** Máximo de turnos por reserva. */
+    public static final int MAX_TURNOS = 8;
 
     private Mensajes() {
     }

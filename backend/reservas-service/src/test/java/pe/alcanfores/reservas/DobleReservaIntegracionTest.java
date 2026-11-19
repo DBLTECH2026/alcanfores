@@ -13,6 +13,7 @@ import pe.alcanfores.reservas.modelo.EstadoTurno;
 import pe.alcanfores.reservas.modelo.Turno;
 import pe.alcanfores.reservas.servicio.ReservaServicio;
 
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
@@ -126,8 +127,75 @@ class DobleReservaIntegracionTest extends PruebaIntegracion {
         assertThat(reservas.count()).isEqualTo(2);
     }
 
+    @Test
+    void dosReservasDeVariosTurnosQueCompartenUnTurnoSoloGanaUna() throws Exception {
+        LocalDate dia = HOY.plusDays(3);
+        Turno t18 = turno(1, dia, 18);
+        Turno t19 = turno(1, dia, 19);
+        Turno t20 = turno(1, dia, 20);
+        // A pide 18 y 19; B pide 19 y 20 (en distinto orden): comparten el turno de las 19.
+        List<List<Long>> pedidos = List.of(List.of(t18.getId(), t19.getId()), List.of(t20.getId(), t19.getId()));
+        CountDownLatch largada = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        List<Future<String>> resultados = new ArrayList<>();
+        for (int i = 0; i < 2; i++) {
+            List<Long> ids = pedidos.get(i);
+            String dni = "4400000" + i;
+            resultados.add(pool.submit(() -> {
+                largada.await();
+                try {
+                    return servicio.registrar(solicitudVarios(ids, dni)).codigoReserva();
+                } catch (NegocioExcepcion e) {
+                    return e.getStatus() + " " + e.getCodigo();
+                }
+            }));
+        }
+        largada.countDown();
+        List<String> salidas = new ArrayList<>();
+        for (Future<String> f : resultados) {
+            salidas.add(f.get(60, TimeUnit.SECONDS));
+        }
+        pool.shutdown();
+
+        assertThat(salidas).filteredOn(s -> s.startsWith("ALC-")).hasSize(1);
+        assertThat(salidas).filteredOn(s -> s.equals("409 TURNO_OCUPADO")).hasSize(1);
+        assertThat(reservas.count()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM reserva_turno WHERE vigente = 1", Integer.class)).isEqualTo(2);
+        assertThat(turnos.findById(t19.getId()).orElseThrow().getEstado()).isEqualTo(EstadoTurno.RESERVADO);
+        long libres = turnos.findAllById(List.of(t18.getId(), t20.getId())).stream()
+                .filter(t -> t.getEstado() == EstadoTurno.DISPONIBLE).count();
+        assertThat(libres).isEqualTo(1);
+    }
+
+    @Test
+    void laColumnaGeneradaDeReservaTurnoImpideQueUnTurnoEsteEnDosReservasVigentes() throws Exception {
+        LocalDate dia = HOY.plusDays(2);
+        Turno t9 = turno(2, dia, 9);
+        Turno t10 = turno(2, dia, 10);
+        reservarWebVarios(List.of(t9.getId(), t10.getId()), "45000001");
+        Long idCliente = jdbc.queryForObject("SELECT id_cliente FROM cliente LIMIT 1", Long.class);
+        Turno t11 = turno(2, dia, 11);
+        // Otra reserva (primer turno distinto) que intenta incluir el turno de las 10 sin pasar por el bloqueo.
+        jdbc.update("INSERT INTO reserva (codigo_reserva, id_cliente, id_turno, estado, estado_pago, origen, monto_total,"
+                + " monto_adelanto, fecha_registro) VALUES ('ALC-WWWWWW', ?, ?, 'PENDIENTE', 'SIN_PAGO', 'WEB', 140, 70, NOW())",
+                idCliente, t11.getId());
+        Long idOtra = jdbc.queryForObject("SELECT id_reserva FROM reserva WHERE codigo_reserva = 'ALC-WWWWWW'", Long.class);
+        String insertar = "INSERT INTO reserva_turno (id_reserva, id_turno, precio, vigente) VALUES (?, ?, 70, ?)";
+        assertThatThrownBy(() -> jdbc.update(insertar, idOtra, t10.getId(), 1))
+                .isInstanceOf(DataIntegrityViolationException.class);
+        // No vigente (reserva cancelada) sí se permite.
+        jdbc.update(insertar, idOtra, t10.getId(), 0);
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM reserva_turno WHERE id_turno = ?", Integer.class, t10.getId()))
+                .isEqualTo(2);
+    }
+
     private static RegistroReservaSolicitud solicitud(Long idTurno, String dni) {
-        return new RegistroReservaSolicitud(idTurno, new ClienteSolicitud(dni, "Ana", "Pérez", "987654321", "ana@example.com"),
-                "YAPE", true, true);
+        return new RegistroReservaSolicitud(idTurno, null,
+                new ClienteSolicitud(dni, "Ana", "Pérez", "987654321", "ana@example.com"), "YAPE", true, true);
+    }
+
+    private static RegistroReservaSolicitud solicitudVarios(List<Long> ids, String dni) {
+        return new RegistroReservaSolicitud(null, ids,
+                new ClienteSolicitud(dni, "Ana", "Pérez", "987654321", "ana@example.com"), "YAPE", true, true);
     }
 }

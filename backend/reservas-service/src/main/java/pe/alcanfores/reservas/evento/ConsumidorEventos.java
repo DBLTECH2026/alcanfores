@@ -3,6 +3,7 @@ package pe.alcanfores.reservas.evento;
 import lombok.RequiredArgsConstructor;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
+import pe.alcanfores.comun.eventos.CalendarioActualizadoEvento;
 import pe.alcanfores.comun.eventos.CanchaActualizadaEvento;
 import pe.alcanfores.comun.eventos.PagoRechazadoEvento;
 import pe.alcanfores.comun.eventos.PagoRegistradoEvento;
@@ -37,5 +38,10 @@ public class ConsumidorEventos {
     @RabbitListener(queues = MensajeriaConfig.COLA_CANCHA_ACTUALIZADA)
     public void alActualizarCancha(CanchaActualizadaEvento evento) {
         turnos.alActualizarCancha(evento);
+    }
+
+    @RabbitListener(queues = MensajeriaConfig.COLA_CALENDARIO_ACTUALIZADO)
+    public void alActualizarCalendario(CalendarioActualizadoEvento evento) {
+        turnos.alActualizarCalendario(evento);
     }
 }

@@ -105,8 +105,10 @@ public class ConstanciaServicioImpl implements ConstanciaServicio {
         String deporte = ReglasReserva.deporteTexto(t.getDeporte());
         m.put("canchaDeporte", t.getNombreCancha().contains(deporte) ? t.getNombreCancha() : t.getNombreCancha() + " · " + deporte);
         m.put("fecha", mayuscula(Tiempo.fechaLarga(t.getFecha())));
-        m.put("hora", Tiempo.horaAmPm(t.getHoraInicio()) + " a " + Tiempo.horaAmPm(t.getHoraFin()));
-        m.put("franja", t.getFranja().name().equals("NOCHE") ? "Tarifa noche" : "Tarifa día");
+        int cantidad = r.cantidadTurnos();
+        m.put("hora", r.horarioTexto() + (cantidad > 1 ? " (" + cantidad + " turnos)" : ""));
+        long franjas = r.turnosOrdenados().stream().map(Turno::getFranja).distinct().count();
+        m.put("franja", franjas > 1 ? "Tarifa día y noche" : t.getFranja().name().equals("NOCHE") ? "Tarifa noche" : "Tarifa día");
         m.put("cliente", cl.nombreCompleto());
         m.put("dni", Documentos.enmascararDni(cl.getDni()));
         m.put("telefono", cl.getTelefono().replaceAll("(\\d{3})(\\d{3})(\\d{3})", "$1 $2 $3"));

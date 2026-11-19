@@ -12,8 +12,9 @@ import pe.alcanfores.comun.seguridad.ComponentesSeguridad;
 import pe.alcanfores.comun.seguridad.SeguridadComun;
 
 /**
- * Reglas de acceso: login público; {@code /api/auth/**} con token; {@code /api/admin/**} con rol ADMIN o RECEPCION
- * (los métodos solo-ADMIN llevan {@code @PreAuthorize}); todo lo demás cerrado.
+ * Reglas de acceso: login del panel, registro y login de clientes públicos; {@code /api/auth/clientes/**} solo con token
+ * CLIENTE; el resto de {@code /api/auth/**} y {@code /api/admin/**} con rol ADMIN o RECEPCION (un token CLIENTE recibe
+ * 403; los métodos solo-ADMIN llevan {@code @PreAuthorize}); todo lo demás cerrado.
  */
 @Configuration
 @EnableMethodSecurity
@@ -25,7 +26,9 @@ public class SeguridadConfig {
         http.authorizeHttpRequests(a -> a
                 .requestMatchers(SeguridadComun.RUTAS_TECNICAS).permitAll()
                 .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
-                .requestMatchers("/api/auth/**").authenticated()
+                .requestMatchers(HttpMethod.POST, "/api/auth/clientes/registro", "/api/auth/clientes/login").permitAll()
+                .requestMatchers("/api/auth/clientes/**").hasRole("CLIENTE")
+                .requestMatchers("/api/auth/**").hasAnyRole("ADMIN", "RECEPCION")
                 .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "RECEPCION")
                 .requestMatchers("/interno/**").hasRole("INTERNO")
                 .anyRequest().denyAll());

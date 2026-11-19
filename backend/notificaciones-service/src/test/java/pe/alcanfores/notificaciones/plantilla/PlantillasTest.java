@@ -110,7 +110,7 @@ class PlantillasTest {
         String html = redactor.redactar(TipoAviso.RESERVA_CONFIRMADA, "x", modeloCompleto()).html();
 
         assertThat(html).contains("Código de reserva", "ALC-7K3M9P", "Cancha 1 · Fútbol 5", "Viernes 20 de noviembre de 2026",
-                "7:00 p. m. a 8:00 p. m.", "S/ 80.00", "Saldo a pagar en el complejo");
+                "7:00–8:00 p. m.", "S/ 80.00", "Saldo a pagar en el complejo");
     }
 
     @Test

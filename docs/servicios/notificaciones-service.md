@@ -91,6 +91,15 @@ Las plantillas están en `resources/plantillas/correo/`: `base.html` (layout), `
   - si no, se toma con un `UPDATE … WHERE estado='PROGRAMADO'` (así dos instancias no lo envían dos veces) y se envía por los dos canales.
 - **Contenido:** el tiempo que falta («Tu partido es en 2 horas», o «1 hora y 30 minutos» si se confirmó tarde), «de hoy» o «de mañana», cancha, hora, **saldo actual** (consultado a reservas; si no responde, se usa el guardado), «Llega 10 minutos antes», dirección + referencia + Google Maps.
 - `reserva.cancelada` → CANCELADO.
+- **Varios turnos (v2):** `inicio` = fecha + `horaInicio` de `DatosReserva`, que reservas-service llena con el PRIMER turno;
+  así el recordatorio sale `recordatorio_horas` antes del primer turno aunque los turnos no sean seguidos.
+
+## Horario en los textos (v2)
+Todos los avisos (correo y WhatsApp) y el recordatorio muestran el campo «Hora» con `ModeloMensajes.horario`: el
+`horarioTexto` de reservas-service («7:00–8:00 p. m.», «9:00–10:00 a. m. y 7:00–8:00 p. m.») y «(N turnos)» si son varios.
+Los eventos y los recordatorios guardados antes de la v2 (JSON sin `horarioTexto` ni `cantidadTurnos`) se leen igual: el
+rango se arma con `Horarios.rango(horaInicio, horaFin)`. «a las …» (confirmación y recordatorio) es la hora del primer turno.
+Sin migraciones nuevas. La demo (`DatosDemo`) incluye una reserva de 2 turnos no seguidos.
 
 ## Reintentos
 
@@ -157,11 +166,13 @@ OpenAPI en `/swagger-ui.html`.
 
 ## Pruebas
 
-`mvn -B -f backend/notificaciones-service/pom.xml verify` → **97 pruebas, 0 fallos**. JaCoCo: **95,5 % de instrucciones** en total y **94,4 %** en `servicio.impl` (93,5 % de líneas).
+`mvn -B -f backend/notificaciones-service/pom.xml verify` → **101 pruebas, 0 fallos** (19/11/2026, v2). JaCoCo: **95,5 % de instrucciones** en total y **94,5 %** en la capa de
+servicio (93,6 % de líneas).
 
 | Clase | Qué cubre |
 |---|---|
 | `ConsumidorEventosTest` | Cada consumidor genera sus 2 avisos con destino, asunto, cuerpo y adjuntos correctos; idempotencia; modo SIMULADO; PDF no disponible; pago por pasarela sin aviso; reservas caído → excepción sin marcar procesado; NO_ASISTIO sin aviso; nota de crédito; cancelación con y sin devolución. |
+| `VariosTurnosTest` | Reserva de 2 turnos no seguidos: registrada, confirmada y cancelada llevan «9:00–10:00 a. m. y 7:00–8:00 p. m. (2 turnos)» en correo y WhatsApp; el recordatorio se programa 2 h antes del primer turno (7:00 a. m.) y se envía con ese horario; un recordatorio guardado sin `horarioTexto` ni `cantidadTurnos` (JSON de la v1) se envía con el rango de horas. |
 | `RecordatorioServicioTest` | Con `Tiempo.fijar`: programado (con las horas del catálogo), no se envía antes de tiempo, enviado a su hora con el contenido completo, saldo actual, reservas caído, OMITIDO (< 30 min), CANCELADO por evento y por reservas, reprogramación, ejecución manual auditada y listado. |
 | `EvolutionClienteTest` | MockRestServiceServer: `sendText` (cabecera `apikey` y cuerpo), `sendMedia` (base64, `fileName`, `caption`), errores 401/400 (número sin WhatsApp)/500, `connectionState` + número, instancia inexistente, `connect` con QR y código, creación automática de la instancia, `logout`, sin conexión. |
 | `EnvioServicioImplTest` | Evolution simulado: ENVIADO; documento con leyenda; texto largo + documento; error → **FALLIDO con el intento sumado** (y vuelve a sumar en el siguiente); error del documento; PDF no disponible; respuesta que no es PDF; descarga única; modo SIMULADO. |

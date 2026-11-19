@@ -65,13 +65,25 @@ class ModeloMensajesTest {
     @DisplayName("Montos y saldo de la reserva; saludo sin nombre")
     void montos() {
         DatosReserva r = new DatosReserva(1L, "ALC-7K3M9P", 1L, "Cancha 1", "FUTBOL_5", Datos.FECHA, Datos.HORA,
-                Datos.HORA.plusHours(1), new BigDecimal("80"), new BigDecimal("40"), new BigDecimal("40"), null);
+                Datos.HORA.plusHours(1), new BigDecimal("80"), new BigDecimal("40"), new BigDecimal("40"), null, null, 0);
         Map<String, Object> m = modelos("http://localhost:5186").reserva(r, Datos.complejo());
 
         assertThat(m).containsEntry("montoTotal", "S/ 80.00").containsEntry("montoPagado", "S/ 40.00")
                 .containsEntry("saldo", "S/ 40.00").containsEntry("haySaldo", true).containsEntry("hayPago", true)
                 .containsEntry("saludo", "Hola").containsEntry("fecha", "Viernes 20 de noviembre de 2026")
-                .containsEntry("fechaCorta", "20/11/2026").containsEntry("horario", "7:00 p. m. a 8:00 p. m.");
+                .containsEntry("fechaCorta", "20/11/2026").containsEntry("horario", "7:00–8:00 p. m.");
+    }
+
+    @Test
+    @DisplayName("Horario: el texto de reservas y, con varios turnos, cuántos son")
+    void horarioDeVariosTurnos() {
+        assertThat(ModeloMensajes.horario(Datos.reservaDosTurnos(Datos.CODIGO, BigDecimal.ZERO)))
+                .isEqualTo("9:00–10:00 a. m. y 7:00–8:00 p. m. (2 turnos)");
+        assertThat(ModeloMensajes.horario(Datos.reserva())).isEqualTo("7:00–8:00 p. m.");
+        Map<String, Object> m = modelos("http://localhost:5186").reserva(Datos.reservaDosTurnos(Datos.CODIGO, BigDecimal.ZERO),
+                Datos.complejo());
+        assertThat(m).containsEntry("horario", "9:00–10:00 a. m. y 7:00–8:00 p. m. (2 turnos)")
+                .containsEntry("horaInicio", "9:00 a. m.");
     }
 
     @Test

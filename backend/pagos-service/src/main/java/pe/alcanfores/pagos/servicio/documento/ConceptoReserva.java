@@ -1,5 +1,6 @@
 package pe.alcanfores.pagos.servicio.documento;
 
+import pe.alcanfores.comun.util.Horarios;
 import pe.alcanfores.comun.util.Tiempo;
 import pe.alcanfores.pagos.modelo.InstantaneaReserva;
 import pe.alcanfores.pagos.modelo.TipoPago;
@@ -12,8 +13,8 @@ import java.time.LocalTime;
 import java.util.Locale;
 
 /**
- * Textos del servicio vendido: «Alquiler de Cancha 2 · Fútbol 6 · vie 20/11/2026 7:00 p. m.–8:00 p. m.» y, en el
- * comprobante, «… · Adelanto 50 %».
+ * Textos del servicio vendido: «Alquiler de Cancha 2 · Fútbol 6 · vie 20/11/2026 7:00–8:00 p. m.» (con varios turnos:
+ * «… 9:00–10:00 a. m. y 7:00–8:00 p. m. (2 turnos)») y, en el comprobante, «… · Adelanto 50 %».
  */
 public final class ConceptoReserva {
 
@@ -23,9 +24,17 @@ public final class ConceptoReserva {
     private ConceptoReserva() {
     }
 
+    /** Un solo turno (semilla y reservas de la v1). */
     public static String concepto(String nombreCancha, String deporte, LocalDate fecha, LocalTime inicio, LocalTime fin,
                                   String codigoReserva) {
-        if (nombreCancha == null || nombreCancha.isBlank() || fecha == null || inicio == null || fin == null) {
+        String horario = inicio == null || fin == null ? null : Horarios.rango(inicio, fin);
+        return concepto(nombreCancha, deporte, fecha, horario, 1, codigoReserva);
+    }
+
+    /** {@code horarioTexto} lo arma reservas-service; con más de un turno se agrega «(N turnos)». */
+    public static String concepto(String nombreCancha, String deporte, LocalDate fecha, String horarioTexto,
+                                  int cantidadTurnos, String codigoReserva) {
+        if (nombreCancha == null || nombreCancha.isBlank() || fecha == null || horarioTexto == null || horarioTexto.isBlank()) {
             return "Alquiler de cancha deportiva · Reserva " + codigoReserva;
         }
         StringBuilder sb = new StringBuilder("Alquiler de ").append(nombreCancha.trim());
@@ -34,8 +43,10 @@ public final class ConceptoReserva {
             sb.append(" · ").append(textoDeporte);
         }
         sb.append(" · ").append(DIAS[fecha.getDayOfWeek().getValue() - 1]).append(' ')
-                .append(fecha.format(Tiempo.FECHA_CORTA)).append(' ')
-                .append(Tiempo.horaAmPm(inicio)).append('–').append(Tiempo.horaAmPm(fin));
+                .append(fecha.format(Tiempo.FECHA_CORTA)).append(' ').append(horarioTexto.trim());
+        if (cantidadTurnos > 1) {
+            sb.append(" (").append(cantidadTurnos).append(" turnos)");
+        }
         return sb.length() > MAX_CONCEPTO ? sb.substring(0, MAX_CONCEPTO) : sb.toString();
     }
 

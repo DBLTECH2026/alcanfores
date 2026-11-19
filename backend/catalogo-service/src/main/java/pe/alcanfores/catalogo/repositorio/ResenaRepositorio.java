@@ -17,6 +17,10 @@ public interface ResenaRepositorio extends JpaRepository<Resena, Long> {
 
     Page<Resena> findByCanchaIdAndEstado(Long idCancha, EstadoResena estado, Pageable pageable);
 
+    /** Todas las reseñas de una cancha (también las ocultas), más recientes primero: la ficha de la cancha del panel. */
+    @EntityGraph(attributePaths = "cancha")
+    List<Resena> findByCanchaIdOrderByCreadoEnDescIdDesc(Long idCancha);
+
     /** Conteo por puntuación de las reseñas publicadas de una cancha: filas {puntuacion, cantidad}. */
     @Query("select r.puntuacion, count(r) from Resena r where r.cancha.id = :idCancha and r.estado = :estado group by r.puntuacion")
     List<Object[]> contarPorPuntuacion(@Param("idCancha") Long idCancha, @Param("estado") EstadoResena estado);

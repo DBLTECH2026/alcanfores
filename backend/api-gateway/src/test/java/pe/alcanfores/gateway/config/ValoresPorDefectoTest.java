@@ -56,4 +56,31 @@ class ValoresPorDefectoTest {
         GatewayPropiedades sinValor = new GatewayPropiedades(null, null, 0, 0, null, null);
         assertThat(sinValor.timeoutDocumentosMs()).isEqualTo(20_000);
     }
+
+    @Test
+    void ningunFiltroQuitaLaCabeceraAuthorization() {
+        // La reseña con sesión (/api/catalogo/**) y «Mis reservas» necesitan que el token llegue al servicio.
+        Properties p = yml();
+        p.stringPropertyNames().stream()
+                .filter(k -> k.contains("filters"))
+                .forEach(k -> assertThat(p.getProperty(k).toLowerCase()).doesNotContain("authorization"));
+    }
+
+    @Test
+    void rutasNuevasDeLaV2() {
+        Properties p = yml();
+        String catalogo = null;
+        String reservas = null;
+        for (int i = 0; p.getProperty("spring.cloud.gateway.server.webflux.routes[" + i + "].id") != null; i++) {
+            String prefijo = "spring.cloud.gateway.server.webflux.routes[" + i + "].";
+            if ("catalogo".equals(p.getProperty(prefijo + "id"))) {
+                catalogo = p.getProperty(prefijo + "predicates[0]");
+            }
+            if ("reservas".equals(p.getProperty(prefijo + "id"))) {
+                reservas = p.getProperty(prefijo + "predicates[0]");
+            }
+        }
+        assertThat(catalogo).contains("/api/admin/calendario/**");
+        assertThat(reservas).contains("/api/cliente/**");
+    }
 }

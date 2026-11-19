@@ -15,21 +15,21 @@ import pe.alcanfores.catalogo.modelo.CanchaFoto;
 import pe.alcanfores.catalogo.modelo.EstadoCancha;
 import pe.alcanfores.catalogo.repositorio.CanchaFotoRepositorio;
 import pe.alcanfores.catalogo.repositorio.CanchaRepositorio;
+import pe.alcanfores.catalogo.modelo.ClaveConfiguracion;
 import pe.alcanfores.catalogo.servicio.CanchaServicio;
+import pe.alcanfores.catalogo.servicio.ConfiguracionServicio;
 import pe.alcanfores.catalogo.servicio.ResenaServicio;
 import pe.alcanfores.catalogo.util.Calificaciones;
 import pe.alcanfores.catalogo.util.Slugs;
 import pe.alcanfores.comun.auditoria.Auditor;
 import pe.alcanfores.comun.error.NegocioExcepcion;
-import pe.alcanfores.comun.eventos.CanchaActualizadaEvento;
 import pe.alcanfores.comun.util.Dinero;
 import pe.alcanfores.comun.util.Texto;
-import pe.alcanfores.comun.util.Tiempo;
 
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -41,6 +41,7 @@ public class CanchaServicioImpl implements CanchaServicio {
     private final CanchaRepositorio canchas;
     private final CanchaFotoRepositorio fotos;
     private final ResenaServicio resenas;
+    private final ConfiguracionServicio configuracion;
     private final CanchaMapeador mapeador;
     private final ApplicationEventPublisher eventos;
     private final Auditor auditor;
@@ -93,6 +94,7 @@ public class CanchaServicioImpl implements CanchaServicio {
         c.setSlug(slugLibre(nombre, null));
         c.setEstado(s.estado() == null ? EstadoCancha.ACTIVA : s.estado());
         c.setOrden(s.orden() == null ? canchas.maximoOrden() + 1 : s.orden());
+        horarioPorDefecto(c);
         canchas.save(c);
         anunciar(c);
         auditor.registrar("CREAR_CANCHA", "cancha", c.getId(), resumenAuditoria(c));
@@ -193,10 +195,23 @@ public class CanchaServicioImpl implements CanchaServicio {
         c.setPrecioNoche(Dinero.redondear(s.precioNoche()));
     }
 
-    /** El evento se entrega a RabbitMQ después del commit (PublicadorCanchaActualizada). */
+    /** El evento (con el horario completo) se entrega a RabbitMQ después del commit (PublicadorCanchaActualizada). */
     private void anunciar(Cancha c) {
-        eventos.publishEvent(new CanchaActualizadaEvento(UUID.randomUUID(), Tiempo.ahora(), c.getId(), c.getNombre(),
-                c.getDeporte().name(), c.getPrecioDia(), c.getPrecioNoche(), c.getEstado().name()));
+        eventos.publishEvent(mapeador.evento(c));
+    }
+
+    /**
+     * Una cancha nueva abre todos los días con el horario global del complejo (por defecto 8:00 a. m.–11:00 p. m., turnos de
+     * 60 min, noche desde las 6:00 p. m.) y en feriado abre con S/ 10 de adicional; luego se ajusta en «Horario y precios».
+     */
+    private void horarioPorDefecto(Cancha c) {
+        Map<String, String> conf = configuracion.todas();
+        int duracion = Integer.parseInt(conf.get(ClaveConfiguracion.DURACION_MIN.clave()));
+        c.setDuracionTurnoMin(duracion);
+        c.setInicioNoche(LocalTime.parse(conf.get(ClaveConfiguracion.INICIO_NOCHE.clave())));
+        c.setHorario(new ArrayList<>(HorarioServicioImpl.semanaPorDefecto(
+                LocalTime.parse(conf.get(ClaveConfiguracion.PRIMER_TURNO.clave())),
+                LocalTime.parse(conf.get(ClaveConfiguracion.ULTIMO_TURNO.clave())), duracion)));
     }
 
     private static String resumenAuditoria(Cancha c) {

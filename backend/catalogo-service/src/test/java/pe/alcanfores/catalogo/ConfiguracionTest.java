@@ -23,7 +23,8 @@ class ConfiguracionTest extends PruebaIntegracion {
     void recepcionPuedeVerPeroNoEditar() throws Exception {
         mvc.perform(get("/api/admin/configuracion").header("Authorization", tokenRecepcion()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", aMapWithSize(23)))
+                .andExpect(jsonPath("$", aMapWithSize(24)))
+                .andExpect(jsonPath("$.dias_generados").value("120"))
                 .andExpect(jsonPath("$.adelanto_pct").value("50"))
                 .andExpect(jsonPath("$.ultimo_turno").value("23:00"))
                 // V3__ruc_emisor_ficticio: el RUC anterior (20612345679) existe en SUNAT; el emisor ficticio es 20000000001.

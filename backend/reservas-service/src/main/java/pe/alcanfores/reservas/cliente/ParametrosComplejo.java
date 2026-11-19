@@ -16,14 +16,14 @@ import java.util.Map;
 public record ParametrosComplejo(int adelantoPct, int devolucionHoras, LocalTime primerTurno, LocalTime ultimoTurno,
                                  int duracionMin, LocalTime inicioNoche, int diasVisibles, int minutosParaPagar,
                                  int recordatorioHoras, String nombreComplejo, String direccion, String referencia,
-                                 String whatsapp, String correo, String mapaUrl) {
+                                 String whatsapp, String correo, String mapaUrl, int diasGenerados) {
 
     private static final ParametrosComplejo DEFECTO = new ParametrosComplejo(50, 24, LocalTime.of(8, 0), LocalTime.of(23, 0),
             60, LocalTime.of(18, 0), 14, 20, 2, "Complejo Deportivo Los Alcanfores",
             "Carretera Central km 11.5, Santa Clara, Ate",
             "Paradero Caseta, a dos cuadras de la UTP Santa Clara",
             "+51 914 995 187", "informes.alcanfores@gmail.com",
-            "https://www.google.com/maps/search/?api=1&query=Complejo+Deportivo+Los+Alcanfores+Santa+Clara+Ate");
+            "https://www.google.com/maps/search/?api=1&query=Complejo+Deportivo+Los+Alcanfores+Santa+Clara+Ate", 120);
 
     public static ParametrosComplejo porDefecto() {
         return DEFECTO;
@@ -55,7 +55,8 @@ public record ParametrosComplejo(int adelantoPct, int devolucionHoras, LocalTime
                 texto(m, "referencia", d.referencia),
                 texto(m, "whatsapp", d.whatsapp),
                 texto(m, "correo", d.correo),
-                texto(m, "mapaurl", d.mapaUrl));
+                texto(m, "mapaurl", d.mapaUrl),
+                entero(m, "diasgenerados", d.diasGenerados, 14, 365));
     }
 
     /** Horas de inicio de los turnos del día: desde el primer turno hasta que el siguiente ya no termine antes del cierre. */
@@ -67,6 +68,11 @@ public record ParametrosComplejo(int adelantoPct, int devolucionHoras, LocalTime
             horas.add(LocalTime.of(m / 60, m % 60));
         }
         return horas;
+    }
+
+    /** Días hacia adelante con turnos generados (nunca menos que los visibles). */
+    public int horizonte() {
+        return Math.max(diasGenerados, diasVisibles);
     }
 
     public Franja franja(LocalTime horaInicio) {

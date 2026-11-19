@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "6f8fadaa-9121-4e88-b0d9-c0a9b196fd6b",
+    "_postman_id": "9bfa8e6c-3572-455c-87f1-0cecef99e152",
     "name": "Alcanfores · API de microservicios",
     "description": "Sistema de reservas del Complejo Deportivo Los Alcanfores (UTP · Desarrollo Web Integrado). Todas las peticiones pasan por el API Gateway. Ejecutar en orden: las variables se encadenan.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
@@ -359,7 +359,8 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('Responde 200', () => pm.response.to.have.status(200));",
-                  "pm.test('Adelanto configurado', () => pm.expect(pm.response.json().reglas.adelantoPct).to.be.above(0));"
+                  "pm.test('Adelanto configurado', () => pm.expect(pm.response.json().reglas.adelantoPct).to.be.above(0));",
+                  "pm.collectionVariables.set('adelantoPct', pm.response.json().reglas.adelantoPct);"
                 ]
               }
             }
@@ -481,7 +482,7 @@
           ]
         },
         {
-          "name": "Reseña con enlace (validación)",
+          "name": "Reseña sin iniciar sesión",
           "request": {
             "method": "POST",
             "header": [
@@ -509,7 +510,7 @@
             },
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"codigoReserva\": \"ALC-XXXXXX\",\n  \"dni\": \"7012\",\n  \"puntuacion\": 9,\n  \"comentario\": \"visita www.spam.com\"\n}"
+              "raw": "{\n  \"codigoReserva\": \"ALC-XXXXXX\",\n  \"puntuacion\": 5,\n  \"comentario\": \"Muy buena cancha, volveremos pronto.\"\n}"
             }
           },
           "event": [
@@ -518,8 +519,78 @@
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
                   "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Horario y feriado en el detalle de la cancha",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/catalogo/canchas/{{idCancha}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "catalogo",
+                "canchas",
+                "{{idCancha}}"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('Trae horario de 7 días con texto y feriado', () => { pm.expect(j.horario.dias.length).to.eql(7); pm.expect(j.horario.texto).to.be.a('string'); pm.expect(j.feriado.modo).to.be.oneOf(['ABIERTA', 'CERRADA']); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Calendario público (feriados y días cerrados)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/catalogo/calendario",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "catalogo",
+                "calendario"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Es una lista con fecha y tipo', () => { const l = pm.response.json(); pm.expect(l).to.be.an('array'); l.forEach(d => pm.expect(d.tipo).to.be.oneOf(['FERIADO', 'NO_LABORABLE'])); });"
                 ]
               }
             }
@@ -1714,6 +1785,2084 @@
           ]
         }
       ]
+    },
+    {
+      "name": "06 · Horario por cancha, calendario y bloqueos",
+      "item": [
+        {
+          "name": "Horario de la cancha (panel)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/admin/canchas/{{idCancha}}/horario",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "canchas",
+                "{{idCancha}}",
+                "horario"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json(); pm.collectionVariables.set('horario', JSON.stringify(j));",
+                  "pm.test('7 días, duración y feriado', () => { pm.expect(j.dias.length).to.eql(7); pm.expect(j.duracionTurnoMin).to.be.at.least(30); pm.expect(j.feriado).to.have.property('recargo'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Guardar el mismo horario (regenera sin cambios)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/admin/canchas/{{idCancha}}/horario",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "canchas",
+                "{{idCancha}}",
+                "horario"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{{horario}}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Devuelve el horario guardado', () => pm.expect(pm.response.json().dias.length).to.eql(7));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Horario que no calza con la duración",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/admin/canchas/{{idCancha}}/horario",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "canchas",
+                "{{idCancha}}",
+                "horario"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"duracionTurnoMin\": 120,\n  \"inicioNoche\": \"18:00\",\n  \"feriado\": {\n    \"modo\": \"ABIERTA\",\n    \"recargo\": 10\n  },\n  \"dias\": [\n    {\n      \"diaSemana\": 1,\n      \"abierto\": true,\n      \"apertura\": \"08:00\",\n      \"cierre\": \"23:00\"\n    },\n    {\n      \"diaSemana\": 2,\n      \"abierto\": true,\n      \"apertura\": \"08:00\",\n      \"cierre\": \"23:00\"\n    },\n    {\n      \"diaSemana\": 3,\n      \"abierto\": true,\n      \"apertura\": \"08:00\",\n      \"cierre\": \"23:00\"\n    },\n    {\n      \"diaSemana\": 4,\n      \"abierto\": true,\n      \"apertura\": \"08:00\",\n      \"cierre\": \"23:00\"\n    },\n    {\n      \"diaSemana\": 5,\n      \"abierto\": true,\n      \"apertura\": \"08:00\",\n      \"cierre\": \"23:00\"\n    },\n    {\n      \"diaSemana\": 6,\n      \"abierto\": true,\n      \"apertura\": \"08:00\",\n      \"cierre\": \"23:00\"\n    },\n    {\n      \"diaSemana\": 7,\n      \"abierto\": true,\n      \"apertura\": \"08:00\",\n      \"cierre\": \"23:00\"\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });",
+                  "pm.test('Dice cuánto sobra y cómo ajustarlo', () => pm.expect(JSON.stringify(pm.response.json())).to.include('sobra 1 hora'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Vista previa del lunes (guardado)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/admin/canchas/{{idCancha}}/horario/vista-previa?dia=1",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "canchas",
+                "{{idCancha}}",
+                "horario",
+                "vista-previa"
+              ],
+              "query": [
+                {
+                  "key": "dia",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Lista de turnos con precio y franja', () => { const l = pm.response.json(); pm.expect(l.length).to.be.above(0); pm.expect(l[0]).to.have.keys('horaInicio','horaFin','precio','franja'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Vista previa sin guardar (turnos de 90 min)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/admin/canchas/{{idCancha}}/horario/vista-previa?dia=1",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "canchas",
+                "{{idCancha}}",
+                "horario",
+                "vista-previa"
+              ],
+              "query": [
+                {
+                  "key": "dia",
+                  "value": "1"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"duracionTurnoMin\": 90,\n  \"inicioNoche\": \"18:00\",\n  \"feriado\": {\n    \"modo\": \"ABIERTA\",\n    \"recargo\": 10\n  },\n  \"dias\": [\n    {\n      \"diaSemana\": 1,\n      \"abierto\": true,\n      \"apertura\": \"08:00\",\n      \"cierre\": \"23:00\"\n    },\n    {\n      \"diaSemana\": 2,\n      \"abierto\": true,\n      \"apertura\": \"08:00\",\n      \"cierre\": \"23:00\"\n    },\n    {\n      \"diaSemana\": 3,\n      \"abierto\": true,\n      \"apertura\": \"08:00\",\n      \"cierre\": \"23:00\"\n    },\n    {\n      \"diaSemana\": 4,\n      \"abierto\": true,\n      \"apertura\": \"08:00\",\n      \"cierre\": \"23:00\"\n    },\n    {\n      \"diaSemana\": 5,\n      \"abierto\": true,\n      \"apertura\": \"08:00\",\n      \"cierre\": \"23:00\"\n    },\n    {\n      \"diaSemana\": 6,\n      \"abierto\": true,\n      \"apertura\": \"08:00\",\n      \"cierre\": \"23:00\"\n    },\n    {\n      \"diaSemana\": 7,\n      \"abierto\": true,\n      \"apertura\": \"08:00\",\n      \"cierre\": \"23:00\"\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('10 turnos de 8:00 a. m. a 11:00 p. m.', () => { const l = pm.response.json(); pm.expect(l.length).to.eql(10); pm.expect(l[0].horaFin).to.eql('09:30'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Calendario del año (panel)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/admin/calendario?anio=2026",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "calendario"
+              ],
+              "query": [
+                {
+                  "key": "anio",
+                  "value": "2026"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Feriados de Perú precargados', () => pm.expect(pm.response.json().filter(d => d.tipo === 'FERIADO').length).to.be.at.least(16));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cargar feriados de Perú 2027 (sin duplicar)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/admin/calendario/feriados-peru?anio=2027",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "calendario",
+                "feriados-peru"
+              ],
+              "query": [
+                {
+                  "key": "anio",
+                  "value": "2027"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Son 16 feriados entre creados y existentes', () => { const j = pm.response.json(); pm.expect(j.creados + j.existentes).to.eql(16); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Día no laborable inválido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/admin/calendario",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "calendario"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fecha\": null,\n  \"tipo\": null,\n  \"nombre\": \"x\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });",
+                  "pm.test('Error en fecha, tipo y nombre', () => { const c = pm.response.json().errores.map(e => e.campo); ['fecha','tipo','nombre'].forEach(x => pm.expect(c).to.include(x)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Registrar día no laborable",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/admin/calendario",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "calendario"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fecha\": \"{{fechaEspecial}}\",\n  \"tipo\": \"NO_LABORABLE\",\n  \"nombre\": \"Mantenimiento del grass (prueba Postman)\",\n  \"canchas\": [\n    \"{{idCancha}}\"\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Fecha lejana (sin turnos ni reservas) que no cae en un feriado nacional",
+                  "const fijos = ['01-01','05-01','06-07','06-29','07-23','07-28','07-29','08-06','08-30','10-08','11-01','12-08','12-09','12-25','04-01','04-02','04-03','03-25','03-26'];",
+                  "let d = new Date(Date.now() + (200 + Math.floor(Math.random()*150))*86400000 - 5*3600000);",
+                  "while (fijos.includes(d.toISOString().slice(5,10))) { d = new Date(d.getTime() + 86400000); }",
+                  "pm.collectionVariables.set('fechaEspecial', d.toISOString().slice(0,10));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json(); pm.collectionVariables.set('idDiaEspecial', j.id);",
+                  "pm.test('Queda solo para esa cancha', () => { pm.expect(j.tipo).to.eql('NO_LABORABLE'); pm.expect(j.canchas.length).to.eql(1); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Misma fecha otra vez",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/admin/calendario",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "calendario"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fecha\": \"{{fechaEspecial}}\",\n  \"tipo\": \"FERIADO\",\n  \"nombre\": \"Feriado repetido de prueba\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409', () => pm.response.to.have.status(409));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });",
+                  "pm.test('DIA_ESPECIAL_DUPLICADO', () => pm.expect(pm.response.json().codigo).to.eql('DIA_ESPECIAL_DUPLICADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Quitar el día no laborable",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/admin/calendario/{{idDiaEspecial}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "calendario",
+                "{{idDiaEspecial}}"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Bloquear un rango de horas",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/admin/turnos/bloquear-rango",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "turnos",
+                "bloquear-rango"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idsCancha\": [\n    \"{{idCancha}}\"\n  ],\n  \"fecha\": \"{{fechaBloqueo}}\",\n  \"horaDesde\": \"08:00\",\n  \"horaHasta\": \"10:00\",\n  \"motivo\": \"Mantenimiento de prueba\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = new Date(Date.now() + (10)*86400000 - 5*3600000); pm.collectionVariables.set('fechaBloqueo', d.toISOString().slice(0,10));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json(); pm.collectionVariables.set('bloqueados', j.bloqueados);",
+                  "pm.test('Cuenta bloqueados y omitidos', () => { pm.expect(j.bloqueados).to.be.a('number'); pm.expect(j.omitidosConReserva).to.be.an('array'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Desbloquear el mismo rango",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/admin/turnos/desbloquear-rango",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "turnos",
+                "desbloquear-rango"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idsCancha\": [\n    \"{{idCancha}}\"\n  ],\n  \"fecha\": \"{{fechaBloqueo}}\",\n  \"horaDesde\": \"08:00\",\n  \"horaHasta\": \"10:00\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Libera lo que se bloqueó', () => pm.expect(pm.response.json().desbloqueados).to.eql(Number(pm.collectionVariables.get('bloqueados'))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Rango con horas al revés",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/admin/turnos/bloquear-rango",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "turnos",
+                "bloquear-rango"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idsCancha\": [\n    \"{{idCancha}}\"\n  ],\n  \"fecha\": \"{{fechaBloqueo}}\",\n  \"horaDesde\": \"12:00\",\n  \"horaHasta\": \"10:00\",\n  \"motivo\": \"Mantenimiento de prueba\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 · Cuentas de clientes y Mis reservas",
+      "item": [
+        {
+          "name": "Turnos libres para la reserva de varios turnos",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/disponibilidad?fecha={{fechaVarios}}&idCancha={{idCancha}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "disponibilidad"
+              ],
+              "query": [
+                {
+                  "key": "fecha",
+                  "value": "{{fechaVarios}}"
+                },
+                {
+                  "key": "idCancha",
+                  "value": "{{idCancha}}"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = new Date(Date.now() + (5)*86400000 - 5*3600000); pm.collectionVariables.set('fechaVarios', d.toISOString().slice(0,10));",
+                  "pm.collectionVariables.set('dniCliente', '98' + String(Math.floor(Math.random()*1e6)).padStart(6, '0'));",
+                  "pm.collectionVariables.set('correoCliente', 'cliente' + Date.now() + '@example.com');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const t = pm.response.json().canchas[0].turnos.filter(x => x.estado === 'DISPONIBLE');",
+                  "let a = null, b = null; for (let i = 0; i < t.length && !b; i++) for (let j = i + 1; j < t.length; j++) if (t[j].horaInicio !== t[i].horaFin) { a = t[i]; b = t[j]; break; }",
+                  "pm.test('Hay dos turnos libres no seguidos y uno más', () => { pm.expect(b).to.not.be.null; pm.expect(t.length).to.be.at.least(3); });",
+                  "const c = t.find(x => x !== a && x !== b);",
+                  "pm.collectionVariables.set('idTurnoA', a.idTurno); pm.collectionVariables.set('idTurnoB', b.idTurno); pm.collectionVariables.set('idTurnoC', c.idTurno);",
+                  "pm.collectionVariables.set('totalVarios', (a.precio + b.precio).toFixed(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reserva de 2 turnos no seguidos (sin cuenta)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/reservas",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "reservas"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idsTurno\": [\n    \"{{idTurnoA}}\",\n    \"{{idTurnoB}}\"\n  ],\n  \"cliente\": {\n    \"dni\": \"{{dniCliente}}\",\n    \"nombres\": \"Lucía\",\n    \"apellidos\": \"Mendoza Paredes\",\n    \"telefono\": \"987111222\",\n    \"correo\": \"{{correoCliente}}\"\n  },\n  \"metodoPago\": \"YAPE\",\n  \"aceptaTerminos\": true,\n  \"aceptaPrivacidad\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json(); pm.collectionVariables.set('codigoVarios', r.codigoReserva);",
+                  "const total = Number(pm.collectionVariables.get('totalVarios')); const pct = Number(pm.collectionVariables.get('adelantoPct'));",
+                  "pm.test('Total = suma de los 2 turnos y adelanto = total × %', () => { pm.expect(r.montoTotal).to.be.closeTo(total, 0.001); pm.expect(r.montoAdelanto).to.be.closeTo(Math.round(total * pct) / 100, 0.001); });",
+                  "pm.test('2 turnos con horario en texto', () => { pm.expect(r.cantidadTurnos).to.eql(2); pm.expect(r.turnos.length).to.eql(2); pm.expect(r.horarioTexto).to.include(' y '); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "El mismo turno dos veces",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/reservas",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "reservas"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idsTurno\": [\n    \"{{idTurnoC}}\",\n    \"{{idTurnoC}}\"\n  ],\n  \"cliente\": {\n    \"dni\": \"{{dniCliente}}\",\n    \"nombres\": \"Lucía\",\n    \"apellidos\": \"Mendoza Paredes\",\n    \"telefono\": \"987111222\",\n    \"correo\": \"{{correoCliente}}\"\n  },\n  \"metodoPago\": \"YAPE\",\n  \"aceptaTerminos\": true,\n  \"aceptaPrivacidad\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });",
+                  "pm.test('Error en idsTurno', () => pm.expect(pm.response.json().errores.map(e => e.campo)).to.include('idsTurno'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear cuenta con datos inválidos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/clientes/registro",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "clientes",
+                "registro"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"12\",\n  \"nombres\": \"1\",\n  \"apellidos\": \"\",\n  \"correo\": \"x\",\n  \"telefono\": \"812\",\n  \"contrasena\": \"corta\",\n  \"confirmacion\": \"otra\",\n  \"aceptaTerminos\": false,\n  \"aceptaPrivacidad\": false\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });",
+                  "pm.test('Un error por cada campo', () => pm.expect(pm.response.json().errores.length).to.be.at.least(7));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear cuenta (DNI de la reserva anterior)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/clientes/registro",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "clientes",
+                "registro"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"{{dniCliente}}\",\n  \"nombres\": \"Lucía\",\n  \"apellidos\": \"Mendoza Paredes\",\n  \"correo\": \"{{correoCliente}}\",\n  \"telefono\": \"987111222\",\n  \"contrasena\": \"Cliente2026\",\n  \"confirmacion\": \"Cliente2026\",\n  \"aceptaTerminos\": true,\n  \"aceptaPrivacidad\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json(); pm.collectionVariables.set('tokenCliente', j.token);",
+                  "pm.test('Sesión iniciada con la cuenta', () => { pm.expect(j.tipo).to.eql('Bearer'); pm.expect(j.cliente.dni).to.eql(pm.collectionVariables.get('dniCliente')); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear cuenta con el mismo DNI",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/clientes/registro",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "clientes",
+                "registro"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"{{dniCliente}}\",\n  \"nombres\": \"Lucía\",\n  \"apellidos\": \"Mendoza Paredes\",\n  \"correo\": \"otro.{{correoCliente}}\",\n  \"telefono\": \"987111222\",\n  \"contrasena\": \"Cliente2026\",\n  \"confirmacion\": \"Cliente2026\",\n  \"aceptaTerminos\": true,\n  \"aceptaPrivacidad\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 409', () => pm.response.to.have.status(409));",
+                  "pm.test('DNI_REGISTRADO', () => pm.expect(pm.response.json().codigo).to.eql('DNI_REGISTRADO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Iniciar sesión con DNI",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/clientes/login",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "clientes",
+                "login"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usuario\": \"{{dniCliente}}\",\n  \"contrasena\": \"Cliente2026\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set('tokenCliente', pm.response.json().token);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Iniciar sesión con correo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/clientes/login",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "clientes",
+                "login"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usuario\": \"{{correoCliente}}\",\n  \"contrasena\": \"Cliente2026\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Contraseña incorrecta",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/clientes/login",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "clientes",
+                "login"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"usuario\": \"{{dniCliente}}\",\n  \"contrasena\": \"Incorrecta2026\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mi cuenta",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/auth/clientes/yo",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "clientes",
+                "yo"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Es la cuenta del DNI', () => pm.expect(pm.response.json().dni).to.eql(pm.collectionVariables.get('dniCliente')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar mis datos",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/clientes/yo",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "clientes",
+                "yo"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"nombres\": \"Lucía\",\n  \"apellidos\": \"Mendoza Paredes\",\n  \"correo\": \"{{correoCliente}}\",\n  \"telefono\": \"987111333\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Celular actualizado', () => pm.expect(pm.response.json().telefono).to.eql('987111333'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mis reservas (incluye la hecha antes de crear la cuenta)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/cliente/reservas",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "cliente",
+                "reservas"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const l = pm.response.json().contenido;",
+                  "pm.test('Aparece la reserva de 2 turnos', () => pm.expect(l.map(x => x.codigoReserva)).to.include(pm.collectionVariables.get('codigoVarios')));",
+                  "pm.test('Cada ítem trae sus acciones', () => pm.expect(l[0]).to.include.keys('puedeCancelar','puedeReenviarComprobante','puedeResenar','resenada'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Detalle en Mis reservas",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/cliente/reservas/{{codigoVarios}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "cliente",
+                "reservas",
+                "{{codigoVarios}}"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Con sus 2 turnos y sin reseña', () => { const j = pm.response.json(); pm.expect(j.turnos.length).to.eql(2); pm.expect(j.resenada).to.eql(false); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mis reservas sin sesión",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/cliente/reservas",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "cliente",
+                "reservas"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 401', () => pm.response.to.have.status(401));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mis reservas con token de administradora",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/cliente/reservas",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "cliente",
+                "reservas"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Panel con token de cliente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/admin/reservas",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "reservas"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reservar con sesión (el DNI sale de la cuenta)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/reservas",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "reservas"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idsTurno\": [\n    \"{{idTurnoC}}\"\n  ],\n  \"cliente\": {\n    \"dni\": \"{{dni}}\",\n    \"nombres\": \"Lucía\",\n    \"apellidos\": \"Mendoza Paredes\",\n    \"telefono\": \"987111222\",\n    \"correo\": \"{{correoCliente}}\"\n  },\n  \"metodoPago\": \"PLIN\",\n  \"aceptaTerminos\": true,\n  \"aceptaPrivacidad\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const r = pm.response.json(); pm.collectionVariables.set('codigoSesion', r.codigoReserva);",
+                  "const dni = pm.collectionVariables.get('dniCliente');",
+                  "pm.test('Quedó a nombre del DNI de la cuenta', () => pm.expect(r.cliente.dniEnmascarado).to.eql(dni[0] + '****' + dni.slice(5)));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reseña con sesión: datos inválidos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/catalogo/canchas/{{idCancha}}/resenas",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "catalogo",
+                "canchas",
+                "{{idCancha}}",
+                "resenas"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigoReserva\": \"ALC-XXXXXX\",\n  \"puntuacion\": 9,\n  \"comentario\": \"visita www.spam.com\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reseña con sesión de una reserva aún no jugada",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/catalogo/canchas/{{idCancha}}/resenas",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "catalogo",
+                "canchas",
+                "{{idCancha}}",
+                "resenas"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"codigoReserva\": \"{{codigoVarios}}\",\n  \"puntuacion\": 5,\n  \"comentario\": \"Todavía no juego pero ya quiero opinar.\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 422', () => pm.response.to.have.status(422));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancelar la reserva de 2 turnos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/reservas/{{codigoVarios}}/cancelar",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "reservas",
+                "{{codigoVarios}}",
+                "cancelar"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"{{dniCliente}}\",\n  \"motivo\": \"Prueba automática de la colección Postman\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('CANCELADA', () => pm.expect(pm.response.json().estado).to.eql('CANCELADA'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancelar la reserva hecha con sesión",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/reservas/{{codigoSesion}}/cancelar",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "reservas",
+                "{{codigoSesion}}",
+                "cancelar"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"{{dniCliente}}\",\n  \"motivo\": \"Prueba automática de la colección Postman\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cambiar mi contraseña",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/clientes/cambiar-contrasena",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "clientes",
+                "cambiar-contrasena"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"actual\": \"Cliente2026\",\n  \"nueva\": \"Cliente2027\",\n  \"confirmacion\": \"Cliente2027\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "08 · Reseñas del complejo (en cada cancha)",
+      "item": [
+        {
+          "name": "Reseñas de la cancha (panel, incluye ocultas)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/admin/canchas/{{idCancha}}/resenas",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "canchas",
+                "{{idCancha}}",
+                "resenas"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const l = pm.response.json(); const c = l.find(r => r.origen === 'CLIENTE'); if (c) pm.collectionVariables.set('idResenaCliente', c.id);",
+                  "pm.test('Cada reseña dice su origen', () => l.forEach(r => pm.expect(r.origen).to.be.oneOf(['CLIENTE', 'COMPLEJO'])));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Crear reseña del complejo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/admin/canchas/{{idCancha}}/resenas",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "canchas",
+                "{{idCancha}}",
+                "resenas"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"autor\": \"Club Los Pumas\",\n  \"puntuacion\": 5,\n  \"comentario\": \"Jugamos el campeonato interno y todo estuvo impecable.\",\n  \"fecha\": \"{{ayer}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = new Date(Date.now() + (-1)*86400000 - 5*3600000); pm.collectionVariables.set('ayer', d.toISOString().slice(0,10));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "const j = pm.response.json(); pm.collectionVariables.set('idResenaComplejo', j.id);",
+                  "pm.test('Origen COMPLEJO y publicada', () => { pm.expect(j.origen).to.eql('COMPLEJO'); pm.expect(j.estado).to.eql('PUBLICADA'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reseña del complejo inválida",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/admin/canchas/{{idCancha}}/resenas",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "canchas",
+                "{{idCancha}}",
+                "resenas"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"autor\": \"1\",\n  \"puntuacion\": 0,\n  \"comentario\": \"corto\",\n  \"fecha\": \"2999-01-01\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Editar la reseña del complejo",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/admin/resenas/{{idResenaComplejo}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "resenas",
+                "{{idResenaComplejo}}"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"autor\": \"Club Los Pumas\",\n  \"puntuacion\": 4,\n  \"comentario\": \"Jugamos el campeonato interno; muy buena atención.\",\n  \"fecha\": \"{{ayer}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Nueva puntuación', () => pm.expect(pm.response.json().puntuacion).to.eql(4));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ocultarla",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/admin/resenas/{{idResenaComplejo}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "resenas",
+                "{{idResenaComplejo}}"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"estado\": \"OCULTA\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Borrar una reseña de cliente (no se permite)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/admin/resenas/{{idResenaCliente}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "resenas",
+                "{{idResenaCliente}}"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 422', () => pm.response.to.have.status(422));",
+                  "pm.test('RESENA_DE_CLIENTE', () => pm.expect(pm.response.json().codigo).to.eql('RESENA_DE_CLIENTE'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Borrar la reseña del complejo",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/admin/resenas/{{idResenaComplejo}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "resenas",
+                "{{idResenaComplejo}}"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "variable": [
@@ -1751,6 +3900,82 @@
     },
     {
       "key": "serie",
+      "value": ""
+    },
+    {
+      "key": "adelantoPct",
+      "value": ""
+    },
+    {
+      "key": "horario",
+      "value": ""
+    },
+    {
+      "key": "fechaEspecial",
+      "value": ""
+    },
+    {
+      "key": "idDiaEspecial",
+      "value": ""
+    },
+    {
+      "key": "fechaBloqueo",
+      "value": ""
+    },
+    {
+      "key": "bloqueados",
+      "value": ""
+    },
+    {
+      "key": "fechaVarios",
+      "value": ""
+    },
+    {
+      "key": "dniCliente",
+      "value": ""
+    },
+    {
+      "key": "correoCliente",
+      "value": ""
+    },
+    {
+      "key": "idTurnoA",
+      "value": ""
+    },
+    {
+      "key": "idTurnoB",
+      "value": ""
+    },
+    {
+      "key": "idTurnoC",
+      "value": ""
+    },
+    {
+      "key": "totalVarios",
+      "value": ""
+    },
+    {
+      "key": "codigoVarios",
+      "value": ""
+    },
+    {
+      "key": "codigoSesion",
+      "value": ""
+    },
+    {
+      "key": "tokenCliente",
+      "value": ""
+    },
+    {
+      "key": "idResenaCliente",
+      "value": ""
+    },
+    {
+      "key": "idResenaComplejo",
+      "value": ""
+    },
+    {
+      "key": "ayer",
       "value": ""
     }
   ]

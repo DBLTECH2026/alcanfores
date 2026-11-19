@@ -10,8 +10,9 @@ import pe.alcanfores.comun.seguridad.ComponentesSeguridad;
 import pe.alcanfores.comun.seguridad.SeguridadComun;
 
 /**
- * Reglas de acceso (SPEC §2): portal público abierto, {@code /api/admin/**} con token (ADMIN o RECEPCION; lo exclusivo
- * de ADMIN se marca con {@code @PreAuthorize}) y {@code /interno/**} solo con {@code X-Interno-Token}.
+ * Reglas de acceso (SPEC §2): portal público abierto, {@code /api/cliente/**} solo con token CLIENTE («Mis reservas»),
+ * {@code /api/admin/**} con token ADMIN o RECEPCION (un token CLIENTE recibe 403; lo exclusivo de ADMIN se marca con
+ * {@code @PreAuthorize}) y {@code /interno/**} solo con {@code X-Interno-Token}.
  */
 @Configuration
 @EnableMethodSecurity
@@ -26,6 +27,7 @@ public class SeguridadConfig {
                 .requestMatchers(HttpMethod.GET, "/api/disponibilidad", "/api/disponibilidad/**").permitAll()
                 .requestMatchers(HttpMethod.GET, "/api/documentos/**").permitAll()
                 .requestMatchers("/api/reservas", "/api/reservas/**").permitAll()
+                .requestMatchers("/api/cliente/**").hasRole("CLIENTE")
                 .requestMatchers("/api/admin/**").hasAnyRole("ADMIN", "RECEPCION")
                 .anyRequest().denyAll());
         return http.build();

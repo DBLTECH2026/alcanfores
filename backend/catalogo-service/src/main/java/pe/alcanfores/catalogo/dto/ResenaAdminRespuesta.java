@@ -2,7 +2,7 @@ package pe.alcanfores.catalogo.dto;
 
 import java.time.LocalDateTime;
 
-/** Reseña en el panel de moderación. */
+/** Reseña en el panel ({@code fecha} = {@code creadoEn}; {@code origen} CLIENTE o COMPLEJO). */
 public record ResenaAdminRespuesta(
         Long id,
         Long idCancha,
@@ -14,6 +14,8 @@ public record ResenaAdminRespuesta(
         String estado,
         String respuesta,
         LocalDateTime respondidoEn,
-        LocalDateTime creadoEn
+        LocalDateTime creadoEn,
+        LocalDateTime fecha,
+        String origen
 ) {
 }

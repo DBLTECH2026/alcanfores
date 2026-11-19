@@ -21,9 +21,9 @@ import { VisorImagen } from '@/componentes/ui/VisorImagen';
 import { medirImagen, tipoPorBytes } from '@/utilidades/documentos';
 import { esquemaCancha, esquemaCaracteristica, esquemaLeyenda, MSJ_PANEL } from './esquemasPanel';
 
-type Entrada = z.input<typeof esquemaCancha>;
-type Salida = z.output<typeof esquemaCancha>;
-const DEPORTES = [
+export type Entrada = z.input<typeof esquemaCancha>;
+export type Salida = z.output<typeof esquemaCancha>;
+export const DEPORTES = [
   { valor: 'FUTBOL_5', texto: 'Fútbol 5' },
   { valor: 'FUTBOL_6', texto: 'Fútbol 6' },
   { valor: 'FUTBOL_7', texto: 'Fútbol 7' },
@@ -31,7 +31,7 @@ const DEPORTES = [
   { valor: 'BASQUET', texto: 'Básquet' },
   { valor: 'MULTIUSO', texto: 'Multiusos (vóley y básquet)' },
 ];
-const CAMPOS = ['nombre', 'deporte', 'superficie', 'capacidad', 'descripcion', 'descripcionLarga', 'medidas', 'caracteristicas', 'precioDia', 'precioNoche', 'orden', 'estado', 'techada', 'iluminacionLed'];
+export const CAMPOS = ['nombre', 'deporte', 'superficie', 'capacidad', 'descripcion', 'descripcionLarga', 'medidas', 'caracteristicas', 'precioDia', 'precioNoche', 'orden', 'estado', 'techada', 'iluminacionLed'];
 const VACIA: Entrada = {
   nombre: '',
   deporte: 'FUTBOL_5',
@@ -48,7 +48,7 @@ const VACIA: Entrada = {
   orden: '5',
   estado: 'ACTIVA',
 };
-const deCancha = (c: CanchaAdmin): Entrada => ({
+export const deCancha = (c: CanchaAdmin): Entrada => ({
   nombre: c.nombre,
   deporte: c.deporte,
   superficie: c.superficie,
@@ -65,7 +65,7 @@ const deCancha = (c: CanchaAdmin): Entrada => ({
   estado: c.estado,
 });
 
-/** Crear o editar una cancha (prototipo adm-41) + gestión de fotos (subir con vista previa, leyenda, orden, principal, borrar). */
+/** Crear una cancha (v2: editarla es la ficha de 3 apartados en ./cancha/FichaCanchaAdmin). Sirve también para editar por id. */
 export default function CanchaFormulario({ id }: { id?: number }) {
   useTituloPagina(id ? 'Editar cancha' : 'Nueva cancha');
   const navigate = useNavigate();
@@ -267,7 +267,8 @@ async function validarFoto(f: File): Promise<string | null> {
   return null;
 }
 
-function FotosCancha({ cancha, alCambiar }: { cancha: CanchaAdmin; alCambiar: () => void }) {
+/** Fotos de la cancha: subir con vista previa, leyenda, orden, principal y borrar. `compacto` = panel lateral del editor. */
+export function FotosCancha({ cancha, alCambiar, compacto }: { cancha: CanchaAdmin; alCambiar: () => void; compacto?: boolean }) {
   const toast = useToast();
   const entrada = useRef<HTMLInputElement>(null);
   const [archivo, setArchivo] = useState<File | null>(null);
@@ -339,17 +340,17 @@ function FotosCancha({ cancha, alCambiar }: { cancha: CanchaAdmin; alCambiar: ()
   };
 
   return (
-    <section className="pc" id="fotos" aria-labelledby="h-fotos">
-      <div className="pc-cab">
+    <section className={compacto ? 'grid gap-3' : 'pc'} id="fotos" aria-labelledby="h-fotos">
+      <div className={compacto ? 'sr-only' : 'pc-cab'}>
         <h2 id="h-fotos">
           <Images className="ico" aria-hidden />
           Fotos
         </h2>
         <span className="pc-der dato-ico">{fotos.length}/10</span>
       </div>
-      <div className="pc-cuerpo grid gap-4">
+      <div className={compacto ? 'grid gap-4' : 'pc-cuerpo grid gap-4'}>
         {/* subir */}
-        <div className="grid gap-3 md:grid-cols-[260px_1fr] items-start">
+        <div className={compacto ? 'grid gap-3' : 'grid gap-3 md:grid-cols-[260px_1fr] items-start'}>
           <button
             type="button"
             className="uploader !min-h-[170px] grid place-items-center gap-2 cursor-pointer overflow-hidden p-0"
@@ -401,7 +402,7 @@ function FotosCancha({ cancha, alCambiar }: { cancha: CanchaAdmin; alCambiar: ()
         {fotos.length === 0 ? (
           <Vacio ilustracion="IL-25-sin-canchas" titulo="Sin fotos" texto="La primera que subas será la principal." compacto />
         ) : (
-          <div className="fotos-panel">
+          <div className={compacto ? 'fotos-panel compacto' : 'fotos-panel'}>
             {fotos.map((f, i) => (
               <figure key={f.id} className="foto-panel m-0">
                 <div className="img">

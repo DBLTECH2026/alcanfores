@@ -105,12 +105,12 @@ public class ReservaAdminServicioImpl implements ReservaAdminServicio {
         UsuarioToken u = SeguridadUtil.requerido();
         PagoInicialSolicitud pago = s.pagoInicial();
         Reserva r = transacciones.execute(estadoTx -> {
-            Reserva creada = operaciones.crear(new OperacionesReserva.NuevaReserva(s.idTurno(), s.cliente(),
+            Reserva creada = operaciones.crear(new OperacionesReserva.NuevaReserva(s.turnos(), s.cliente(),
                     Origen.valueOf(s.origen()), pago == null ? null : pago.metodo(), s.nota(), u.id(), u.usuario()));
             validarMonto(pago, creada);
             auditor.registrar("REGISTRAR_RESERVA_MANUAL", "reserva", creada.getCodigoReserva(),
                     creada.getTurno().getNombreCancha() + " · " + creada.getTurno().getFecha() + " "
-                            + creada.getTurno().getHoraInicio() + " · " + creada.getOrigen());
+                            + creada.horarioTexto() + " · " + creada.getOrigen());
             return creada;
         });
         var respuesta = mapeador.creada(r);

@@ -1,7 +1,11 @@
 package pe.alcanfores.catalogo.modelo;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
 import jakarta.persistence.Convert;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.OrderBy;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -20,6 +24,7 @@ import pe.alcanfores.comun.util.Tiempo;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -84,6 +89,28 @@ public class Cancha {
 
     @Column(nullable = false)
     private Integer orden;
+
+    /** Duración de cada turno (30–240, múltiplo de 15). */
+    @Column(name = "duracion_turno_min", nullable = false)
+    private Integer duracionTurnoMin = 60;
+
+    /** Un turno que EMPIEZA a esta hora o después cobra {@code precioNoche}. */
+    @Column(name = "inicio_noche", nullable = false)
+    private LocalTime inicioNoche = LocalTime.of(18, 0);
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "feriado_modo", nullable = false)
+    private FeriadoModo feriadoModo = FeriadoModo.ABIERTA;
+
+    /** Adicional en soles POR TURNO cuando la cancha abre en feriado. */
+    @Column(name = "recargo_feriado", nullable = false, precision = 8, scale = 2)
+    private BigDecimal recargoFeriado = new BigDecimal("10.00");
+
+    /** Los 7 días de la semana (lunes primero). */
+    @ElementCollection
+    @CollectionTable(name = "cancha_horario", joinColumns = @JoinColumn(name = "id_cancha"))
+    @OrderBy("diaSemana")
+    private List<HorarioCancha> horario = new ArrayList<>();
 
     @Column(name = "creado_en", nullable = false, updatable = false)
     private LocalDateTime creadoEn;

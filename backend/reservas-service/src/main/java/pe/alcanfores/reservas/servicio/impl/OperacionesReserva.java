@@ -16,10 +16,10 @@ import pe.alcanfores.comun.util.Dinero;
 import pe.alcanfores.comun.util.Texto;
 import pe.alcanfores.comun.util.Tiempo;
 import pe.alcanfores.comun.validacion.CodigoReserva;
-import pe.alcanfores.reservas.cliente.CanchaCatalogo;
 import pe.alcanfores.reservas.cliente.ParametrosComplejo;
 import pe.alcanfores.reservas.dto.Mensajes;
 import pe.alcanfores.reservas.dto.ReservaDtos.ClienteSolicitud;
+import pe.alcanfores.reservas.dto.ReservaDtos.TurnosPedidos;
 import pe.alcanfores.reservas.evento.EventoParaPublicar;
 import pe.alcanfores.reservas.mapeador.ReservaMapeador;
 import pe.alcanfores.reservas.modelo.Cancelacion;
@@ -39,6 +39,7 @@ import pe.alcanfores.reservas.repositorio.ClienteRepositorio;
 import pe.alcanfores.reservas.repositorio.ConsultaDocumentoRepositorio;
 import pe.alcanfores.reservas.repositorio.HistorialRepositorio;
 import pe.alcanfores.reservas.repositorio.ReservaRepositorio;
+import pe.alcanfores.reservas.repositorio.ReservaTurnoRepositorio;
 import pe.alcanfores.reservas.repositorio.TurnoRepositorio;
 import pe.alcanfores.reservas.servicio.ComplejoServicio;
 import pe.alcanfores.reservas.servicio.ReglasReserva;
@@ -48,6 +49,9 @@ import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -63,11 +67,12 @@ public class OperacionesReserva {
 
     public static final String MENSAJE_OCUPADO = "Ese turno acaba de ser reservado por otra persona. Elige otro horario.";
     public static final String MENSAJE_NO_ENCONTRADA = "No encontramos una reserva con ese código y DNI. Revisa ambos datos.";
-    private static final List<EstadoReserva> VIGENTES = List.of(EstadoReserva.PENDIENTE, EstadoReserva.CONFIRMADA);
     private static final SecureRandom AZAR = new SecureRandom();
 
     private final ReservaRepositorio reservas;
     private final TurnoRepositorio turnos;
+    private final ReservaTurnoRepositorio reservaTurnos;
+    private final PlanificadorTurnos planificador;
     private final ClienteRepositorio clientes;
     private final CancelacionRepositorio cancelaciones;
     private final HistorialRepositorio historial;
@@ -76,15 +81,17 @@ public class OperacionesReserva {
     private final ReservaMapeador mapeador;
     private final ApplicationEventPublisher eventos;
 
-    /** Datos para crear una reserva (web o manual). */
-    public record NuevaReserva(Long idTurno, ClienteSolicitud cliente, Origen origen, String metodoPagoPrevisto, String nota,
-                               Long registradoPor, String registradoPorUsuario) {
+    /** Datos para crear una reserva (web o manual) de 1 a 8 turnos. */
+    public record NuevaReserva(TurnosPedidos turnos, ClienteSolicitud cliente, Origen origen, String metodoPagoPrevisto,
+                               String nota, Long registradoPor, String registradoPorUsuario) {
     }
 
     /**
-     * Crea la reserva PENDIENTE/SIN_PAGO: bloquea el turno con {@code SELECT … FOR UPDATE}, valida las reglas del §3,
-     * hace upsert del cliente por DNI y deja el evento {@code reserva.registrada} para después del commit.
-     * Si aun así dos reservas chocan, el índice UNIQUE de {@code turno_activo} lo impide → 409 TURNO_OCUPADO.
+     * Crea la reserva PENDIENTE/SIN_PAGO de 1 a 8 turnos de la misma cancha y fecha (pueden no ser seguidos): bloquea los
+     * turnos con {@code SELECT … FOR UPDATE} en orden de id (dos reservas que comparten un turno no se interbloquean),
+     * valida las reglas del §3, hace upsert del cliente por DNI y deja {@code reserva.registrada} para después del commit.
+     * Total = suma de los precios (con recargo de feriado); adelanto = total × adelantoPct. Si aun así dos reservas chocan,
+     * el índice UNIQUE de {@code reserva_turno.turno_activo} lo impide → 409 TURNO_OCUPADO.
      */
     @Transactional(propagation = Propagation.MANDATORY)
     public Reserva crear(NuevaReserva n) {
@@ -92,41 +99,36 @@ public class OperacionesReserva {
         LocalDateTime ahora = Tiempo.ahora();
         LocalDate hoy = ahora.toLocalDate();
         boolean web = n.origen() == Origen.WEB;
-
-        Turno t = turnos.bloquearPorId(n.idTurno())
-                .orElseThrow(() -> NegocioExcepcion.validacion("idTurno", Mensajes.TURNO));
-        if (t.getFecha().isBefore(hoy) || t.getFecha().isAfter(hoy.plusDays(p.diasVisibles()))) {
+        List<Turno> ts = bloquearTurnos(n.turnos());
+        Turno primero = ts.get(0);
+        if (primero.getFecha().isBefore(hoy) || primero.getFecha().isAfter(hoy.plusDays(p.diasVisibles()))) {
             throw NegocioExcepcion.validacion("fecha", Mensajes.rangoFecha(p.diasVisibles()));
         }
-        boolean aTiempo = web ? !t.inicio().isBefore(ahora.plusMinutes(ReglasReserva.MINUTOS_ANTICIPACION))
-                : ahora.isBefore(t.fin());
-        if (!aTiempo) {
-            throw NegocioExcepcion.validacion("idTurno", Mensajes.TURNO);
-        }
-        boolean canchaInactiva = complejo.cancha(t.getIdCancha()).map(c -> !c.activa()).orElse(false);
-        if (t.getEstado() == EstadoTurno.BLOQUEADO || canchaInactiva) {
-            throw NegocioExcepcion.conflicto("TURNO_NO_DISPONIBLE", Mensajes.TURNO);
-        }
-        if (t.getEstado() == EstadoTurno.RESERVADO || !reservas.deTurnoEnEstados(t.getId(), VIGENTES).isEmpty()) {
-            throw ocupado();
+        for (Turno t : ts) {
+            validarLibre(t, web, ahora, n.turnos().campo());
         }
 
         Reserva r = new Reserva();
         r.setCodigoReserva(nuevoCodigo());
         r.setCliente(guardarCliente(n.cliente(), ahora, !web));
-        r.setTurno(t);
         r.setEstado(EstadoReserva.PENDIENTE);
         r.setEstadoPago(EstadoPago.SIN_PAGO);
+        BigDecimal total = BigDecimal.ZERO;
+        for (Turno t : ts) {
+            BigDecimal precio = Dinero.redondear(t.getPrecio());
+            r.agregarTurno(t, precio);
+            total = total.add(precio);
+            t.setEstado(EstadoTurno.RESERVADO);
+        }
         r.setOrigen(n.origen());
         r.setMetodoPagoPrevisto(n.metodoPagoPrevisto());
-        r.setMontoTotal(Dinero.redondear(t.getPrecio()));
-        r.setMontoAdelanto(Dinero.porcentaje(t.getPrecio(), p.adelantoPct()));
+        r.setMontoTotal(Dinero.redondear(total));
+        r.setMontoAdelanto(Dinero.porcentaje(total, p.adelantoPct()));
         r.setMontoPagado(BigDecimal.ZERO.setScale(2));
-        r.setVenceEn(web ? min(ahora.plusMinutes(p.minutosParaPagar()), t.inicio()) : null);
+        r.setVenceEn(web ? min(ahora.plusMinutes(p.minutosParaPagar()), primero.inicio()) : null);
         r.setFechaRegistro(ahora);
         r.setRegistradoPor(n.registradoPor());
         r.setNota(n.nota() == null || n.nota().isBlank() ? null : Texto.limpiar(n.nota()));
-        t.setEstado(EstadoTurno.RESERVADO);
         try {
             reservas.saveAndFlush(r);
         } catch (DataIntegrityViolationException e) {
@@ -139,7 +141,7 @@ public class OperacionesReserva {
         return r;
     }
 
-    /** Cancela la reserva, libera el turno y deja {@code reserva.cancelada} para después del commit. */
+    /** Cancela la reserva, libera TODOS sus turnos y deja {@code reserva.cancelada} para después del commit. */
     @Transactional(propagation = Propagation.MANDATORY)
     public Cancelacion cancelar(Reserva r, CanceladoPor por, Long idAdministrador, String motivo, boolean devolucion) {
         LocalDateTime ahora = Tiempo.ahora();
@@ -149,10 +151,10 @@ public class OperacionesReserva {
         DatosReserva datos = mapeador.datos(r);
         r.setEstado(EstadoReserva.CANCELADA);
         r.setVenceEn(null);
-        Turno t = r.getTurno();
-        if (t.getEstado() == EstadoTurno.RESERVADO) {
-            t.setEstado(EstadoTurno.DISPONIBLE);
-            complejo.cancha(t.getIdCancha()).filter(CanchaCatalogo::activa).ifPresent(c -> t.setPrecio(c.precio(t.getFranja())));
+        for (Turno t : r.turnosOrdenados()) {
+            if (t.getEstado() == EstadoTurno.RESERVADO) {
+                planificador.liberado(t);
+            }
         }
         Cancelacion c = new Cancelacion();
         c.setReserva(r);
@@ -253,6 +255,47 @@ public class OperacionesReserva {
                     ConsultaDocumento.FUENTE_NO_ENCONTRADO));
         }
         return clientes.save(c);
+    }
+
+    /**
+     * Valida la lista (1 a 8, sin repetir) y bloquea los turnos en orden de id. Deben ser de la misma cancha y fecha.
+     *
+     * @return los turnos ordenados por hora de inicio
+     */
+    private List<Turno> bloquearTurnos(TurnosPedidos pedidos) {
+        List<Long> ids = pedidos.ids();
+        String campo = pedidos.campo();
+        if (ids.isEmpty() || ids.size() > Mensajes.MAX_TURNOS) {
+            throw NegocioExcepcion.validacion(campo, Mensajes.TURNOS_CANTIDAD);
+        }
+        if (new HashSet<>(ids).size() != ids.size()) {
+            throw NegocioExcepcion.validacion(campo, Mensajes.TURNOS_REPETIDOS);
+        }
+        List<Turno> ts = new ArrayList<>(turnos.bloquearPorIds(ids));
+        if (ts.size() != ids.size() || ts.stream().anyMatch(t -> !t.visible())) {
+            throw NegocioExcepcion.validacion(campo, Mensajes.TURNO);
+        }
+        if (ts.stream().map(Turno::getIdCancha).distinct().count() > 1 || ts.stream().map(Turno::getFecha).distinct().count() > 1) {
+            throw NegocioExcepcion.validacion(campo, Mensajes.TURNOS_MISMO_DIA);
+        }
+        ts.sort(Comparator.comparing(Turno::getHoraInicio));
+        return ts;
+    }
+
+    /** Web: empieza en 30 min o más; panel: aún no termina. No bloqueado, cancha activa y sin reserva vigente. */
+    private void validarLibre(Turno t, boolean web, LocalDateTime ahora, String campo) {
+        boolean aTiempo = web ? !t.inicio().isBefore(ahora.plusMinutes(ReglasReserva.MINUTOS_ANTICIPACION))
+                : ahora.isBefore(t.fin());
+        if (!aTiempo) {
+            throw NegocioExcepcion.validacion(campo, Mensajes.TURNO);
+        }
+        boolean canchaInactiva = complejo.cancha(t.getIdCancha()).map(c -> !c.activa()).orElse(false);
+        if (t.getEstado() == EstadoTurno.BLOQUEADO || canchaInactiva) {
+            throw NegocioExcepcion.conflicto("TURNO_NO_DISPONIBLE", Mensajes.TURNO);
+        }
+        if (t.getEstado() == EstadoTurno.RESERVADO || reservaTurnos.existsByTurnoIdAndVigenteTrue(t.getId())) {
+            throw ocupado();
+        }
     }
 
     private String textoRegistro(Reserva r, NuevaReserva n) {

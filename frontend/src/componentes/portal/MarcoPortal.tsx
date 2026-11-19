@@ -13,8 +13,11 @@ import {
   ShieldCheck,
   Smartphone,
   Ticket,
+  UserRound,
   X,
 } from 'lucide-react';
+import { useCuenta } from '@/contexto/CuentaContext';
+import { iniciales } from '@/utilidades/formato';
 import { Logo, PatronCancha } from '@/componentes/ui/Marca';
 import { Modal } from '@/componentes/ui/Modal';
 import { Boton, BotonEnlace, BotonExterno } from '@/componentes/ui/Boton';
@@ -42,6 +45,7 @@ const SELLO = MODO_MOCK ? 'Proyecto UTP · datos simulados' : 'Proyecto UTP · D
  */
 export function MarcoPortal({ children, modo = 'completo' }: { children: ReactNode; modo?: 'completo' | 'flujo' }) {
   const { datos: complejo } = useComplejo();
+  const { cliente } = useCuenta();
   const [menu, setMenu] = useState(false);
   const [salir, setSalir] = useState(false);
   const { pathname } = useLocation();
@@ -87,6 +91,18 @@ export function MarcoPortal({ children, modo = 'completo' }: { children: ReactNo
                   ))}
                 </nav>
                 <div className="mc-acciones">
+                  {/* v2: cuenta del cliente, discreta (reservar sin cuenta sigue igual) */}
+                  {cliente ? (
+                    <Link to="/mi-cuenta" className="mc-cuenta" aria-label={`Mi cuenta: ${cliente.nombres}`} aria-current={pathname.startsWith('/mi-cuenta') ? 'page' : undefined}>
+                      <span className="mc-cuenta-av">{iniciales(`${cliente.nombres} ${cliente.apellidos}`)}</span>
+                      <span className="solo-escritorio">{cliente.nombres.split(' ')[0]}</span>
+                    </Link>
+                  ) : (
+                    <Link to="/ingresar" className="mc-ingresar">
+                      <LogIn className="ico ico-18" aria-hidden />
+                      <span>Ingresar</span>
+                    </Link>
+                  )}
                   <BotonEnlace to="/mi-reserva" variante="secundario" tamano="sm" icono={Ticket} className="mc-mireserva-movil">
                     Mi reserva
                   </BotonEnlace>
@@ -184,7 +200,13 @@ export function MarcoPortal({ children, modo = 'completo' }: { children: ReactNo
                 <Boton variante="fantasma" icono={X} etiqueta="Cerrar menú" onClick={() => setMenu(false)} autoFocus />
               </div>
               <nav className="drawer-nav">
-                {[{ a: '/reservar', texto: 'Reservar', icono: CalendarPlus }, ...NAV, { a: '/terminos', texto: 'Términos', icono: ShieldCheck }, { a: '/privacidad', texto: 'Privacidad', icono: Lock }].map(
+                {[
+                  { a: '/reservar', texto: 'Reservar', icono: CalendarPlus },
+                  ...NAV,
+                  cliente ? { a: '/mi-cuenta', texto: 'Mi cuenta', icono: UserRound } : { a: '/ingresar', texto: 'Ingresar', icono: LogIn },
+                  { a: '/terminos', texto: 'Términos', icono: ShieldCheck },
+                  { a: '/privacidad', texto: 'Privacidad', icono: Lock },
+                ].map(
                   ({ a, texto, icono: Icono }) => (
                     <Link key={a} to={a} aria-current={pathname.startsWith(a) ? 'page' : undefined} onClick={() => setMenu(false)}>
                       <Icono className="ico" aria-hidden />

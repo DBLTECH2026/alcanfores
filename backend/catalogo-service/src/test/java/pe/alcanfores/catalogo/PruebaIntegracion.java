@@ -42,6 +42,11 @@ public abstract class PruebaIntegracion {
         return "Bearer " + jwt.generar(new UsuarioToken(1L, "rhuaman", "Rosa Huamán", UsuarioToken.ADMIN));
     }
 
+    /** Cliente con cuenta (rol CLIENTE) y su DNI en el token. */
+    protected String tokenCliente(String dni) {
+        return "Bearer " + jwt.generar(new UsuarioToken(15L, "cliente@correo.pe", "Lucía Mendoza", UsuarioToken.CLIENTE, dni));
+    }
+
     protected String tokenRecepcion() {
         return "Bearer " + jwt.generar(new UsuarioToken(2L, "mtorres", "Marco Torres", UsuarioToken.RECEPCION));
     }

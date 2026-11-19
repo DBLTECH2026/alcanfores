@@ -8,6 +8,7 @@ import pe.alcanfores.reservas.modelo.EstadoPago;
 import pe.alcanfores.reservas.modelo.EstadoReserva;
 import pe.alcanfores.reservas.modelo.EstadoTurno;
 import pe.alcanfores.reservas.modelo.Franja;
+import pe.alcanfores.reservas.modelo.TipoBloqueo;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -26,8 +27,10 @@ public final class TurnoDtos {
     public record AgendaCancha(Long idCancha, String nombre, String deporte, boolean activa, List<AgendaTurno> turnos) {
     }
 
+    /** {@code precio} ya incluye el {@code recargo} de feriado; {@code tipoBloqueo}: MANUAL, FERIADO, NO_LABORABLE o CANCHA_INACTIVA. */
     public record AgendaTurno(Long idTurno, LocalTime horaInicio, LocalTime horaFin, BigDecimal precio, Franja franja,
-                              EstadoTurno estado, String motivoBloqueo, AgendaReserva reserva) {
+                              EstadoTurno estado, String motivoBloqueo, AgendaReserva reserva, boolean feriado,
+                              BigDecimal recargo, TipoBloqueo tipoBloqueo) {
     }
 
     public record AgendaReserva(String codigoReserva, String cliente, String telefono, EstadoReserva estado,
@@ -49,15 +52,34 @@ public final class TurnoDtos {
     public record DesbloqueoSolicitud(@Size(max = 120, message = Mensajes.MOTIVO_BLOQUEO) String motivo) {
     }
 
+    /**
+     * Bloqueo por rango: varias canchas ({@code idsCancha}; se acepta {@code idCancha} suelto), una fecha o hasta
+     * {@code fechaHasta} (máx. 31 días) y las horas desde–hasta ({@code "24:00"} = fin del día).
+     */
     public record BloqueoRangoSolicitud(
-            @NotNull(message = Mensajes.CANCHA) @Positive(message = Mensajes.CANCHA) Long idCancha,
+            List<@NotNull(message = Mensajes.CANCHA) @Positive(message = Mensajes.CANCHA) Long> idsCancha,
+            @Positive(message = Mensajes.CANCHA) Long idCancha,
             @NotNull(message = Mensajes.FECHA) LocalDate fecha,
+            LocalDate fechaHasta,
             @NotNull(message = Mensajes.HORA) LocalTime horaDesde,
             @NotNull(message = Mensajes.HORA) LocalTime horaHasta,
             @TextoEntre(min = 3, max = 120, message = Mensajes.MOTIVO_BLOQUEO) String motivo) {
     }
 
-    /** bloqueados: turnos que pasaron a BLOQUEADO; omitidos: turnos con reserva vigente (no se tocan). */
-    public record BloqueoRangoRespuesta(int bloqueados, int omitidos, List<LocalTime> horasOmitidas) {
+    public record DesbloqueoRangoSolicitud(
+            List<@NotNull(message = Mensajes.CANCHA) @Positive(message = Mensajes.CANCHA) Long> idsCancha,
+            @Positive(message = Mensajes.CANCHA) Long idCancha,
+            @NotNull(message = Mensajes.FECHA) LocalDate fecha,
+            LocalDate fechaHasta,
+            @NotNull(message = Mensajes.HORA) LocalTime horaDesde,
+            @NotNull(message = Mensajes.HORA) LocalTime horaHasta) {
+    }
+
+    /** bloqueados: turnos libres que pasaron a BLOQUEADO; omitidosConReserva: códigos de las reservas que se respetaron. */
+    public record BloqueoRangoRespuesta(int bloqueados, List<String> omitidosConReserva) {
+    }
+
+    /** Turnos con bloqueo MANUAL que volvieron a quedar libres. */
+    public record DesbloqueoRangoRespuesta(int desbloqueados) {
     }
 }

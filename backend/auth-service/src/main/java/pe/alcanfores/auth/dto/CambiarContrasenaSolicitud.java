@@ -5,7 +5,7 @@ import jakarta.validation.constraints.Size;
 import pe.alcanfores.auth.validacion.ContrasenaSegura;
 import pe.alcanfores.auth.validacion.ContrasenasCoinciden;
 
-/** Cambio de contraseña del propio usuario: {@code {actual, nueva, confirmacion}}. */
+/** Cambio de contraseña del propio usuario (administrador o cliente): {@code {actual, nueva, confirmacion}}. */
 @ContrasenasCoinciden
 public record CambiarContrasenaSolicitud(
         @NotBlank(message = "Ingresa tu contraseña actual.")
@@ -17,7 +17,12 @@ public record CambiarContrasenaSolicitud(
         String nueva,
 
         @NotBlank(message = "Repite la contraseña nueva.")
-        String confirmacion) {
+        String confirmacion) implements ContrasenasCoinciden.ConConfirmacion {
+
+    @Override
+    public String contrasenaAConfirmar() {
+        return nueva;
+    }
 
     @Override
     public String toString() {

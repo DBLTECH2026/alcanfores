@@ -16,6 +16,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import static pe.alcanfores.catalogo.modelo.ClaveConfiguracion.DIAS_GENERADOS;
+import static pe.alcanfores.catalogo.modelo.ClaveConfiguracion.DIAS_VISIBLES;
 import static pe.alcanfores.catalogo.modelo.ClaveConfiguracion.DURACION_MIN;
 import static pe.alcanfores.catalogo.modelo.ClaveConfiguracion.INICIO_NOCHE;
 import static pe.alcanfores.catalogo.modelo.ClaveConfiguracion.PRIMER_TURNO;
@@ -95,6 +97,10 @@ public class ValidadorConfiguracion {
                 errores.add(new ErrorCampo(INICIO_NOCHE.clave(),
                         "La tarifa de noche debe empezar entre el primer turno y la hora de cierre."));
             }
+        }
+        if (Integer.parseInt(c.get(DIAS_GENERADOS.clave())) < Integer.parseInt(c.get(DIAS_VISIBLES.clave()))) {
+            errores.add(new ErrorCampo(DIAS_GENERADOS.clave(),
+                    "Los días con turnos creados no pueden ser menos que los días visibles para reservar."));
         }
         return errores;
     }

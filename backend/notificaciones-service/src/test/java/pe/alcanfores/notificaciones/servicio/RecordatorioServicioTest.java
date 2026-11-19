@@ -89,7 +89,7 @@ class RecordatorioServicioTest extends PruebaIntegracion {
         String wsp = avisosEnviados.stream().filter(n -> n.getCanal() == CanalNotificacion.WHATSAPP).findFirst()
                 .orElseThrow().getCuerpo();
         assertThat(wsp).startsWith("*Tu partido es en 2 horas*")
-                .contains("Te recordamos tu reserva de hoy.", "*Cancha:* Cancha 1 · Fútbol 5", "*Hora:* 7:00 p. m. a 8:00 p. m.",
+                .contains("Te recordamos tu reserva de hoy.", "*Cancha:* Cancha 1 · Fútbol 5", "*Hora:* 7:00–8:00 p. m.",
                         "*Saldo a pagar:* S/ 40.00", "*Llega 10 minutos antes*",
                         "*Dirección:* Carretera Central km 11.5, Santa Clara, Ate",
                         "*Referencia:* Paradero Caseta, a dos cuadras de la UTP Santa Clara",

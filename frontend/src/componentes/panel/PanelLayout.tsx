@@ -11,6 +11,7 @@ import { ahoraLima, fmtFecha } from '@/utilidades/fecha';
 import { iniciales } from '@/utilidades/formato';
 import { MODO_MOCK, type IdBusto } from '@/utilidades/recursos';
 import { cx } from '@/utilidades/cx';
+import { ModalAvisos } from './ModalAvisos';
 import './panel-extra.css';
 
 const ROL_TEXTO = { ADMIN: 'Administrador', RECEPCION: 'Recepción' } as const;
@@ -25,24 +26,41 @@ const ContextoPanel = createContext<ApiPanel>({ porValidar: 0, refrescarContador
 /** Datos compartidos del panel (contador por validar). */
 export const usePanel = () => useContext(ContextoPanel);
 
-function Navegacion({ items, porValidar, alNavegar }: { items: ItemMenu[]; porValidar: number; alNavegar?: () => void }) {
+function Navegacion({ items, porValidar, alNavegar, plegado }: { items: ItemMenu[]; porValidar: number; alNavegar?: () => void; plegado?: boolean }) {
   const secciones = [...new Set(items.map((i) => i.seccion))];
+  // Plegado: tooltip flotante (la barra recorta lo que sale de ella, por eso va en un portal).
+  const [tip, setTip] = useState<{ texto: string; top: number; left: number } | null>(null);
+  const mostrar = (texto: string, el: HTMLElement) => {
+    if (!plegado) return;
+    const r = el.getBoundingClientRect();
+    setTip({ texto, top: r.top + r.height / 2, left: r.right + 10 });
+  };
   return (
-    <nav className="ma-nav" aria-label="Menú del panel">
+    <nav className="ma-nav" aria-label="Menú del panel" onMouseLeave={() => setTip(null)}>
       {secciones.map((s) => (
-        <div key={s} className="contents">
+        <div key={s} className="ma-grupo">
           <div className="ma-nav-sec">{s}</div>
           {items
             .filter((i) => i.seccion === s)
             .map((i) => {
               const I = i.icono;
+              const cnt = i.contador && porValidar > 0 ? porValidar : 0;
               return (
-                <NavLink key={i.clave} to={i.ruta} className="ma-item" onClick={alNavegar} title={i.texto}>
+                <NavLink
+                  key={i.clave}
+                  to={i.ruta}
+                  className="ma-item"
+                  onClick={alNavegar}
+                  aria-label={plegado ? (cnt ? `${i.texto}: ${cnt} por validar` : i.texto) : undefined}
+                  onMouseEnter={(e) => mostrar(cnt ? `${i.texto} · ${cnt} por validar` : i.texto, e.currentTarget)}
+                  onFocus={(e) => mostrar(i.texto, e.currentTarget)}
+                  onBlur={() => setTip(null)}
+                >
                   <I className="ico" aria-hidden />
-                  <span>{i.texto}</span>
-                  {i.contador && porValidar > 0 && (
+                  <span className="ma-item-txt">{i.texto}</span>
+                  {cnt > 0 && (
                     <span className="ma-cnt" title="Por validar">
-                      {porValidar}
+                      {cnt}
                     </span>
                   )}
                 </NavLink>
@@ -50,6 +68,14 @@ function Navegacion({ items, porValidar, alNavegar }: { items: ItemMenu[]; porVa
             })}
         </div>
       ))}
+      {plegado &&
+        tip &&
+        createPortal(
+          <div className="ma-tip" role="tooltip" style={{ top: tip.top, left: tip.left }}>
+            {tip.texto}
+          </div>,
+          document.body,
+        )}
     </nav>
   );
 }
@@ -159,6 +185,7 @@ export function PanelLayout() {
   const [plegado, setPlegado] = useState(() => localStorage.getItem('alc-menu-plegado') === '1');
   const [porValidar, setPorValidar] = useState(0);
   const [version, setVersion] = useState(0);
+  const [avisos, setAvisos] = useState(false);
   const items = menuPara(usuario?.rol);
   const actual = itemDeRuta(pathname);
 
@@ -176,18 +203,31 @@ export function PanelLayout() {
   useEffect(() => setMenuMovil(false), [pathname]);
 
   const nombre = usuario ? `${usuario.nombres} ${usuario.apellidos}` : '';
-  const pie = (
+  const alternarPlegado = () => {
+    localStorage.setItem('alc-menu-plegado', plegado ? '0' : '1');
+    setPlegado((p) => !p);
+  };
+  /** Pie de la barra: tarjeta del usuario con «Plegar menú» integrado (en el menú móvil, «Cerrar sesión»). */
+  const pie = (movil: boolean) => (
     <div className="ma-pie">
       {MODO_MOCK && <span className="sello-demo">Datos simulados</span>}
       <div className="ma-usuario">
-        <Avatar nombre={nombre} admin />
-        <div className="min-w-0">
-          <b className="truncar">{nombre}</b>
-          <span className="ma-rol">{usuario ? ROL_TEXTO[usuario.rol] : ''}</span>
-        </div>
-        <button type="button" className="ma-salir" aria-label="Cerrar sesión" title="Cerrar sesión" onClick={() => salir('manual')}>
-          <LogOut className="ico ico-18" aria-hidden />
-        </button>
+        <Link to="/admin/cuenta" className="ma-usuario-dato" title={plegado && !movil ? `${nombre} · ${usuario ? ROL_TEXTO[usuario.rol] : ''}` : 'Mi cuenta'}>
+          <Avatar nombre={nombre} admin />
+          <span className="ma-usuario-txt min-w-0">
+            <b className="truncar">{nombre}</b>
+            <span className="ma-rol">{usuario ? ROL_TEXTO[usuario.rol] : ''}</span>
+          </span>
+        </Link>
+        {movil ? (
+          <button type="button" className="ma-salir" aria-label="Cerrar sesión" title="Cerrar sesión" onClick={() => salir('manual')}>
+            <LogOut className="ico ico-18" aria-hidden />
+          </button>
+        ) : (
+          <button type="button" className="ma-salir ma-plegar-btn" aria-pressed={plegado} aria-label={plegado ? 'Desplegar menú' : 'Plegar menú'} title={plegado ? 'Desplegar menú' : 'Plegar menú'} onClick={alternarPlegado}>
+            {plegado ? <PanelLeftOpen className="ico ico-18" aria-hidden /> : <PanelLeftClose className="ico ico-18" aria-hidden />}
+          </button>
+        )}
       </div>
     </div>
   );
@@ -202,20 +242,8 @@ export function PanelLayout() {
               <Link className="ma-logo" to="/admin/hoy" aria-label="Alcanfores, ir a Hoy">
                 {plegado ? <Logo variante="isotipo" className="!h-[30px]" /> : <Logo variante="horizontal-oscuro" className="!h-[28px]" />}
               </Link>
-              <Navegacion items={items} porValidar={porValidar} />
-              {pie}
-              <button
-                type="button"
-                className="ma-plegar bg-transparent border-0 cursor-pointer"
-                aria-pressed={plegado}
-                onClick={() => {
-                  localStorage.setItem('alc-menu-plegado', plegado ? '0' : '1');
-                  setPlegado((p) => !p);
-                }}
-              >
-                {plegado ? <PanelLeftOpen className="ico" aria-hidden /> : <PanelLeftClose className="ico" aria-hidden />}
-                <span>{plegado ? 'Desplegar menú' : 'Plegar menú'}</span>
-              </button>
+              <Navegacion items={items} porValidar={porValidar} plegado={plegado} />
+              {pie(false)}
             </div>
           </aside>
 
@@ -243,10 +271,10 @@ export function PanelLayout() {
               </nav>
               <Buscador />
               <Reloj />
-              <Link to="/admin/reservas?estadoPago=EN_REVISION" className="mt-avisos" aria-label={`Avisos: ${porValidar} por validar`}>
+              <button type="button" className="mt-avisos cursor-pointer" aria-haspopup="dialog" aria-label={`Avisos: ${porValidar} comprobantes por validar`} title="Comprobantes por validar" onClick={() => setAvisos(true)}>
                 <Bell className="ico" aria-hidden />
                 {porValidar > 0 && <i>{porValidar}</i>}
-              </Link>
+              </button>
               <MenuUsuario />
             </header>
             <main className="ma-main" id="contenido" tabIndex={-1}>
@@ -254,6 +282,8 @@ export function PanelLayout() {
             </main>
           </div>
         </div>
+
+        <ModalAvisos abierto={avisos} alCerrar={() => setAvisos(false)} alCambiar={() => setVersion((v) => v + 1)} />
 
         {menuMovil &&
           createPortal(
@@ -268,7 +298,7 @@ export function PanelLayout() {
                 <div className="px-3 py-2 overflow-y-auto flex-1">
                   <Navegacion items={items} porValidar={porValidar} alNavegar={() => setMenuMovil(false)} />
                 </div>
-                <div className="px-3 pb-4">{pie}</div>
+                <div className="px-3 pb-4">{pie(true)}</div>
               </aside>
             </div>,
             document.body,

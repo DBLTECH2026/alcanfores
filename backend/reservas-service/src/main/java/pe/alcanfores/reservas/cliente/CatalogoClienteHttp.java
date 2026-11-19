@@ -10,6 +10,7 @@ import org.springframework.web.client.RestClient;
 import pe.alcanfores.comun.error.NegocioExcepcion;
 import pe.alcanfores.reservas.config.ReservasPropiedades;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -36,6 +37,12 @@ public class CatalogoClienteHttp implements CatalogoCliente {
     public List<CanchaCatalogo> canchas() {
         return circuito.run(() -> http.get().uri("/interno/canchas").retrieve()
                 .body(new ParameterizedTypeReference<List<CanchaCatalogo>>() { }), this::caido);
+    }
+
+    @Override
+    public List<DiaEspecial> calendario(LocalDate desde, LocalDate hasta) {
+        return circuito.run(() -> http.get().uri("/interno/calendario?desde={d}&hasta={h}", desde, hasta).retrieve()
+                .body(new ParameterizedTypeReference<List<DiaEspecial>>() { }), this::caido);
     }
 
     @Override

@@ -1,6 +1,7 @@
 package pe.alcanfores.reservas.dto;
 
 import pe.alcanfores.comun.eventos.ClienteContacto;
+import pe.alcanfores.reservas.dto.ReservaDtos.TurnoReserva;
 import pe.alcanfores.reservas.modelo.Asistencia;
 import pe.alcanfores.reservas.modelo.EstadoPago;
 import pe.alcanfores.reservas.modelo.EstadoReserva;
@@ -10,6 +11,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 
 /** Respuestas de las rutas {@code /interno/**} (solo para otros microservicios). */
 public final class InternoDtos {
@@ -22,7 +24,12 @@ public final class InternoDtos {
                                  LocalDate fecha, LocalTime horaInicio, LocalTime horaFin, BigDecimal montoTotal,
                                  BigDecimal montoAdelanto, BigDecimal montoPagado, ClienteContacto cliente,
                                  EstadoReserva estado, EstadoPago estadoPago, Asistencia asistencia, Origen origen,
-                                 String metodoPagoPrevisto, BigDecimal saldo, LocalDateTime inicio, LocalDateTime venceEn) {
+                                 String metodoPagoPrevisto, BigDecimal saldo, LocalDateTime inicio, LocalDateTime venceEn,
+                                 String horarioTexto, int cantidadTurnos, List<TurnoReserva> turnos) {
+    }
+
+    /** Códigos de las reservas vigentes de un día (catálogo los usa antes de cerrar ese día). */
+    public record ReservasVigentes(List<String> codigos) {
     }
 
     public record ElegibilidadResena(boolean elegible, String motivo, String autor) {

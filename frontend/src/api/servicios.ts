@@ -4,7 +4,9 @@ import type {
   CanchaResumen,
   Complejo,
   ComprobanteEnviado,
+  CuentaCliente,
   DashboardHoy,
+  DiaEspecial,
   DatosComprobante,
   DiaCalendario,
   Disponibilidad,
@@ -20,6 +22,9 @@ import type {
   PagoCliente,
   Pagina,
   PreferenciaMp,
+  RegistroCliente,
+  ReservaDeCliente,
+  RespuestaLoginCliente,
   Resena,
   ReservaCreada,
   ReservaDetalle,
@@ -49,6 +54,24 @@ export const catalogoApi = {
     http.get<Pagina<Resena>>(`/catalogo/canchas/${idCancha}/resenas`, { params: { page, size, orden } }).then((r) => r.data),
   publicarResena: (idCancha: number, datos: NuevaResena) =>
     http.post<Resena>(`/catalogo/canchas/${idCancha}/resenas`, datos, { silenciarToast: true }).then((r) => r.data),
+  /** v2: feriados y días no laborables para pintar el calendario del portal. */
+  calendario: (desde: string, hasta: string) =>
+    http.get<DiaEspecial[]>('/catalogo/calendario', { params: { desde, hasta }, silenciarToast: true }).then((r) => r.data),
+};
+
+// ------------------------------ v2: cuentas de clientes ------------------------------
+export const cuentaApi = {
+  registro: (datos: RegistroCliente) => http.post<RespuestaLoginCliente>('/auth/clientes/registro', datos, { silenciarToast: true }).then((r) => r.data),
+  login: (usuario: string, contrasena: string) =>
+    http.post<RespuestaLoginCliente>('/auth/clientes/login', { usuario, contrasena }, { silenciarToast: true }).then((r) => r.data),
+  yo: () => http.get<CuentaCliente>('/auth/clientes/yo', { silenciarToast: true }).then((r) => r.data),
+  editar: (datos: Pick<CuentaCliente, 'nombres' | 'apellidos' | 'correo' | 'telefono'>) =>
+    http.put<CuentaCliente>('/auth/clientes/yo', datos, { silenciarToast: true }).then((r) => r.data),
+  cambiarContrasena: (datos: { actual: string; nueva: string; confirmacion: string }) =>
+    http.post<void>('/auth/clientes/cambiar-contrasena', datos, { silenciarToast: true }).then((r) => r.data),
+  reservas: (f: { estado?: string; page?: number; size?: number } = {}) =>
+    http.get<Pagina<ReservaDeCliente>>('/cliente/reservas', { params: f, silenciarToast: true }).then((r) => r.data),
+  reserva: (codigo: string) => http.get<ReservaDeCliente>(`/cliente/reservas/${codigo}`, { silenciarToast: true }).then((r) => r.data),
 };
 
 // ------------------------------ reservas-service ------------------------------

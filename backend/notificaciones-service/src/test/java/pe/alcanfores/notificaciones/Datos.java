@@ -43,7 +43,13 @@ public final class Datos {
 
     public static DatosReserva reserva(String codigo, BigDecimal pagado) {
         return new DatosReserva(10L, codigo, 1L, "Cancha 1", "FUTBOL_5", FECHA, HORA, HORA.plusHours(1),
-                new BigDecimal("80.00"), new BigDecimal("40.00"), pagado, cliente());
+                new BigDecimal("80.00"), new BigDecimal("40.00"), pagado, cliente(), "7:00–8:00 p. m.", 1);
+    }
+
+    /** Reserva de 2 turnos NO seguidos (9 a. m. y 7 p. m.) del mismo día; horaInicio = primer turno. */
+    public static DatosReserva reservaDosTurnos(String codigo, BigDecimal pagado) {
+        return new DatosReserva(11L, codigo, 1L, "Cancha 1", "FUTBOL_5", FECHA, LocalTime.of(9, 0), LocalTime.of(20, 0),
+                new BigDecimal("140.00"), new BigDecimal("70.00"), pagado, cliente(), "9:00–10:00 a. m. y 7:00–8:00 p. m.", 2);
     }
 
     public static DatosComplejo complejo() {

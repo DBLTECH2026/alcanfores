@@ -117,6 +117,12 @@ y `GET /interno/comprobantes/{id}/pdf` (lo usa notificaciones).
   op. gravada/exonerada/inafecta, IGV, total, «SON: …», QR, valor resumen, estado «ACEPTADO (SIMULADO)», marca de agua diagonal
   «DOCUMENTO DE PRUEBA · SIN VALIDEZ TRIBUTARIA» y pie «Representación impresa de la … (simulada) · Proyecto académico UTP».
   Fuentes Inter y Barlow Semi Condensed incrustadas (licencia OFL).
+- **Descripción del ítem (v2, varios turnos):** `ConceptoReserva` usa el `horarioTexto` que arma reservas-service y, si la
+  reserva tiene más de un turno, agrega «(N turnos)»: «Alquiler de Cancha 1 · Fútbol 5 · vie 20/11/2026 9:00–10:00 a. m. y
+  7:00–8:00 p. m. (2 turnos) · Adelanto 50 %». Un turno: «… vie 20/11/2026 7:00–8:00 p. m. · …». Si reservas aún no manda
+  `horarioTexto`/`cantidadTurnos` (v1), se arma el rango con `Horarios.rango(horaInicio, horaFin)` de `comun` y se asume 1
+  turno (`ReservaInterna.horario()`/`turnos()`). En el PDF cada tramo de horas queda sin cortes de línea. Los montos ya llegan
+  sumados desde reservas; nada más cambia en pagos. Sin migraciones nuevas.
 - XML UBL 2.1 `Invoice` / `CreditNote` (con `DiscrepancyResponse` y `BillingReference`), sin firma y con un comentario de documento simulado.
 - Muestras: `docs/muestras/boleta-B001-00000012.pdf/.xml`, `factura-F001-00000003.pdf/.xml`, `nota-credito-FC01-00000001.pdf/.xml`
   (las genera `MuestrasComprobantesTest` en `target/muestras`).
@@ -153,16 +159,18 @@ Comunes: `DB_HOST/DB_PORT/DB_USUARIO/DB_CLAVE`, `EUREKA_URL`, `RABBIT_*`, `JWT_S
 - `ManejadorErroresPagos` convierte `?sort=` inválido en 400 (el manejador común lo dejaría en 500).
 
 ## Pruebas (`mvn -B -f backend/pagos-service/pom.xml verify`)
-111 pruebas, 0 fallos (18/11/2026). JaCoCo: líneas 93,0 % en total, 92,4 % en la capa de servicio (regla `check` ≥ 70 % en el pom).
+115 pruebas, 0 fallos (19/11/2026, v2). JaCoCo: líneas 93,0 % en total, 92,4 % en la capa de servicio (instrucciones 93,1 % y
+92,1 %; regla `check` ≥ 70 % en el pom).
 Las de integración usan MariaDB `alcanfores_pagos_test` + Flyway, servidor en puerto aleatorio (la pasarela llama de verdad a su
 webhook) y simulan reservas, catálogo, Mercado Pago y RabbitMQ.
 
 | Clase | Qué cubre |
 |---|---|
-| `FlujoComprobanteYapeTest` | 400 por campo (código, DNI, método, operación, archivo), imagen falsa con extensión .png y menor de 200 px, factura con RUC inválido y sin razón social, DNI ajeno 404, reservas caído 503, flujo subir → validar → boleta → eventos y auditoría, factura F001, rechazo, caja con monto > saldo (400) y saldo, caja interna, anulación (403 RECEPCION / NC BC01 / 409 repetida), descargas PDF/XML, reporte (403/401/400), token inválido 401. |
+| `FlujoComprobanteYapeTest` | 400 por campo (código, DNI, método, operación, archivo), imagen falsa con extensión .png y menor de 200 px, factura con RUC inválido y sin razón social, DNI ajeno 404, reservas caído 503, flujo subir → validar → boleta → eventos y auditoría, factura F001, rechazo, caja con monto > saldo (400) y saldo, caja interna, anulación (403 RECEPCION / NC BC01 / 409 repetida), descargas PDF/XML, reporte (403/401/400), token inválido 401; reserva de **2 turnos no seguidos** cobrada en caja: la
+descripción del comprobante (BD, XML y PDF) lleva «9:00–10:00 a. m. y 7:00–8:00 p. m. (2 turnos)» y el total S/ 160. |
 | `PasarelaBetaTest` | Tarjeta aprobada vía webhook, fondos/bloqueada/vencida, reintento tras rechazo, Luhn/CVV/vencimiento/marca, 3DS correcto e incorrecto, Yape beta, firma HMAC inválida 401, idempotencia por `X-Evento-Id`, intento expirado, PAN nunca guardado. |
 | `MercadoPagoTest` | Sin token (`mercadoPago:false`, 409), cuerpo de la preferencia, webhook con `x-signature` válida/inválida e idempotente, avisos ignorados, «Ya pagué, verificar». |
 | `NumeracionConcurrenteTest` | 100 correlativos simultáneos sin huecos ni duplicados, rollback no consume número, 12 cobros simultáneos → B001-1…12. |
 | `CancelacionYSemillaTest` | `reserva.cancelada` (anulación, reembolso + nota de crédito, idempotencia) y semilla coherente sin eventos. |
-| `ClientesHttpTest` | `MockRestServiceServer`: reservas (200/404/500→503), catálogo (mapa/lista/caído), Mercado Pago (preferencia con token e idempotencia, pago, búsqueda, 502→503). |
-| Unitarias | `ValidadorTarjetaTest`, `FirmaHmacTest` (vector conocido + manifiesto MP), `ConceptoEIgvTest` (IGV y letras), `FacturaCompletaTest`, `AlmacenComprobantesTest`, `ReglasCobroTest`, `ConfiguracionComercioTest`, `TareasTest`, `MuestrasComprobantesTest`, `ArranqueTest`. |
+| `ClientesHttpTest` | `MockRestServiceServer`: reservas (200/404/500→503; respuesta v1 sin `horarioTexto` → rango y 1 turno), catálogo (mapa/lista/caído), Mercado Pago (preferencia con token e idempotencia, pago, búsqueda, 502→503). |
+| Unitarias | `ValidadorTarjetaTest`, `FirmaHmacTest` (vector conocido + manifiesto MP), `ConceptoEIgvTest` (IGV, letras y concepto con 1 y 2 turnos), `ReservaInternaTest` (horario y turnos con respaldo v1), `FacturaCompletaTest`, `AlmacenComprobantesTest`, `ReglasCobroTest`, `ConfiguracionComercioTest`, `TareasTest`, `MuestrasComprobantesTest`, `ArranqueTest`. |

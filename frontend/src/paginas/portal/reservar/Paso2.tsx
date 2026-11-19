@@ -21,6 +21,8 @@ import {
 import { documentosApi } from '@/api/servicios';
 import { esErrorApi } from '@/api/cliente';
 import { useReserva } from '@/contexto/ReservaContext';
+import { useCuenta } from '@/contexto/CuentaContext';
+import { Link } from 'react-router-dom';
 import { CampoTexto, Casilla } from '@/componentes/ui/Campo';
 import { Alerta, Insignia } from '@/componentes/ui/Estados';
 import { Segmentado } from '@/componentes/ui/Datos';
@@ -30,6 +32,19 @@ import { RE_DNI, normalizarCelular, rucValido } from '@/utilidades/documentos';
 import { aTitulo } from '@/utilidades/formato';
 import { CabezaPaso } from './CabezaPaso';
 
+const VACIO: DatosClienteEntrada = {
+  dni: '',
+  nombres: '',
+  apellidos: '',
+  telefono: '',
+  correo: '',
+  tipoComprobante: 'BOLETA',
+  ruc: '',
+  razonSocial: '',
+  direccionFiscal: '',
+  aceptaTerminos: false,
+  aceptaPrivacidad: false,
+};
 type EstadoConsulta = 'inicial' | 'buscando' | 'verificado' | 'no-encontrado' | 'no-disponible';
 const CAMPOS = ['dni', 'nombres', 'apellidos', 'telefono', 'correo', 'tipoComprobante', 'ruc', 'razonSocial', 'direccionFiscal', 'aceptaTerminos', 'aceptaPrivacidad'] as const;
 
@@ -43,11 +58,14 @@ function BotonLupa({ alPulsar, buscando, etiqueta, deshabilitado }: { alPulsar: 
 
 export default function Paso2() {
   const r = useReserva();
-  const [dniEstado, setDniEstado] = useState<EstadoConsulta>(r.verificadoReniec ? 'verificado' : 'inicial');
+  // v2: con sesión de cliente el paso se llena con su cuenta y el DNI queda fijo (el back lo toma del token).
+  const { cliente: cuenta, salir } = useCuenta();
+  const deCuenta = Boolean(cuenta);
+  const [dniEstado, setDniEstado] = useState<EstadoConsulta>(r.verificadoReniec || deCuenta ? 'verificado' : 'inicial');
   const [dniMensaje, setDniMensaje] = useState('');
   const [rucEstado, setRucEstado] = useState<EstadoConsulta>('inicial');
   const [rucMensaje, setRucMensaje] = useState('');
-  const ultimoDni = useRef<string>(r.verificadoReniec ? r.cliente?.dni ?? '' : '');
+  const ultimoDni = useRef<string>(deCuenta ? cuenta?.dni ?? '' : r.verificadoReniec ? r.cliente?.dni ?? '' : '');
   const ultimoRuc = useRef<string>('');
 
   const {
@@ -63,18 +81,10 @@ export default function Paso2() {
   } = useForm<DatosClienteEntrada>({
     resolver: zodResolver(esquemaDatosCliente),
     mode: 'onTouched',
-    defaultValues: r.cliente ?? {
-      dni: '',
-      nombres: '',
-      apellidos: '',
-      telefono: '',
-      correo: '',
-      tipoComprobante: 'BOLETA',
-      ruc: '',
-      razonSocial: '',
-      direccionFiscal: '',
-      aceptaTerminos: false,
-      aceptaPrivacidad: false,
+    defaultValues: {
+      ...VACIO,
+      ...(r.cliente ?? {}),
+      ...(cuenta ? { dni: cuenta.dni, nombres: cuenta.nombres, apellidos: cuenta.apellidos, telefono: r.cliente?.telefono || cuenta.telefono, correo: r.cliente?.correo || cuenta.correo } : {}),
     },
   });
 
@@ -184,12 +194,34 @@ export default function Paso2() {
           </button>
         }
         apoyo={
-          <span className="inline-flex items-center gap-1.5">
-            <UserRound className="ico ico-14" aria-hidden />
-            Sin crear cuenta
-          </span>
+          deCuenta ? (
+            <span className="inline-flex items-center gap-1.5">
+              <BadgeCheck className="ico ico-14" aria-hidden />
+              Con tu cuenta
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5">
+              <UserRound className="ico ico-14" aria-hidden />
+              Sin crear cuenta ·
+              <Link className="enlace" to="/ingresar?volver=%2Freservar">
+                Ingresar
+              </Link>
+            </span>
+          )
         }
       />
+      {cuenta && (
+        <div className="cuenta-en-paso">
+          <BadgeCheck className="ico ico-18 text-verde" aria-hidden />
+          <span className="min-w-0">
+            <b>{`${cuenta.nombres} ${cuenta.apellidos}`}</b>
+            <small>Usamos los datos de tu cuenta. Puedes cambiar el celular o el correo.</small>
+          </span>
+          <button type="button" className="enlace bg-transparent border-0 p-0 text-[13px] ml-auto whitespace-nowrap shrink-0" onClick={salir}>
+            No soy yo
+          </button>
+        </div>
+      )}
 
       <form id="form-paso2" onSubmit={enviar} noValidate className="grid gap-5">
         <div className="form-grid dos">
@@ -203,8 +235,13 @@ export default function Paso2() {
             placeholder="8 dígitos"
             error={errors.dni?.message}
             valido={verificado}
+            lectura={deCuenta}
             ayuda={
-              verificado ? (
+              deCuenta ? (
+                <Insignia tono="menta" icono={BadgeCheck} tamano="sm">
+                  DNI de tu cuenta
+                </Insignia>
+              ) : verificado ? (
                 <Insignia tono="menta" icono={BadgeCheck} tamano="sm">
                   Verificado con RENIEC
                 </Insignia>
@@ -214,7 +251,7 @@ export default function Paso2() {
                 'Lo usamos para tu boleta'
               )
             }
-            accion={<BotonLupa etiqueta="Buscar DNI en RENIEC" buscando={dniEstado === 'buscando'} alPulsar={() => void consultarDni(getValues('dni') ?? '')} />}
+            accion={deCuenta ? undefined : <BotonLupa etiqueta="Buscar DNI en RENIEC" buscando={dniEstado === 'buscando'} alPulsar={() => void consultarDni(getValues('dni') ?? '')} />}
             {...register('dni', { setValueAs: (v: string) => String(v ?? '').replace(/\D/g, '').slice(0, 8) })}
           />
           <div className="hidden md:block" aria-hidden />

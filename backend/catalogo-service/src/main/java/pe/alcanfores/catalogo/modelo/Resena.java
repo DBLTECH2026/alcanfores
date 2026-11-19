@@ -36,8 +36,17 @@ public class Resena {
     @JoinColumn(name = "id_cancha", nullable = false)
     private Cancha cancha;
 
-    @Column(name = "codigo_reserva", nullable = false, length = 12, unique = true)
+    /** Reserva que habilitó la reseña (origen CLIENTE); nulo en las del complejo. */
+    @Column(name = "codigo_reserva", length = 12, unique = true)
     private String codigoReserva;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private OrigenResena origen = OrigenResena.CLIENTE;
+
+    /** Cuenta del cliente que la escribió (id de auth-service); nulo en las antiguas y en las del complejo. */
+    @Column(name = "id_cuenta_cliente")
+    private Long idCuentaCliente;
 
     @Column(nullable = false, length = 60)
     private String autor;
@@ -58,11 +67,18 @@ public class Resena {
     @Column(name = "respondido_en")
     private LocalDateTime respondidoEn;
 
-    @Column(name = "creado_en", nullable = false, updatable = false)
+    /** Fecha de la reseña; en las del complejo la elige el administrador. */
+    @Column(name = "creado_en", nullable = false)
     private LocalDateTime creadoEn;
 
     @PrePersist
     void alCrear() {
-        creadoEn = Tiempo.ahora();
+        if (creadoEn == null) {
+            creadoEn = Tiempo.ahora();
+        }
+    }
+
+    public boolean delComplejo() {
+        return origen == OrigenResena.COMPLEJO;
     }
 }

@@ -10,7 +10,6 @@ import {
   Receipt,
   ScrollText,
   Settings,
-  Star,
   UsersRound,
   UserCog,
   type LucideIcon,
@@ -19,7 +18,7 @@ import type { Rol } from '@/api/tipos';
 import type { IdBusto } from '@/utilidades/recursos';
 
 /**
- * Menú del panel (SPEC §6 y matriz de permisos §2). ÚNICA fuente: la barra lateral, el menú móvil,
+ * Menú del panel (SPEC §6 y matriz de permisos §2). v2: sin «Reseñas» (ahora viven en la ficha de cada cancha). ÚNICA fuente: la barra lateral, el menú móvil,
  * las migas, el busto de la cabecera y las rutas protegidas salen de aquí.
  * Para agregar una pantalla: crea la página y pon su `elemento` en src/rutas/router.tsx (mismo `ruta`).
  */
@@ -47,7 +46,6 @@ export const MENU_PANEL: ItemMenu[] = [
   { clave: 'clientes', texto: 'Clientes', ruta: '/admin/clientes', icono: UsersRound, roles: TODOS, seccion: 'Caja y clientes', busto: 'BU-rosa-panel' },
   { clave: 'notificaciones', texto: 'Notificaciones', ruta: '/admin/notificaciones', icono: MessagesSquare, roles: TODOS, seccion: 'Caja y clientes', busto: 'BU-rosa-laptop' },
   { clave: 'canchas', texto: 'Canchas', ruta: '/admin/canchas', icono: LayoutGrid, roles: ADMIN, seccion: 'Gestión', busto: 'BU-rosa-gorra' },
-  { clave: 'resenas', texto: 'Reseñas', ruta: '/admin/resenas', icono: Star, roles: ADMIN, seccion: 'Gestión', busto: 'BU-lucho-silbato' },
   { clave: 'reportes', texto: 'Reportes', ruta: '/admin/reportes', icono: ChartColumn, roles: ADMIN, seccion: 'Gestión', busto: 'BU-rosa-pizarra' },
   { clave: 'usuarios', texto: 'Usuarios', ruta: '/admin/usuarios', icono: UserCog, roles: ADMIN, seccion: 'Sistema', busto: 'BU-rosa-panel' },
   { clave: 'bitacora', texto: 'Bitácora', ruta: '/admin/bitacora', icono: ScrollText, roles: ADMIN, seccion: 'Sistema', busto: 'BU-rosa-pizarra' },

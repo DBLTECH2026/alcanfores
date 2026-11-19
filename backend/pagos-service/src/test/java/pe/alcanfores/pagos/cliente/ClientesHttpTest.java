@@ -70,6 +70,9 @@ class ClientesHttpTest {
         ReservaInterna r = cliente.buscar("ALC-7K3M9P").orElseThrow();
         assertThat(r.dniCliente()).isEqualTo("70123321");
         assertThat(r.saldoPendiente()).isEqualByComparingTo("90.00");
+        // reservas v1 no manda horarioTexto ni cantidadTurnos: se arma el rango y se asume 1 turno
+        assertThat(r.horario()).isEqualTo("7:00–8:00 p. m.");
+        assertThat(r.turnos()).isEqualTo(1);
         assertThat(cliente.buscar("ALC-ZZZZZZ")).isEmpty();
         assertThatThrownBy(() -> cliente.buscar("ALC-CAIDAA")).isInstanceOfSatisfying(NegocioExcepcion.class, e -> {
             assertThat(e.getStatus()).isEqualTo(503);

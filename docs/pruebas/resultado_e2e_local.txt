@@ -1,41 +1,66 @@
-Prueba de punta a punta contra http://localhost:8086 · 18/11/2026 22:14
+Prueba de punta a punta contra http://localhost:8086 · 19/11/2026 01:02
 
 [OK] Los 7 microservicios están UP en Eureka · discovery-server=UP, api-gateway=UP, auth-service=UP, catalogo-service=UP, reservas-service=UP, pagos-service=UP, notificaciones-service=UP
 [OK] Catálogo público con 4 canchas · Cancha 1 · Fútbol 5, Cancha 2 · Fútbol 6, Cancha 3 · Fútbol 7, Losa multiusos
-[OK] Detalle de cancha con fotos y reseñas · 3 fotos · 5 reseñas · promedio 4.2
+[OK] Detalle de cancha con fotos y reseñas · 3 fotos · 6 reseñas · promedio 4.3
 [OK] La foto de la cancha se descarga
-[OK] Validación: 400 con error por cada campo inválido · aceptaPrivacidad, aceptaTerminos, cliente.apellidos, cliente.correo, cliente.dni, cliente.nombres, cliente.telefono, idTurno, metodoPago
+[OK] Validación: 400 con error por cada campo inválido · aceptaPrivacidad, aceptaTerminos, cliente.apellidos, cliente.correo, cliente.dni, cliente.nombres, cliente.telefono, metodoPago
 [OK] RUC con dígito verificador incorrecto se rechaza sin consultar
 [OK] Consulta SUNAT por RUC (Factiliza) · SUPERINTENDENCIA NACIONAL DE ADUANAS Y DE ADMINISTRACION TRIBUTARIA - SUNAT
-[OK] Reserva web registrada (PENDIENTE, con plazo para pagar) · {"codigoReserva":"ALC-6QJ2B5","estado":"PENDIENTE","estadoPago":"SIN_PAGO","venceEn":"2026-11-18T22:34:19","cancha":{"id":2,"nombre":"Cancha 2 · Fútbol 6","depo
-      código ALC-6QJ2B5 · Cancha 2 · Fútbol 6 · 2026-11-19 20:00 · adelanto S/ 45.0
+[OK] Reserva web registrada (PENDIENTE, con plazo para pagar) · {"codigoReserva":"ALC-5R58T3","estado":"PENDIENTE","estadoPago":"SIN_PAGO","venceEn":"2026-11-19T01:22:11","cancha":{"id":2,"nombre":"Cancha 2 · Fútbol 6","depo
+      código ALC-5R58T3 · Cancha 2 · Fútbol 6 · 2026-11-20 20:00 · adelanto S/ 45.0
 [OK] Doble reserva del mismo turno: 409 TURNO_OCUPADO
-[OK] Comprobante de Yape subido (pago PENDIENTE) · {"idPago":164,"estado":"PENDIENTE","mensaje":"Recibimos tu comprobante. Lo validaremos en unos minutos y te avisaremos p
+[OK] Comprobante de Yape subido (pago PENDIENTE) · {"idPago":191,"estado":"PENDIENTE","mensaje":"Recibimos tu comprobante. Lo validaremos en unos minutos y te avisaremos p
 [OK] Imagen falsa (extensión cambiada) rechazada
 [OK] Evento pago.registrado → reserva EN_REVISION (RabbitMQ)
 [OK] Panel sin token: 401
 [OK] RECEPCION no puede ver reportes: 403
 [OK] Login del administrador (JWT)
-[OK] Administradora valida el comprobante · {"idPago":164,"estado":"VALIDADO","monto":45.00,"comprobante":{"id":157,"tipo":"BOLETA","serieNumero":"B001-00000110","e
+[OK] Administradora valida el comprobante · {"idPago":191,"estado":"VALIDADO","monto":45.00,"comprobante":{"id":183,"tipo":"BOLETA","serieNumero":"B001-00000124","e
 [OK] Evento pago.validado → reserva CONFIRMADA · pagado S/ 45.0 · saldo S/ 45.0
-[OK] Boleta electrónica (simulada) emitida · B001-00000110
-[OK] PDF de la boleta descargable por el cliente · 114 KB
+[OK] Boleta electrónica (simulada) emitida · B001-00000124
+[OK] PDF de la boleta descargable por el cliente · 113 KB
 [OK] Constancia de reserva en PDF · 111 KB
 [OK] Notificaciones por correo y WhatsApp (registrada, comprobante, confirmada, boleta) · comprobante.emitido/CORREO/SIMULADO, comprobante.emitido/WHATSAPP/SIMULADO, pago.registrado/CORREO/SIMULADO, pago.registrado/WHATSAPP/SIMULADO, reserva.confirmada/CORREO/SIMULADO, reserva.confirmada/WHATSAPP/SIMULADO, reserva.registrada/CORREO/SIMULADO, reserva.registrada/WHATSAPP/SIMULADO
-[OK] Recordatorio programado 2 horas antes (cron) · enviar en 2026-11-19T18:00:00 · PROGRAMADO
+[OK] Recordatorio programado 2 horas antes (cron) · enviar en 2026-11-20T18:00:00 · PROGRAMADO
 [OK] Pasarela beta: tarjeta sin fondos rechazada · Fondos insuficientes. Prueba con otra tarjeta.
-[OK] Pasarela beta: Visa de prueba aprobada · autorización 216515 · Visa ****1111
+[OK] Pasarela beta: Visa de prueba aprobada · autorización 106077 · Visa ****1111
 [OK] Webhook firmado → pago automático → reserva CONFIRMADA y PAGADO_TOTAL
-[OK] Factura electrónica (simulada) emitida al RUC · F001-00000048
+[OK] Factura electrónica (simulada) emitida al RUC · F001-00000054
 [OK] Cliente cancela con motivo (≥ 24 h: con devolución)
-[OK] Evento reserva.cancelada → reembolso simulado y nota de crédito · FC01-00000001
+[OK] Cancelada con devolución: estadoPago REEMBOLSADO y saldo 0 · estadoPago REEMBOLSADO · pagado S/ 0.0 · saldo S/ 0.0
+[OK] Línea de tiempo sin doble punto
+[OK] Evento reserva.cancelada → reembolso simulado y nota de crédito · FC01-00000004
 [OK] El turno cancelado vuelve a estar DISPONIBLE
-[OK] Reseña verificada publicada (código + DNI de una reserva jugada) · ALC-BBGTSM
+[OK] Reserva de 2 turnos no seguidos: total = suma y adelanto = total × % · ALC-B5WY37 · total S/ 120.0 (esperado 120.0) · adelanto S/ 60.0 (esperado 60.00)
+[OK] Horario en texto de los turnos no seguidos · 8:00–9:00 a. m. y 10:00–11:00 a. m.
+[OK] Los 2 turnos quedan OCUPADOS
+[OK] No laborable en un día con reservas: 409 DIA_CON_RESERVAS con el código · Ese día ya hay reservas en esas canchas: ALC-6Q5LUH, ALC-B5WY37, ALC-ZGKUTS. Cancélalas o cámbialas antes.
+[OK] Cambiar el horario (abre 10:00 a. m.) regenera los turnos de la cancha · 2026-11-27 · primer turno 10:00
+[OK] Restaurar el horario devuelve los turnos tempranos · abre otra vez 08:00
+[OK] Feriado: la cancha abre con recargo por turno · 2026-11-25 · recargo S/ 10.0 · 08:00 S/ 80.0
+[OK] Al quitar el feriado vuelve el precio normal
+[OK] Día no laborable: bloquea los turnos solo de la cancha indicada · 2026-12-02
+[OK] Al quitar el día no laborable los turnos vuelven a estar libres
+[OK] Registro de cliente: 201 con sesión iniciada · 98765589
+[OK] Mismo DNI otra vez: 409 DNI_REGISTRADO
+[OK] Login del cliente con DNI y con correo
+[OK] Mis reservas incluye la reserva hecha ANTES de crear la cuenta · ALC-B5WY37
+[OK] Mis reservas sin sesión: 401
+[OK] Mis reservas con token de administradora: 403
+[OK] Panel con token de cliente: 403
+[OK] Cancelar la reserva libera sus 2 turnos
+[OK] Reseña verificada publicada (con sesión del cliente de una reserva jugada) · ALC-YC7QLZ
 [OK] Reseña repetida: 409 RESENA_DUPLICADA
-[OK] Reseña de una reserva aún no jugada: rechazada (422) · Esa reserva no corresponde a esta cancha.
-[OK] Dashboard del día · {"reservasHoy": 1, "porValidar": 5, "confirmadasHoy": 1, "ocupacionHoyPct": 1.7, "noShowMesPct": 14.3, "reservasSemana": 18}
-[OK] Reporte de ingresos · total S/ 7570.0 en 153 pagos
+[OK] Reseña sin iniciar sesión: 401 · Inicia sesión para calificar la cancha.
+[OK] Reseña de una reserva aún no jugada: rechazada (422) · Podrás calificar la cancha cuando empiece tu turno.
+[OK] Reseña del complejo creada y visible en la cancha (origen COMPLEJO)
+[OK] Reseña del complejo borrada por la administradora
+[OK] Dashboard del día · {"reservasHoy": 5, "porValidar": 7, "confirmadasHoy": 4, "ocupacionHoyPct": 8.5, "noShowMesPct": 13.9, "reservasSemana": 28}
+[OK] Reporte de ingresos · total S/ 8435.0 en 168 pagos
 [OK] Reporte de reservas en Excel · 12 KB
-[OK] Bitácora de auditoría registra las acciones · Bruno H.:CREAR_RESENA; Sistema:REEMBOLSO_SIMULADO; Cliente 4****912:CANCELAR_RESERVA; rhuaman:VALIDAR_PAGO; rhuaman:LOGIN_EXITOSO
+[OK] CORS: origen no permitido → 403 ORIGEN_NO_PERMITIDO con cuerpo ErrorApi · {"timestamp":"2026-11-19T01:02:29","status":403,"codigo":"ORIGEN_NO_PERMITIDO","mensaje":"
+[OK] CORS local: el panel en 5187 está permitido
+[OK] Bitácora de auditoría registra las acciones · rhuaman:BORRAR_RESENA_COMPLEJO; rhuaman:CREAR_RESENA_COMPLEJO; e2e.70123321@example.com:REGISTRAR_CUENTA; Rosa L.:CREAR_RESENA; e2e.99010020@example.com:REGISTRAR_CUENTA
 
-Resultado: 36 de 36 comprobaciones correctas.
+Resultado: 61 de 61 comprobaciones correctas.

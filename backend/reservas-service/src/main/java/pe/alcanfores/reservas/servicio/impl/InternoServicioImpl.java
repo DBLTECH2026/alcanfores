@@ -9,16 +9,20 @@ import pe.alcanfores.comun.util.Tiempo;
 import pe.alcanfores.reservas.dto.InternoDtos.ElegibilidadResena;
 import pe.alcanfores.reservas.dto.InternoDtos.ReservaInterna;
 import pe.alcanfores.reservas.dto.InternoDtos.ReservaSemilla;
+import pe.alcanfores.reservas.dto.InternoDtos.ReservasVigentes;
 import pe.alcanfores.reservas.mapeador.ReservaMapeador;
 import pe.alcanfores.reservas.modelo.Asistencia;
 import pe.alcanfores.reservas.modelo.EstadoReserva;
 import pe.alcanfores.reservas.modelo.Reserva;
 import pe.alcanfores.reservas.repositorio.ReservaRepositorio;
+import pe.alcanfores.reservas.repositorio.ReservaTurnoRepositorio;
 import pe.alcanfores.reservas.servicio.ConstanciaServicio;
 import pe.alcanfores.reservas.servicio.InternoServicio;
 import pe.alcanfores.reservas.servicio.ReglasReserva;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -30,6 +34,7 @@ public class InternoServicioImpl implements InternoServicio {
     private static final String NO_ENCONTRADA = "No encontramos una reserva con ese código y DNI.";
 
     private final ReservaRepositorio reservas;
+    private final ReservaTurnoRepositorio reservaTurnos;
     private final OperacionesReserva operaciones;
     private final ReservaMapeador mapeador;
     private final ConstanciaServicio constancias;
@@ -85,6 +90,14 @@ public class InternoServicioImpl implements InternoServicio {
                 .filter(r -> !r.inicio().isBefore(d) && !r.inicio().isAfter(h))
                 .sorted(Comparator.comparing(Reserva::inicio))
                 .map(mapeador::interna).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ReservasVigentes vigentes(LocalDate fecha, Collection<Long> idsCancha) {
+        List<String> codigos = idsCancha == null || idsCancha.isEmpty() ? reservaTurnos.codigosVigentesEn(fecha)
+                : reservaTurnos.codigosVigentesEn(fecha, idsCancha);
+        return new ReservasVigentes(codigos.stream().sorted().toList());
     }
 
     @Override

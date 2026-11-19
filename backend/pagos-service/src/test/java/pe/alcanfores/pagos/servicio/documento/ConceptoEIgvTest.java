@@ -41,13 +41,29 @@ class ConceptoEIgvTest {
     void conceptoConCanchaDeporteDiaYHoras() {
         assertThat(ConceptoReserva.concepto("Cancha 2", "FUTBOL_6", LocalDate.of(2026, 11, 20), LocalTime.of(19, 0),
                 LocalTime.of(20, 0), "ALC-7K3M9P"))
-                .isEqualTo("Alquiler de Cancha 2 · Fútbol 6 · vie 20/11/2026 7:00 p. m.–8:00 p. m.");
+                .isEqualTo("Alquiler de Cancha 2 · Fútbol 6 · vie 20/11/2026 7:00–8:00 p. m.");
         // si el nombre ya trae el deporte no se repite
         assertThat(ConceptoReserva.concepto("Cancha 1 · Fútbol 5", "FUTBOL_5", LocalDate.of(2026, 11, 22),
                 LocalTime.of(9, 0), LocalTime.of(10, 0), "ALC-7K3M9P"))
-                .isEqualTo("Alquiler de Cancha 1 · Fútbol 5 · dom 22/11/2026 9:00 a. m.–10:00 a. m.");
+                .isEqualTo("Alquiler de Cancha 1 · Fútbol 5 · dom 22/11/2026 9:00–10:00 a. m.");
         assertThat(ConceptoReserva.concepto(null, null, null, null, null, "ALC-7K3M9P"))
                 .isEqualTo("Alquiler de cancha deportiva · Reserva ALC-7K3M9P");
+    }
+
+    @Test
+    void conceptoConVariosTurnosUsaElHorarioTextoYCuantosSon() {
+        assertThat(ConceptoReserva.concepto("Cancha 1 · Fútbol 5", "FUTBOL_5", LocalDate.of(2026, 11, 20),
+                "9:00–10:00 a. m. y 7:00–8:00 p. m.", 2, "ALC-7K3M9P"))
+                .isEqualTo("Alquiler de Cancha 1 · Fútbol 5 · vie 20/11/2026 9:00–10:00 a. m. y 7:00–8:00 p. m. (2 turnos)");
+        // dos turnos seguidos: un solo tramo, pero igual se dice cuántos turnos son
+        assertThat(ConceptoReserva.concepto("Losa", "MULTIUSO", LocalDate.of(2026, 11, 20), "7:00–9:00 p. m.", 2, "ALC-7K3M9P"))
+                .isEqualTo("Alquiler de Losa · Multiusos · vie 20/11/2026 7:00–9:00 p. m. (2 turnos)");
+        assertThat(ConceptoReserva.concepto("Losa", "MULTIUSO", LocalDate.of(2026, 11, 20), "7:00–8:00 p. m.", 1, "ALC-7K3M9P"))
+                .doesNotContain("turnos");
+        assertThat(ConceptoReserva.concepto("Losa", "MULTIUSO", LocalDate.of(2026, 11, 20), " ", 1, "ALC-7K3M9P"))
+                .isEqualTo("Alquiler de cancha deportiva · Reserva ALC-7K3M9P");
+        assertThat(ConceptoReserva.concepto("Losa", "MULTIUSO", LocalDate.of(2026, 11, 20), "7:00–8:00 p. m. ".repeat(20), 8,
+                "ALC-7K3M9P")).hasSize(160);
     }
 
     @Test
@@ -67,6 +83,9 @@ class ConceptoEIgvTest {
     void descripcionHtmlEscapaYProtegeElRangoHorario() {
         assertThat(GeneradorPdfComprobante.descripcionHtml("A <b> · 7:00 p. m.–8:00 p. m. · Adelanto"))
                 .isEqualTo("A &lt;b&gt; · <span style=\"white-space: nowrap;\">7:00 p. m.–8:00 p. m.</span> · Adelanto");
+        assertThat(GeneradorPdfComprobante.descripcionHtml("vie 9:00–10:00 a. m. y 11:00 a. m.–1:00 p. m. (2 turnos)"))
+                .isEqualTo("vie <span style=\"white-space: nowrap;\">9:00–10:00 a. m.</span> y "
+                        + "<span style=\"white-space: nowrap;\">11:00 a. m.–1:00 p. m.</span> (2 turnos)");
         assertThat(GeneradorPdfComprobante.motivoCatalogo09("01")).isEqualTo("Anulación de la operación");
         assertThat(GeneradorPdfComprobante.motivoCatalogo09("06")).isEqualTo("Devolución total");
     }

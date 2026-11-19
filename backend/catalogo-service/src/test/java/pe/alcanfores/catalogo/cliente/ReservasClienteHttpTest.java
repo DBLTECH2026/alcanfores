@@ -65,6 +65,31 @@ class ReservasClienteHttpTest {
     }
 
     @Test
+    void reservasVigentesDeUnDiaConYSinCanchas() {
+        servidor.expect(requestTo("http://reservas-service/interno/reservas/vigentes?fecha=2030-05-12&idsCancha=1,3"))
+                .andRespond(withSuccess("{\"codigos\":[\"ALC-AB2CD3\"]}", MediaType.APPLICATION_JSON));
+        servidor.expect(requestTo("http://reservas-service/interno/reservas/vigentes?fecha=2030-05-13"))
+                .andRespond(withSuccess("{\"codigos\":[]}", MediaType.APPLICATION_JSON));
+        assertThat(cliente.reservasVigentes(java.time.LocalDate.of(2030, 5, 12), java.util.List.of(1L, 3L)))
+                .containsExactly("ALC-AB2CD3");
+        assertThat(cliente.reservasVigentes(java.time.LocalDate.of(2030, 5, 13), null)).isEmpty();
+        servidor.verify();
+    }
+
+    @Test
+    void reservasVigentesSinListaOConErrorDa503() {
+        servidor.expect(requestTo("http://reservas-service/interno/reservas/vigentes?fecha=2030-05-12"))
+                .andRespond(withSuccess("{}", MediaType.APPLICATION_JSON));
+        servidor.expect(requestTo("http://reservas-service/interno/reservas/vigentes?fecha=2030-05-12"))
+                .andRespond(withServerError());
+        for (int i = 0; i < 2; i++) {
+            assertThatThrownBy(() -> cliente.reservasVigentes(java.time.LocalDate.of(2030, 5, 12), null))
+                    .isInstanceOf(NegocioExcepcion.class)
+                    .satisfies(e -> assertThat(((NegocioExcepcion) e).getStatus()).isEqualTo(503));
+        }
+    }
+
+    @Test
     void elegible() {
         servidor.expect(requestTo(URL)).andExpect(method(org.springframework.http.HttpMethod.GET))
                 .andRespond(withSuccess("{\"elegible\":true,\"motivo\":null,\"autor\":\"Diego R.\"}", MediaType.APPLICATION_JSON));

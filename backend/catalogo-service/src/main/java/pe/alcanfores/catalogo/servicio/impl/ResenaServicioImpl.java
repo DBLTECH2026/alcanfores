@@ -10,12 +10,14 @@ import pe.alcanfores.catalogo.cliente.ElegibilidadResena;
 import pe.alcanfores.catalogo.cliente.ReservasCliente;
 import pe.alcanfores.catalogo.dto.CalificacionRespuesta;
 import pe.alcanfores.catalogo.dto.ResenaAdminRespuesta;
+import pe.alcanfores.catalogo.dto.ResenaComplejoSolicitud;
 import pe.alcanfores.catalogo.dto.ResenaPublicaRespuesta;
 import pe.alcanfores.catalogo.dto.ResenaSolicitud;
 import pe.alcanfores.catalogo.dto.ResumenResenasRespuesta;
 import pe.alcanfores.catalogo.mapeador.ResenaMapeador;
 import pe.alcanfores.catalogo.modelo.Cancha;
 import pe.alcanfores.catalogo.modelo.EstadoResena;
+import pe.alcanfores.catalogo.modelo.OrigenResena;
 import pe.alcanfores.catalogo.modelo.Resena;
 import pe.alcanfores.catalogo.repositorio.CanchaRepositorio;
 import pe.alcanfores.catalogo.repositorio.ResenaRepositorio;
@@ -23,12 +25,14 @@ import pe.alcanfores.catalogo.servicio.ResenaServicio;
 import pe.alcanfores.catalogo.util.Calificaciones;
 import pe.alcanfores.comun.auditoria.Auditor;
 import pe.alcanfores.comun.error.NegocioExcepcion;
+import pe.alcanfores.comun.seguridad.UsuarioToken;
 import pe.alcanfores.comun.util.PaginaRespuesta;
 import pe.alcanfores.comun.util.Texto;
 import pe.alcanfores.comun.util.Tiempo;
 
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 
@@ -38,6 +42,7 @@ public class ResenaServicioImpl implements ResenaServicio {
 
     static final String DUPLICADA = "Esta reserva ya tiene una reseña. ¡Gracias por contarnos tu experiencia!";
     static final String AUTOR_POR_DEFECTO = "Cliente verificado";
+    static final String DE_CLIENTE = "Las reseñas de clientes no se editan ni se borran; puedes ocultarlas o responderlas.";
 
     private final ResenaRepositorio resenas;
     private final CanchaRepositorio canchas;
@@ -80,11 +85,11 @@ public class ResenaServicioImpl implements ResenaServicio {
 
     @Override
     @Transactional
-    public ResenaPublicaRespuesta crear(Long idCancha, ResenaSolicitud s) {
+    public ResenaPublicaRespuesta crear(Long idCancha, ResenaSolicitud s, UsuarioToken cliente) {
         Cancha cancha = canchaActiva(idCancha);
         String codigo = s.codigoReserva().trim().toUpperCase(Locale.ROOT);
-        // Primero código + DNI (reservas): así el 409 «ya tiene reseña» no revela a un tercero que el código existe.
-        ElegibilidadResena e = reservas.elegibleResena(codigo, s.dni().trim(), idCancha);
+        // Primero código + DNI del token (reservas): así el 409 «ya tiene reseña» no revela a un tercero que el código existe.
+        ElegibilidadResena e = reservas.elegibleResena(codigo, cliente.dni(), idCancha);
         if (!e.elegible()) {
             throw NegocioExcepcion.regla("RESENA_NO_ELEGIBLE", e.motivo() == null || e.motivo().isBlank()
                     ? "Esta reserva todavía no permite dejar una reseña." : e.motivo());
@@ -95,6 +100,8 @@ public class ResenaServicioImpl implements ResenaServicio {
         Resena r = new Resena();
         r.setCancha(cancha);
         r.setCodigoReserva(codigo);
+        r.setOrigen(OrigenResena.CLIENTE);
+        r.setIdCuentaCliente(cliente.id());
         r.setAutor(autor(e.autor()));
         r.setPuntuacion(s.puntuacion());
         r.setComentario(Texto.limpiar(s.comentario()));
@@ -176,6 +183,73 @@ public class ResenaServicioImpl implements ResenaServicio {
         r.setRespondidoEn(Tiempo.ahora());
         auditor.registrar("RESPONDER_RESENA", "resena", id, r.getCancha().getNombre() + " · " + r.getAutor());
         return mapeador.admin(r);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ResenaAdminRespuesta> listarDeCancha(Long idCancha) {
+        if (!canchas.existsById(idCancha)) {
+            throw NegocioExcepcion.noEncontrado(CanchaServicioImpl.NO_ENCONTRADA);
+        }
+        return resenas.findByCanchaIdOrderByCreadoEnDescIdDesc(idCancha).stream().map(mapeador::admin).toList();
+    }
+
+    @Override
+    @Transactional
+    public ResenaAdminRespuesta crearDelComplejo(Long idCancha, ResenaComplejoSolicitud s) {
+        Cancha cancha = canchas.findById(idCancha)
+                .orElseThrow(() -> NegocioExcepcion.noEncontrado(CanchaServicioImpl.NO_ENCONTRADA));
+        Resena r = new Resena();
+        r.setCancha(cancha);
+        r.setOrigen(OrigenResena.COMPLEJO);
+        r.setEstado(EstadoResena.PUBLICADA);
+        copiar(s, r);
+        resenas.saveAndFlush(r);
+        auditor.registrar("CREAR_RESENA_COMPLEJO", "resena", r.getId(), detalle(r));
+        return mapeador.admin(r);
+    }
+
+    @Override
+    @Transactional
+    public ResenaAdminRespuesta editarDelComplejo(Long id, ResenaComplejoSolicitud s) {
+        Resena r = delComplejo(id);
+        String antes = detalle(r);
+        copiar(s, r);
+        resenas.saveAndFlush(r);
+        auditor.registrar("EDITAR_RESENA_COMPLEJO", "resena", id, antes + " → " + r.getAutor() + " · " + r.getPuntuacion()
+                + " estrellas");
+        return mapeador.admin(r);
+    }
+
+    @Override
+    @Transactional
+    public void eliminarDelComplejo(Long id) {
+        Resena r = delComplejo(id);
+        String detalle = detalle(r);
+        resenas.delete(r);
+        auditor.registrar("BORRAR_RESENA_COMPLEJO", "resena", id, detalle);
+    }
+
+    private Resena delComplejo(Long id) {
+        Resena r = buscar(id);
+        if (!r.delComplejo()) {
+            throw NegocioExcepcion.regla("RESENA_DE_CLIENTE", DE_CLIENTE);
+        }
+        return r;
+    }
+
+    private static void copiar(ResenaComplejoSolicitud s, Resena r) {
+        if (s.fecha().isAfter(Tiempo.hoy())) {
+            throw NegocioExcepcion.validacion("fecha", "La fecha de la reseña no puede ser futura.");
+        }
+        r.setAutor(Texto.limpiar(s.autor()));
+        r.setPuntuacion(s.puntuacion());
+        r.setComentario(Texto.limpiar(s.comentario()));
+        r.setCreadoEn(s.fecha().atTime(12, 0));
+    }
+
+    private static String detalle(Resena r) {
+        return r.getCancha().getNombre() + " · " + r.getAutor() + " · " + r.getPuntuacion() + " estrellas";
     }
 
     private Resena buscar(Long id) {

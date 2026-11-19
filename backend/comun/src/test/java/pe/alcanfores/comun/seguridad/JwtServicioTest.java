@@ -34,6 +34,21 @@ class JwtServicioTest {
     }
 
     @Test
+    void elTokenDeUnClienteLlevaSuDniYElDeUnAdministradorNo() {
+        UsuarioToken cliente = new UsuarioToken(15L, "lucia@correo.pe", "Lucía Mendoza", UsuarioToken.CLIENTE, "70123456");
+        UsuarioToken leido = jwt.validar(jwt.generar(cliente));
+        assertThat(leido).isEqualTo(cliente);
+        assertThat(leido.esCliente()).isTrue();
+        assertThat(leido.esAdmin()).isFalse();
+        String token = jwt.generar(rosa);
+        Claims c = Jwts.parser().verifyWith(Keys.hmacShaKeyFor(SECRETO.getBytes(StandardCharsets.UTF_8))).build()
+                .parseSignedClaims(token).getPayload();
+        assertThat(c.containsKey("dni")).isFalse();
+        assertThat(jwt.validar(token).dni()).isNull();
+        assertThat(jwt.validar(token).esCliente()).isFalse();
+    }
+
+    @Test
     void elTokenLlevaEmisorSujetoYVencimientoEnHoras() {
         String token = jwt.generar(rosa);
         Claims c = Jwts.parser().verifyWith(Keys.hmacShaKeyFor(SECRETO.getBytes(StandardCharsets.UTF_8))).build()

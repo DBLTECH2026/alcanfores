@@ -68,7 +68,7 @@ public class VerificadorReservas {
     public static InstantaneaReserva instantanea(ReservaInterna r) {
         ClienteContacto c = r.cliente();
         return new InstantaneaReserva(c.dni(), c.nombres(), c.apellidos(), c.telefono(), c.correo(),
-                ConceptoReserva.concepto(r.nombreCancha(), r.deporte(), r.fecha(), r.horaInicio(), r.horaFin(),
+                ConceptoReserva.concepto(r.nombreCancha(), r.deporte(), r.fecha(), r.horario(), r.turnos(),
                         r.codigoReserva()),
                 ConceptoReserva.porcentaje(r.montoAdelanto(), r.montoTotal()));
     }

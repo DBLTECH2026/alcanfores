@@ -1,16 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, HandCoins, RefreshCw, TriangleAlert } from 'lucide-react';
-import { reservasApi } from '@/api/servicios';
+import { useEffect, useMemo, useState } from 'react';
+import { CalendarDays, HandCoins, Layers, RefreshCw, TriangleAlert, X } from 'lucide-react';
+import { catalogoApi, reservasApi } from '@/api/servicios';
 import type { Turno } from '@/api/tipos';
-import { useReserva } from '@/contexto/ReservaContext';
+import { MAX_TURNOS, useReserva } from '@/contexto/ReservaContext';
 import { useToast } from '@/contexto/ToastContext';
 import { useCanchas, useComplejo } from '@/hooks/useDatosPublicos';
 import { useCarga } from '@/hooks/useCarga';
 import { Boton } from '@/componentes/ui/Boton';
 import { Alerta } from '@/componentes/ui/Estados';
 import { Esqueleto, Vacio } from '@/componentes/ui/Datos';
-import { GrillaTurnos, LeyendaTurnos, SelectorCanchas, TiraFechas } from '@/componentes/portal/Asistente';
-import { fmtFecha, fmtHace, fmtHora12, hoyLima, isoLima } from '@/utilidades/fecha';
+import { GrillaTurnos, LeyendaTurnos } from '@/componentes/portal/Asistente';
+import { SelectorCancha } from '@/componentes/portal/SelectorCancha';
+import { TiraFechas, type MarcaDia } from '@/componentes/portal/Fechas';
+import { fmtFecha, fmtHace, hoyLima, isoLima, sumarDias } from '@/utilidades/fecha';
+import { fmtSoles, plural } from '@/utilidades/formato';
 import { CabezaPaso, HoraLimaCorta } from './CabezaPaso';
 
 export default function Paso1() {
@@ -25,7 +28,6 @@ export default function Paso1() {
   const [refresco, setRefresco] = useState(0);
   const [actualizado, setActualizado] = useState<string | null>(null);
   const [, setTic] = useState(0);
-  const grilla = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (r.idCancha === null && lista[0]) r.elegirCancha(lista[0].id);
@@ -37,7 +39,21 @@ export default function Paso1() {
     return () => window.clearInterval(t);
   }, []);
 
-  const cal = useCarga(() => reservasApi.calendario(hoyLima(), dias, idCancha ?? undefined), idCancha ? `${idCancha}-${refresco}` : null);
+  const hoy = hoyLima();
+  const cal = useCarga(() => reservasApi.calendario(hoy, dias + 1, idCancha ?? undefined), idCancha ? `${idCancha}-${dias}-${refresco}` : null);
+  // v2: feriados y días no laborables del rango + cómo trata los feriados esta cancha.
+  const especiales = useCarga(() => catalogoApi.calendario(hoy, sumarDias(hoy, dias)).catch(() => []), `esp-${hoy}-${dias}`);
+  const detalle = useCarga(() => catalogoApi.cancha(idCancha ?? 0).catch(() => null), idCancha ? `det-${idCancha}` : null);
+  const marcas = useMemo(() => {
+    const m = new Map<string, MarcaDia>();
+    const feriado = detalle.datos?.feriado;
+    for (const d of especiales.datos ?? []) {
+      const aplica = !d.canchas?.length || (idCancha !== null && d.canchas.includes(idCancha));
+      if (d.tipo === 'NO_LABORABLE' && aplica) m.set(d.fecha, { tipo: 'cerrado', nombre: d.nombre });
+      if (d.tipo === 'FERIADO') m.set(d.fecha, feriado?.modo === 'CERRADA' ? { tipo: 'cerrado', nombre: d.nombre } : { tipo: 'feriado', nombre: d.nombre, recargo: feriado?.recargo });
+    }
+    return m;
+  }, [especiales.datos, detalle.datos, idCancha]);
 
   // Fecha por defecto: la elegida si sigue visible; si no, el primer día con turnos libres.
   useEffect(() => {
@@ -49,30 +65,37 @@ export default function Paso1() {
 
   const fecha = r.fecha;
   const disp = useCarga(async () => {
-    const d = await reservasApi.disponibilidad(fecha ?? hoyLima(), idCancha ?? undefined);
+    const d = await reservasApi.disponibilidad(fecha ?? hoy, idCancha ?? undefined);
     setActualizado(isoLima());
     return d;
   }, idCancha && fecha ? `${idCancha}-${fecha}-${refresco}` : null);
 
   const turnos: Turno[] = disp.datos?.canchas.find((c) => c.idCancha === idCancha)?.turnos ?? [];
+  const marcados = r.turnos.filter((t) => t.fecha === fecha && t.idCancha === idCancha).map((t) => t.idTurno);
 
-  // Si el turno elegido se ocupó al actualizar, se quita la selección.
+  // Si un turno marcado se ocupó al actualizar, se quita de la selección.
   useEffect(() => {
-    if (!r.turno || !disp.datos || r.turno.fecha !== fecha || r.turno.idCancha !== idCancha) return;
-    const t = turnos.find((x) => x.idTurno === r.turno?.idTurno);
-    if (t && t.estado !== 'DISPONIBLE') {
-      r.elegirTurno(null);
-      toast.advertencia('Ese horario se acaba de ocupar');
+    if (!disp.datos || !r.turnos.length) return;
+    const perdidos = r.turnos.filter((m) => m.fecha === fecha && m.idCancha === idCancha && turnos.find((x) => x.idTurno === m.idTurno && x.estado !== 'DISPONIBLE'));
+    if (perdidos.length) {
+      perdidos.forEach((p) => r.alternarTurno(p));
+      toast.advertencia('Un horario que marcaste se acaba de ocupar');
     }
   }, [disp.datos]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const elegir = (t: Turno) => {
+  const alternar = (t: Turno) => {
     if (!cancha || !fecha) return;
-    r.elegirTurno({ idTurno: t.idTurno, idCancha: cancha.id, nombreCancha: cancha.nombre, deporte: cancha.deporte, fecha, horaInicio: t.horaInicio, horaFin: t.horaFin, precio: t.precio, franja: t.franja });
+    if (!marcados.includes(t.idTurno) && marcados.length >= MAX_TURNOS) {
+      toast.info(`Puedes marcar hasta ${MAX_TURNOS} turnos`);
+      return;
+    }
+    r.alternarTurno({ idTurno: t.idTurno, idCancha: cancha.id, nombreCancha: cancha.nombre, deporte: cancha.deporte, fecha, horaInicio: t.horaInicio, horaFin: t.horaFin, precio: t.precio, franja: t.franja, feriado: t.feriado });
   };
 
   const actualizar = () => setRefresco((n) => n + 1);
   const siguienteConLibres = cal.datos?.find((d) => d.fecha > (fecha ?? '') && d.libres > 0);
+  const marcaHoy = fecha ? marcas.get(fecha) : undefined;
+  const sel = r.turno && r.turno.fecha === fecha && r.turno.idCancha === idCancha ? r.turno : null;
 
   return (
     <div className="grid gap-5">
@@ -95,29 +118,26 @@ export default function Paso1() {
 
       {r.turnoPerdido && (
         <Alerta tipo="advertencia" icono={TriangleAlert} titulo="Alguien se adelantó" alCerrar={() => r.elegirTurno(null)}>
-          {`Las ${fmtHora12(r.turnoPerdido.horaInicio)} del ${fmtFecha(r.turnoPerdido.fecha)} ya no están libres. Tus datos siguen guardados: elige otro horario.`}
+          {`${r.turnoPerdido.horarioTexto} del ${fmtFecha(r.turnoPerdido.fecha)} ya no está libre. Tus datos siguen guardados: elige otro horario.`}
         </Alerta>
       )}
 
       {canchas.cargando ? (
-        <div className="flex gap-2">
-          {[1, 2, 3].map((n) => (
-            <Esqueleto key={n} ancho={150} alto={52} radio={14} />
-          ))}
-        </div>
+        <Esqueleto alto={72} radio={14} />
       ) : canchas.error ? (
         <Vacio ilustracion="IL-19-sin-conexion" titulo="Sin conexión con el servidor" compacto acciones={<Boton variante="secundario" icono={RefreshCw} onClick={canchas.recargar}>Reintentar</Boton>} />
       ) : lista.length === 0 ? (
         <Vacio ilustracion="IL-25-sin-canchas" titulo="Sin canchas por ahora" compacto />
       ) : (
-        <SelectorCanchas canchas={lista} activa={idCancha} alElegir={r.elegirCancha} />
+        <SelectorCancha canchas={lista} activa={idCancha} alElegir={r.elegirCancha} />
       )}
 
       {idCancha && (
-        <section className="grid gap-3" aria-labelledby="h-fecha">
+        <section className="grid gap-3 min-w-0" aria-labelledby="h-fecha">
           <h2 id="h-fecha" className="inline-flex items-center gap-2 text-[14px] font-semibold">
             <CalendarDays className="ico ico-16 text-verde" aria-hidden />
             {fecha ? fmtFecha(fecha, 'larga') : 'Fecha'}
+            {marcaHoy && <span className="t-sec font-normal">{`· ${marcaHoy.nombre}`}</span>}
           </h2>
           {cal.cargando && !cal.datos ? (
             <div className="flex gap-2 overflow-hidden">
@@ -126,16 +146,23 @@ export default function Paso1() {
               ))}
             </div>
           ) : cal.datos ? (
-            <TiraFechas dias={cal.datos} seleccionada={fecha} alElegir={r.elegirFecha} />
+            <TiraFechas dias={cal.datos} seleccionada={fecha} alElegir={r.elegirFecha} marcas={marcas} />
+          ) : cal.error ? (
+            <Vacio ilustracion="IL-19-sin-conexion" titulo="No pudimos cargar las fechas" compacto acciones={<Boton variante="secundario" icono={RefreshCw} onClick={actualizar}>Reintentar</Boton>} />
           ) : null}
         </section>
       )}
 
       {idCancha && fecha && (
-        <section className="grid gap-4" aria-labelledby="h-turnos" ref={grilla}>
+        <section className="grid gap-4" aria-labelledby="h-turnos">
           <h2 id="h-turnos" className="sr-only">
             Horarios disponibles
           </h2>
+          {marcaHoy?.tipo === 'feriado' && (
+            <Alerta tipo="info" titulo={`Feriado: ${marcaHoy.nombre}`}>
+              {marcaHoy.recargo ? `Cada turno lleva un adicional de ${fmtSoles(marcaHoy.recargo, { decimales: 0 })} (ya incluido en el precio).` : 'La cancha abre con su precio normal.'}
+            </Alerta>
+          )}
           <LeyendaTurnos
             extra={
               <span className="ml-auto inline-flex items-center gap-1.5 t-mini" role="status">
@@ -156,7 +183,7 @@ export default function Paso1() {
             </div>
           ) : turnos.length === 0 ? (
             <div className="card">
-              <Vacio ilustracion="IL-26-sin-turnos" titulo="Sin horarios publicados" texto="Aún no hay turnos para ese día." compacto />
+              <Vacio ilustracion="IL-26-sin-turnos" titulo={marcaHoy?.tipo === 'cerrado' ? `Cerrado: ${marcaHoy.nombre}` : 'Sin horarios ese día'} texto={marcaHoy ? undefined : 'La cancha no abre ese día.'} compacto />
             </div>
           ) : !turnos.some((t) => t.estado === 'DISPONIBLE') ? (
             <div className="grid gap-4">
@@ -174,10 +201,25 @@ export default function Paso1() {
                   }
                 />
               </div>
-              <GrillaTurnos turnos={turnos} seleccionado={null} alElegir={elegir} />
+              <GrillaTurnos turnos={turnos} seleccionados={[]} alElegir={alternar} />
             </div>
           ) : (
-            <GrillaTurnos turnos={turnos} seleccionado={r.turno?.fecha === fecha && r.turno.idCancha === idCancha ? r.turno.idTurno : null} alElegir={elegir} />
+            <>
+              <p className="t-sec flex items-center gap-2 -mb-1">
+                <Layers className="ico ico-16 text-verde" aria-hidden />
+                Puedes marcar varios turnos para jugar más horas.
+              </p>
+              <GrillaTurnos turnos={turnos} seleccionados={marcados} alElegir={alternar} />
+              {sel && sel.partes.length > 1 && (
+                <div className="seleccion-turnos" role="status">
+                  <b className="tnum">{`${plural(sel.partes.length, 'turno', 'turnos')} · ${sel.horarioTexto}`}</b>
+                  <span className="tnum">{`Total ${fmtSoles(sel.precio)}`}</span>
+                  <Boton variante="fantasma" tamano="sm" icono={X} onClick={() => r.elegirTurno(null)}>
+                    Quitar
+                  </Boton>
+                </div>
+              )}
+            </>
           )}
         </section>
       )}

@@ -230,7 +230,7 @@ function ListaReservas() {
               celda: (r) => (
                 <div>
                   <span className="block">{`${r.cancha.split(' · ')[0]} · ${fmtFecha(r.fecha, 'relativa')}`}</span>
-                  <span className="sub t-sec tnum">{fmtRango24(r.horaInicio, r.horaFin)}</span>
+                  <span className="sub t-sec tnum">{r.cantidadTurnos && r.cantidadTurnos > 1 && r.horarioTexto ? `${r.horarioTexto} · ${r.cantidadTurnos} turnos` : fmtRango24(r.horaInicio, r.horaFin)}</span>
                 </div>
               ),
             },

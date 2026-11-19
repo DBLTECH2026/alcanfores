@@ -11,7 +11,10 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Date;
 
-/** Emite y valida JWT HS256 (RFC 7519). El secreto lo comparten auth-service, el gateway y cada servicio. */
+/**
+ * Emite y valida JWT HS256 (RFC 7519). El secreto lo comparten auth-service, el gateway y cada servicio. Claims: {@code sub},
+ * {@code usuario}, {@code nombre}, {@code rol} y, solo en los clientes, {@code dni} (un claim nulo no se escribe).
+ */
 public class JwtServicio {
 
     public static final String EMISOR = "alcanfores-auth";
@@ -34,6 +37,7 @@ public class JwtServicio {
                 .claim("usuario", u.usuario())
                 .claim("nombre", u.nombre())
                 .claim("rol", u.rol())
+                .claim("dni", u.dni())
                 .issuedAt(Date.from(ahora))
                 .expiration(Date.from(ahora.plus(horas, ChronoUnit.HOURS)))
                 .signWith(clave, Jwts.SIG.HS256)
@@ -44,7 +48,7 @@ public class JwtServicio {
     public UsuarioToken validar(String token) {
         Claims c = Jwts.parser().verifyWith(clave).requireIssuer(EMISOR).build().parseSignedClaims(token).getPayload();
         return new UsuarioToken(Long.valueOf(c.getSubject()), c.get("usuario", String.class), c.get("nombre", String.class),
-                c.get("rol", String.class));
+                c.get("rol", String.class), c.get("dni", String.class));
     }
 
     /** Momento en que vencería un token emitido ahora. */

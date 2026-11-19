@@ -86,7 +86,7 @@ class MuestrasComprobantesTest {
         String contenidoXml = armador.xml(c, null);
 
         assertThat(c.getDescripcion())
-                .isEqualTo("Alquiler de Cancha 2 · Fútbol 6 · vie 20/11/2026 7:00 p. m.–8:00 p. m. · Adelanto 50 %");
+                .isEqualTo("Alquiler de Cancha 2 · Fútbol 6 · vie 20/11/2026 7:00–8:00 p. m. · Adelanto 50 %");
         assertThat(c.getOpGravada()).isEqualByComparingTo("38.14");
         assertThat(c.getIgv()).isEqualByComparingTo("6.86");
         assertThat(c.getMontoLetras()).isEqualTo("CUARENTA Y CINCO CON 00/100 SOLES");

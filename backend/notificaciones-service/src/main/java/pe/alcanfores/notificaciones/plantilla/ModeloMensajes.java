@@ -6,6 +6,7 @@ import pe.alcanfores.comun.config.AlcanforesPropiedades;
 import pe.alcanfores.comun.eventos.ClienteContacto;
 import pe.alcanfores.comun.eventos.DatosReserva;
 import pe.alcanfores.comun.util.Dinero;
+import pe.alcanfores.comun.util.Horarios;
 import pe.alcanfores.comun.util.Tiempo;
 import pe.alcanfores.notificaciones.canal.CorreoCanal;
 import pe.alcanfores.notificaciones.servicio.DatosComplejo;
@@ -66,7 +67,7 @@ public class ModeloMensajes {
         m.put("fechaTexto", Tiempo.fechaLarga(r.fecha()));
         m.put("fechaCorta", r.fecha().format(Tiempo.FECHA_CORTA));
         m.put("horaInicio", Tiempo.horaAmPm(r.horaInicio()));
-        m.put("horario", Tiempo.horaAmPm(r.horaInicio()) + " a " + Tiempo.horaAmPm(r.horaFin()));
+        m.put("horario", horario(r));
         BigDecimal total = cero(r.montoTotal());
         BigDecimal pagado = cero(r.montoPagado());
         m.put("montoTotal", Dinero.formato(total));
@@ -80,6 +81,17 @@ public class ModeloMensajes {
         m.put("urlListo", frontUrl() + "/reservar/listo/" + r.codigoReserva());
         m.put("urlResena", urlResena(r.idCancha(), r.codigoReserva()));
         return m;
+    }
+
+    /**
+     * «7:00–8:00 p. m.» o, con varios turnos, «9:00–10:00 a. m. y 7:00–8:00 p. m. (2 turnos)». Usa el {@code horarioTexto}
+     * que arma reservas-service; los eventos y recordatorios guardados antes de la v2 no lo traen: entonces se arma con
+     * la hora de inicio y fin.
+     */
+    public static String horario(DatosReserva r) {
+        String texto = r.horarioTexto() != null && !r.horarioTexto().isBlank() ? r.horarioTexto().trim()
+                : Horarios.rango(r.horaInicio(), r.horaFin());
+        return r.cantidadTurnos() > 1 ? texto + " (" + r.cantidadTurnos() + " turnos)" : texto;
     }
 
     /** Sobrescribe el saldo cuando se conoce uno más actual (evento confirmada o consulta a reservas). */

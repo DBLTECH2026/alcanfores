@@ -69,7 +69,17 @@ class ValidadorConfiguracionTest {
         m.put("ultimo_turno", ultimo);
         m.put("inicio_noche", noche);
         m.put("duracion_min", duracion);
+        m.put("dias_visibles", "14");
+        m.put("dias_generados", "120");
         return m;
+    }
+
+    @Test
+    void losDiasGeneradosNoPuedenSerMenosQueLosVisibles() {
+        Map<String, String> c = horario("08:00", "23:00", "18:00", "60");
+        c.put("dias_visibles", "30");
+        c.put("dias_generados", "20");
+        assertThat(validador.validarConjunto(c)).extracting(e -> e.campo()).containsExactly("dias_generados");
     }
 
     @Test

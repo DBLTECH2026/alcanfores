@@ -30,7 +30,8 @@ import type { RespuestaManual } from '@/api/admin/tipos';
 import { documentosApi } from '@/api/servicios';
 import { esErrorApi } from '@/api/cliente';
 import { useCarga } from '@/hooks/useCarga';
-import { useComplejo } from '@/hooks/useDatosPublicos';
+import { useCanchas, useComplejo } from '@/hooks/useDatosPublicos';
+import { SelectorCancha } from '@/componentes/portal/SelectorCancha';
 import { useTituloPagina } from '@/hooks/useTituloPagina';
 import { aplicarErroresServidor } from '@/hooks/useErroresServidor';
 import { useToast } from '@/contexto/ToastContext';
@@ -42,14 +43,14 @@ import { Avatar, Esqueleto, Segmentado, Spinner, Vacio } from '@/componentes/ui/
 import { Alerta } from '@/componentes/ui/Estados';
 import { IconoDeporte } from '@/componentes/ui/Marca';
 import { Modal } from '@/componentes/ui/Modal';
-import { ahoraLima, diaSemanaCorto, fmtFecha, fmtRango24, hoyLima, numeroDia, sumarDias } from '@/utilidades/fecha';
+import { ahoraLima, diaSemanaCorto, fmtFecha, hoyLima, numeroDia, sumarDias, textoHorario } from '@/utilidades/fecha';
 import { aTitulo, fmtSoles, plural } from '@/utilidades/formato';
 import { normalizarCelular, RE_DNI } from '@/utilidades/documentos';
 import { comprobanteDe, crearEsquemaManual } from './esquemasPanel';
 
 type Entrada = z.input<ReturnType<typeof crearEsquemaManual>>;
 type Salida = z.output<ReturnType<typeof crearEsquemaManual>>;
-const CAMPOS = ['idTurno', 'dni', 'nombres', 'apellidos', 'telefono', 'correo', 'origen', 'nota', 'monto', 'metodo', 'tipoPago', 'codigoOperacion', 'ruc', 'razonSocial', 'direccionFiscal'];
+const CAMPOS = ['idsTurno', 'dni', 'nombres', 'apellidos', 'telefono', 'correo', 'origen', 'nota', 'monto', 'metodo', 'tipoPago', 'codigoOperacion', 'ruc', 'razonSocial', 'direccionFiscal'];
 
 /** /admin/nueva-reserva — reserva presencial o telefónica (prototipo adm-20). Acepta ?idCancha=&fecha=&idTurno= desde la agenda. */
 export default function NuevaReserva() {
@@ -65,6 +66,9 @@ export default function NuevaReserva() {
   const agenda = useCarga(() => turnosApi.agenda(fecha), `ag-${fecha}`);
   const canchas = (agenda.datos?.canchas ?? []).filter((c) => c.activa);
   const cancha = canchas.find((c) => c.idCancha === idCancha) ?? null;
+  // Tarjetas con portada para el selector (los datos públicos de las canchas activas de la agenda).
+  const catalogo = useCanchas();
+  const publicas = (catalogo.datos ?? []).filter((c) => canchas.some((x) => x.idCancha === c.id));
   const [dniEstado, setDniEstado] = useState<'nada' | 'buscando' | 'verificado' | 'manual'>('nada');
   const [frecuente, setFrecuente] = useState<{ total: number; noShows: number } | null>(null);
   const [creada, setCreada] = useState<RespuestaManual | null>(null);
@@ -85,7 +89,7 @@ export default function NuevaReserva() {
     resolver: zodResolver(esquema),
     mode: 'onTouched',
     defaultValues: {
-      idTurno: sp.get('idTurno') ? Number(sp.get('idTurno')) : (undefined as unknown as number),
+      idsTurno: sp.get('idTurno') ? [Number(sp.get('idTurno'))] : [],
       dni: '',
       nombres: '',
       apellidos: '',
@@ -106,10 +110,15 @@ export default function NuevaReserva() {
     },
   });
   const v = watch();
-  const turno = cancha?.turnos.find((t) => t.idTurno === v.idTurno) ?? null;
+  // v2: varios turnos de la misma cancha y fecha; el total suma sus precios (con recargo de feriado).
+  const ids = v.idsTurno ?? [];
+  const elegidos = (cancha?.turnos ?? []).filter((t) => ids.includes(t.idTurno));
+  const sumaTurnos = Math.round(elegidos.reduce((a, t) => a + t.precio, 0) * 100) / 100;
   const adelantoPct = complejo.datos?.reglas.adelantoPct ?? 50;
-  const adelanto = turno ? Math.round(turno.precio * adelantoPct) / 100 : 0;
-  useEffect(() => setTotal(turno?.precio ?? 0), [turno?.precio]);
+  const adelanto = Math.round(sumaTurnos * adelantoPct) / 100;
+  useEffect(() => setTotal(sumaTurnos), [sumaTurnos]);
+  const alternarTurno = (id: number) =>
+    setValue('idsTurno', ids.includes(id) ? ids.filter((x) => x !== id) : ids.length >= 8 ? ids : [...ids, id], { shouldValidate: true });
   useEffect(() => {
     if (!idCancha && canchas[0]) setIdCancha(canchas[0].idCancha);
   }, [canchas, idCancha]);
@@ -155,7 +164,7 @@ export default function NuevaReserva() {
     setErrorGeneral(null);
     try {
       const r = await reservasAdminApi.crearManual({
-        idTurno: d.idTurno,
+        idsTurno: d.idsTurno,
         cliente: { dni: d.dni, nombres: aTitulo(d.nombres), apellidos: aTitulo(d.apellidos), telefono: normalizarCelular(d.telefono), correo: d.correo },
         origen: d.origen,
         nota: d.nota || undefined,
@@ -283,35 +292,21 @@ export default function NuevaReserva() {
                 <Clock className="ico" aria-hidden />
                 Turno
               </h2>
-              <span className="pc-der dato-ico">Hora de Lima</span>
+              <span className="pc-der dato-ico">Marca uno o varios</span>
             </div>
             <div className="pc-cuerpo grid gap-4">
-              <div className="chips-cancha" role="radiogroup" aria-label="Cancha">
-                {!agenda.datos && agenda.cargando
-                  ? Array.from({ length: 4 }, (_, i) => <Esqueleto key={i} ancho={150} alto={54} />)
-                  : canchas.map((c) => (
-                      <button
-                        key={c.idCancha}
-                        type="button"
-                        role="radio"
-                        aria-checked={c.idCancha === idCancha}
-                        aria-pressed={c.idCancha === idCancha}
-                        className="chip-cancha-p"
-                        onClick={() => {
-                          setIdCancha(c.idCancha);
-                          setValue('idTurno', undefined as unknown as number);
-                        }}
-                      >
-                        <span className="td-ico">
-                          <IconoDeporte deporte={c.deporte} className="ico" />
-                        </span>
-                        <span>
-                          <b>{c.nombre.split(' · ')[0]}</b>
-                          <small>{c.nombre.split(' · ')[1] ?? 'Multiusos'}</small>
-                        </span>
-                      </button>
-                    ))}
-              </div>
+              {!agenda.datos && agenda.cargando ? (
+                <Esqueleto alto={68} radio={14} />
+              ) : (
+                <SelectorCancha
+                  canchas={publicas}
+                  activa={idCancha}
+                  alElegir={(id) => {
+                    setIdCancha(id);
+                    setValue('idsTurno', []);
+                  }}
+                />
+              )}
               <div className="tira-dias" role="radiogroup" aria-label="Fecha">
                 {Array.from({ length: dias }, (_, i) => sumarDias(hoyLima(), i)).map((f) => (
                   <button
@@ -320,7 +315,7 @@ export default function NuevaReserva() {
                     aria-pressed={f === fecha}
                     onClick={() => {
                       setFecha(f);
-                      setValue('idTurno', undefined as unknown as number);
+                      setValue('idsTurno', []);
                     }}
                   >
                     <small>{f === hoyLima() ? 'Hoy' : diaSemanaCorto(f)}</small>
@@ -333,7 +328,7 @@ export default function NuevaReserva() {
               ) : !cancha || cancha.turnos.length === 0 ? (
                 <Vacio ilustracion="IL-26-sin-turnos" titulo="Sin turnos ese día" compacto />
               ) : (
-                <div className="turnos-libres" role="radiogroup" aria-label="Turno">
+                <div className="turnos-libres" role="group" aria-label="Turnos (puedes marcar varios)">
                   {cancha.turnos.map((t) => {
                     const libre = t.estado === 'DISPONIBLE' && !terminado(t.horaFin);
                     return (
@@ -342,20 +337,27 @@ export default function NuevaReserva() {
                         type="button"
                         className="turno-p"
                         disabled={!libre}
-                        aria-pressed={v.idTurno === t.idTurno}
+                        aria-pressed={ids.includes(t.idTurno)}
                         title={!libre ? (t.estado === 'BLOQUEADO' ? t.motivoBloqueo ?? 'Bloqueado' : t.estado === 'RESERVADO' ? 'Ocupado' : 'Ya pasó') : undefined}
-                        onClick={() => setValue('idTurno', t.idTurno, { shouldValidate: true })}
+                        onClick={() => alternarTurno(t.idTurno)}
                       >
+                        {ids.includes(t.idTurno) && <Check className="ico turno-p-check" aria-hidden />}
                         <b>{t.horaInicio}</b>
-                        <small>{libre ? fmtSoles(t.precio, { decimales: 0 }) : t.estado === 'RESERVADO' ? 'Ocupado' : t.estado === 'BLOQUEADO' ? 'Bloqueado' : 'Pasó'}</small>
+                        <small>{libre ? `${fmtSoles(t.precio, { decimales: 0 })}${t.feriado ? ' · feriado' : ''}` : t.estado === 'RESERVADO' ? 'Ocupado' : t.estado === 'BLOQUEADO' ? 'Bloqueado' : 'Pasó'}</small>
                       </button>
                     );
                   })}
                 </div>
               )}
-              {errors.idTurno?.message && (
+              {ids.length > 0 && (
+                <span className="dato-ico">
+                  <Clock className="ico" aria-hidden />
+                  {`${plural(ids.length, 'turno', 'turnos')} · ${textoHorario(elegidos, true)}`}
+                </span>
+              )}
+              {errors.idsTurno?.message && (
                 <Alerta tipo="error" className="!py-2">
-                  {errors.idTurno.message}
+                  {errors.idsTurno.message}
                 </Alerta>
               )}
             </div>
@@ -460,7 +462,7 @@ export default function NuevaReserva() {
               <span className="td-ico">
                 <Clock className="ico" aria-hidden />
               </span>
-              {turno ? fmtRango24(turno.horaInicio, turno.horaFin) : <span className="t-sec font-normal">Elige un turno</span>}
+              {elegidos.length ? `${textoHorario(elegidos, true)}${elegidos.length > 1 ? ` · ${elegidos.length} turnos` : ''}` : <span className="t-sec font-normal">Elige uno o más turnos</span>}
             </div>
           </div>
           <div className="pc-cuerpo border-t border-borde-panel grid gap-1">

@@ -31,6 +31,7 @@ public final class Eventos {
     public static final String PAGO_RECHAZADO = "pago.rechazado";
     public static final String COMPROBANTE_EMITIDO = "comprobante.emitido";
     public static final String CANCHA_ACTUALIZADA = "cancha.actualizada";
+    public static final String CALENDARIO_ACTUALIZADO = "calendario.actualizado";
     public static final String AUDITORIA_ACCION = "auditoria.accion";
 
     private Eventos() {

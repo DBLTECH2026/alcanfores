@@ -4,7 +4,6 @@ import jakarta.validation.Constraint;
 import jakarta.validation.ConstraintValidator;
 import jakarta.validation.ConstraintValidatorContext;
 import jakarta.validation.Payload;
-import pe.alcanfores.auth.dto.CambiarContrasenaSolicitud;
 
 import java.lang.annotation.Documented;
 import java.lang.annotation.ElementType;
@@ -13,7 +12,10 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 import java.util.Objects;
 
-/** La confirmación debe repetir exactamente la contraseña nueva; el error se marca en el campo {@code confirmacion}. */
+/**
+ * La confirmación debe repetir exactamente la contraseña nueva; el error se marca en el campo {@code confirmacion}.
+ * Se aplica a cualquier solicitud que implemente {@link ConConfirmacion} (cambio de contraseña y registro de clientes).
+ */
 @Documented
 @Constraint(validatedBy = ContrasenasCoinciden.Validador.class)
 @Target(ElementType.TYPE)
@@ -26,14 +28,21 @@ public @interface ContrasenasCoinciden {
 
     Class<? extends Payload>[] payload() default {};
 
-    class Validador implements ConstraintValidator<ContrasenasCoinciden, CambiarContrasenaSolicitud> {
+    /** Solicitud con una contraseña que se debe repetir. */
+    interface ConConfirmacion {
+        String contrasenaAConfirmar();
+
+        String confirmacion();
+    }
+
+    class Validador implements ConstraintValidator<ContrasenasCoinciden, ConConfirmacion> {
 
         @Override
-        public boolean isValid(CambiarContrasenaSolicitud s, ConstraintValidatorContext ctx) {
-            if (s == null || s.nueva() == null || s.confirmacion() == null || s.confirmacion().isBlank()) {
+        public boolean isValid(ConConfirmacion s, ConstraintValidatorContext ctx) {
+            if (s == null || s.contrasenaAConfirmar() == null || s.confirmacion() == null || s.confirmacion().isBlank()) {
                 return true;
             }
-            if (Objects.equals(s.nueva(), s.confirmacion())) {
+            if (Objects.equals(s.contrasenaAConfirmar(), s.confirmacion())) {
                 return true;
             }
             ctx.disableDefaultConstraintViolation();

@@ -32,6 +32,7 @@ public final class ServicioSimulado {
                                         + "\",\"requestId\":\"" + valor(req.requestHeaders().get("X-Request-Id"))
                                         + "\",\"internoToken\":\"" + valor(req.requestHeaders().get("X-Interno-Token"))
                                         + "\",\"ip\":\"" + valor(req.requestHeaders().get("X-Forwarded-For"))
+                                        + "\",\"autorizacion\":\"" + valor(req.requestHeaders().get("Authorization"))
                                         + "\",\"bytes\":" + cuerpo.length() + "}");
                         if (ruta.equals("/api/auth/lento")) {
                             eco = eco.delayElement(Duration.ofSeconds(4));

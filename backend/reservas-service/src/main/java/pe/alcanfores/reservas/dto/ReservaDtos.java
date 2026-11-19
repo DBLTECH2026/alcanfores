@@ -14,6 +14,7 @@ import pe.alcanfores.comun.validacion.NombrePersona;
 import pe.alcanfores.reservas.modelo.Asistencia;
 import pe.alcanfores.reservas.modelo.EstadoPago;
 import pe.alcanfores.reservas.modelo.EstadoReserva;
+import pe.alcanfores.reservas.modelo.Origen;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -39,13 +40,35 @@ public final class ReservaDtos {
             @Size(max = 100, message = Mensajes.CORREO) String correo) {
     }
 
+    /** Turnos pedidos: {@code idsTurno} (1 a 8) o, como en la v1, un solo {@code idTurno}. */
+    public record TurnosPedidos(List<Long> ids, String campo) {
+
+        public static TurnosPedidos de(Long idTurno, List<Long> idsTurno) {
+            if (idsTurno != null && !idsTurno.isEmpty()) {
+                return new TurnosPedidos(idsTurno, "idsTurno");
+            }
+            return new TurnosPedidos(idTurno == null ? List.of() : List.of(idTurno), idTurno == null ? "idsTurno" : "idTurno");
+        }
+    }
+
     public record RegistroReservaSolicitud(
-            @NotNull(message = Mensajes.ELEGIR_TURNO) @Positive(message = Mensajes.ELEGIR_TURNO) Long idTurno,
+            @Positive(message = Mensajes.ELEGIR_TURNO) Long idTurno,
+            @Size(max = Mensajes.MAX_TURNOS, message = Mensajes.TURNOS_CANTIDAD)
+            List<@NotNull(message = Mensajes.ELEGIR_TURNO) @Positive(message = Mensajes.ELEGIR_TURNO) Long> idsTurno,
             @NotNull(message = Mensajes.DATOS_CLIENTE) @Valid ClienteSolicitud cliente,
             @NotNull(message = Mensajes.METODO_PAGO) @Pattern(regexp = "YAPE|PLIN|TARJETA|MERCADO_PAGO",
                     message = Mensajes.METODO_PAGO) String metodoPago,
             @NotNull(message = Mensajes.TERMINOS) @AssertTrue(message = Mensajes.TERMINOS) Boolean aceptaTerminos,
             @NotNull(message = Mensajes.TERMINOS) @AssertTrue(message = Mensajes.TERMINOS) Boolean aceptaPrivacidad) {
+
+        public TurnosPedidos turnos() {
+            return TurnosPedidos.de(idTurno, idsTurno);
+        }
+
+        /** La misma solicitud con otro cliente (token CLIENTE: el DNI sale del token). */
+        public RegistroReservaSolicitud conCliente(ClienteSolicitud otro) {
+            return new RegistroReservaSolicitud(idTurno, idsTurno, otro, metodoPago, aceptaTerminos, aceptaPrivacidad);
+        }
     }
 
     public record CancelacionClienteSolicitud(
@@ -56,6 +79,10 @@ public final class ReservaDtos {
     public record CanchaResumen(Long id, String nombre, String deporte) {
     }
 
+    /** Un turno de la reserva con el precio que se cobró. */
+    public record TurnoReserva(Long idTurno, LocalTime horaInicio, LocalTime horaFin, BigDecimal precio) {
+    }
+
     /** Cliente en vistas públicas: DNI enmascarado (Ley 29733). */
     public record ClientePublico(String nombres, String apellidos, String dniEnmascarado, String telefono, String correo) {
     }
@@ -63,7 +90,8 @@ public final class ReservaDtos {
     public record ReservaCreadaRespuesta(String codigoReserva, EstadoReserva estado, EstadoPago estadoPago,
                                          LocalDateTime venceEn, CanchaResumen cancha, LocalDate fecha, LocalTime horaInicio,
                                          LocalTime horaFin, BigDecimal montoTotal, BigDecimal montoAdelanto,
-                                         ClientePublico cliente) {
+                                         ClientePublico cliente, List<TurnoReserva> turnos, String horarioTexto,
+                                         int cantidadTurnos) {
     }
 
     public record CancelacionInfo(String canceladoPor, String motivo, LocalDateTime fecha, boolean devolucion,
@@ -80,6 +108,17 @@ public final class ReservaDtos {
                                         ClientePublico cliente, Asistencia asistencia, BigDecimal montoPagado,
                                         BigDecimal saldo, String metodoPagoPrevisto, CancelacionInfo cancelacion,
                                         List<EventoLinea> linea, boolean puedeCancelar, boolean puedeReenviarComprobante,
-                                        boolean puedeResenar) {
+                                        boolean puedeResenar, List<TurnoReserva> turnos, String horarioTexto,
+                                        int cantidadTurnos, boolean resenada) {
+    }
+
+    /** Ítem de «Mis reservas» (cliente con cuenta: todas las reservas de su DNI). */
+    public record ReservaClienteItem(String codigoReserva, EstadoReserva estado, EstadoPago estadoPago, Asistencia asistencia,
+                                     Origen origen, CanchaResumen cancha, LocalDate fecha, LocalTime horaInicio,
+                                     LocalTime horaFin, String horarioTexto, int cantidadTurnos, List<TurnoReserva> turnos,
+                                     BigDecimal montoTotal, BigDecimal montoAdelanto, BigDecimal montoPagado,
+                                     BigDecimal saldo, LocalDateTime venceEn, LocalDateTime fechaRegistro,
+                                     boolean puedeCancelar, boolean puedeReenviarComprobante, boolean puedeResenar,
+                                     boolean resenada) {
     }
 }

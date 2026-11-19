@@ -20,7 +20,7 @@ import java.util.function.LongSupplier;
 
 /**
  * Limitador en memoria por IP y por regla (SPEC §1.1): login 10/min, documentos 20/min, registrar reserva 10/min,
- * pasarela 30/min. Cada combinación regla+IP tiene su propia {@link CubetaTokens}. Con varias réplicas del gateway
+ * pasarela 30/min; v2: registro de clientes 5/min y login de clientes 10/min. Cada combinación regla+IP tiene su propia {@link CubetaTokens}. Con varias réplicas del gateway
  * cada una lleva su cuenta (suficiente para este despliegue de una sola instancia).
  */
 @Component

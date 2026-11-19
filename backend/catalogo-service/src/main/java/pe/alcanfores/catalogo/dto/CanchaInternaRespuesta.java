@@ -1,8 +1,15 @@
 package pe.alcanfores.catalogo.dto;
 
-import java.math.BigDecimal;
+import pe.alcanfores.comun.eventos.HorarioDia;
 
-/** Datos que necesitan reservas-service y pagos-service ({@code /interno/canchas}). */
+import java.math.BigDecimal;
+import java.time.LocalTime;
+import java.util.List;
+
+/**
+ * Datos que necesitan reservas-service y pagos-service ({@code /interno/canchas}), con el horario propio de la cancha
+ * (los 7 días; el cierre a medianoche llega 23:59:59) y qué hace en feriado.
+ */
 public record CanchaInternaRespuesta(
         Long id,
         String slug,
@@ -13,6 +20,11 @@ public record CanchaInternaRespuesta(
         BigDecimal precioDia,
         BigDecimal precioNoche,
         String estado,
-        Integer orden
+        Integer orden,
+        Integer duracionTurnoMin,
+        LocalTime inicioNoche,
+        List<HorarioDia> dias,
+        String feriadoModo,
+        BigDecimal recargoFeriado
 ) {
 }

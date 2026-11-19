@@ -131,7 +131,7 @@ export function ResumenCalificacion({ promedio, total, distribucion }: { promedi
         <span className="font-titular font-extrabold text-[56px] leading-none tnum">{total ? promedio.toFixed(1) : '–'}</span>
         <div className="grid gap-1 pb-1">
           <Estrellas valor={promedio} tamano={20} />
-          <span className="t-sec tnum">{total === 1 ? '1 reseña verificada' : `${total} reseñas verificadas`}</span>
+          <span className="t-sec tnum">{total === 1 ? '1 reseña' : `${total} reseñas`}</span>
         </div>
       </div>
       <div className="distribucion" aria-label="Distribución de calificaciones">

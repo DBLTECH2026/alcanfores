@@ -112,6 +112,9 @@ class ClientesInternosTest {
 
         assertThat(r.datos().cliente().correo()).isEqualTo("d@x.pe");
         assertThat(r.datos().horaInicio()).hasToString("19:00");
+        // reservas v1 no manda horarioTexto ni cantidadTurnos
+        assertThat(r.datos().horarioTexto()).isNull();
+        assertThat(r.datos().cantidadTurnos()).isZero();
         assertThat(r.estado()).isEqualTo("CONFIRMADA");
         assertThat(r.saldo()).isEqualByComparingTo("40.00");
         assertThat(r.venceEn()).isEqualTo(LocalDateTime.of(2026, 11, 19, 22, 30));

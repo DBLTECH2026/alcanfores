@@ -2,7 +2,7 @@
  * Tipos de los endpoints del PANEL (`/api/admin/**`, `/api/estado`), tomados de las respuestas reales del back
  * (OpenAPI de cada servicio + docs/servicios/*.md). Los del portal siguen en `@/api/tipos`.
  */
-import type { Asistencia, Deporte, EstadoPago, EstadoReserva, Franja, Pagina, Rol } from '@/api/tipos';
+import type { Asistencia, DiaHorario, Deporte, EstadoPago, EstadoReserva, FeriadoCancha, Franja, Pagina, Rol, TipoDiaEspecial, TurnoReserva } from '@/api/tipos';
 
 export type { Pagina };
 export type Origen = 'WEB' | 'PRESENCIAL' | 'TELEFONICA';
@@ -45,6 +45,9 @@ export interface FilaReserva {
   montoTotal: number;
   montoPagado: number;
   fechaRegistro: string;
+  /** v2 */
+  horarioTexto?: string;
+  cantidadTurnos?: number;
 }
 
 export interface FiltrosReservas {
@@ -74,6 +77,9 @@ export interface ReservaAdmin {
   horaInicio: string;
   horaFin: string;
   franja: Franja;
+  /** v2 */
+  turnos?: TurnoReserva[];
+  horarioTexto?: string;
   montoTotal: number;
   montoAdelanto: number;
   montoPagado: number;
@@ -92,7 +98,8 @@ export interface ReservaAdmin {
 }
 
 export interface NuevaReservaManual {
-  idTurno: number;
+  /** v2: 1 a 8 turnos de la misma cancha y fecha. */
+  idsTurno: number[];
   cliente: { dni: string; nombres: string; apellidos: string; telefono: string; correo: string };
   origen: 'PRESENCIAL' | 'TELEFONICA';
   nota?: string;
@@ -117,7 +124,35 @@ export interface TurnoAgenda {
   franja: Franja;
   estado: 'DISPONIBLE' | 'RESERVADO' | 'BLOQUEADO';
   motivoBloqueo: string | null;
-  reserva: { codigoReserva: string; cliente: string; telefono: string; estado: EstadoReserva; estadoPago: EstadoPago; asistencia: Asistencia } | null;
+  reserva: {
+    codigoReserva: string;
+    cliente: string;
+    telefono: string;
+    estado: EstadoReserva;
+    estadoPago: EstadoPago;
+    asistencia: Asistencia;
+    /** v2: reservas de varios turnos. */
+    cantidadTurnos?: number;
+    horarioTexto?: string;
+  } | null;
+  /** v2 (SPEC_V2 §C) */
+  feriado?: boolean;
+  recargo?: number;
+  tipoBloqueo?: 'MANUAL' | 'FERIADO' | 'NO_LABORABLE' | 'CANCHA_INACTIVA' | null;
+}
+/** v2: bloqueo o desbloqueo de un rango de horas en varias canchas (y opcionalmente varios días). */
+export interface SolicitudRango {
+  idsCancha: number[];
+  fecha: string;
+  fechaHasta?: string;
+  horaDesde: string;
+  horaHasta: string;
+  motivo?: string;
+}
+export interface ResultadoRango {
+  bloqueados?: number;
+  desbloqueados?: number;
+  omitidosConReserva?: string[];
 }
 export interface AgendaDia {
   fecha: string;
@@ -289,6 +324,42 @@ export interface CanchaAdmin {
   orden: number;
   creadoEn: string;
   actualizadoEn: string;
+  /** v2 */
+  duracionTurnoMin?: number;
+  inicioNoche?: string;
+  horario?: { duracionTurnoMin?: number; inicioNoche?: string; texto?: string; dias?: DiaHorario[] } | null;
+  feriado?: FeriadoCancha | null;
+}
+
+// ------------------------------ v2: horario por cancha (SPEC_V2 §A) ------------------------------
+export interface HorarioAdmin {
+  duracionTurnoMin: number;
+  inicioNoche: string;
+  dias: DiaHorario[];
+  feriado: FeriadoCancha;
+}
+export interface TurnoVistaPrevia {
+  horaInicio: string;
+  horaFin: string;
+  precio: number;
+  franja: Franja;
+}
+
+// ------------------------------ v2: calendario (SPEC_V2 §B) ------------------------------
+export interface DiaEspecialAdmin {
+  id: number;
+  fecha: string;
+  tipo: TipoDiaEspecial;
+  nombre: string;
+  canchas: number[] | null;
+  creadoEn?: string;
+  actualizadoEn?: string;
+}
+export interface SolicitudDiaEspecial {
+  fecha: string;
+  tipo: TipoDiaEspecial;
+  nombre: string;
+  canchas?: number[] | null;
 }
 export interface SolicitudCancha {
   nombre: string;
@@ -310,7 +381,10 @@ export interface ResenaAdmin {
   id: number;
   idCancha: number;
   cancha: string;
-  codigoReserva: string;
+  /** null en las reseñas del complejo (v2). */
+  codigoReserva: string | null;
+  origen?: 'CLIENTE' | 'COMPLEJO';
+  fecha?: string;
   autor: string;
   puntuacion: number;
   comentario: string;
@@ -318,6 +392,12 @@ export interface ResenaAdmin {
   respuesta: string | null;
   respondidoEn: string | null;
   creadoEn: string;
+}
+export interface SolicitudResenaComplejo {
+  autor: string;
+  puntuacion: number;
+  comentario: string;
+  fecha: string;
 }
 export type Configuracion = Record<string, string>;
 

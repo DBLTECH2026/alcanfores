@@ -3,8 +3,11 @@ package pe.alcanfores.reservas.servicio;
 import pe.alcanfores.reservas.dto.InternoDtos.ElegibilidadResena;
 import pe.alcanfores.reservas.dto.InternoDtos.ReservaInterna;
 import pe.alcanfores.reservas.dto.InternoDtos.ReservaSemilla;
+import pe.alcanfores.reservas.dto.InternoDtos.ReservasVigentes;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 /** Consultas para otros microservicios (rutas {@code /interno/**}). */
@@ -22,4 +25,7 @@ public interface InternoServicio {
 
     /** Reservas creadas por la semilla (pagos-service siembra pagos y comprobantes coherentes). */
     List<ReservaSemilla> paraSemilla();
+
+    /** Códigos de las reservas vigentes con algún turno esa fecha en esas canchas (vacío o nulo = todas). */
+    ReservasVigentes vigentes(LocalDate fecha, Collection<Long> idsCancha);
 }

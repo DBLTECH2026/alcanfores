@@ -5,10 +5,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pe.alcanfores.comun.auditoria.Auditor;
 import pe.alcanfores.comun.error.NegocioExcepcion;
+import pe.alcanfores.comun.seguridad.SeguridadUtil;
+import pe.alcanfores.comun.seguridad.UsuarioToken;
 import pe.alcanfores.comun.util.Tiempo;
 import pe.alcanfores.comun.validacion.Documentos;
 import pe.alcanfores.reservas.cliente.CatalogoCliente;
 import pe.alcanfores.reservas.dto.ReservaDtos.CancelacionClienteSolicitud;
+import pe.alcanfores.reservas.dto.ReservaDtos.ClienteSolicitud;
 import pe.alcanfores.reservas.dto.ReservaDtos.RegistroReservaSolicitud;
 import pe.alcanfores.reservas.dto.ReservaDtos.ReservaClienteDetalle;
 import pe.alcanfores.reservas.dto.ReservaDtos.ReservaCreadaRespuesta;
@@ -35,9 +38,19 @@ public class ReservaServicioImpl implements ReservaServicio {
     @Override
     @Transactional
     public ReservaCreadaRespuesta registrar(RegistroReservaSolicitud s) {
-        Reserva r = operaciones.crear(new OperacionesReserva.NuevaReserva(s.idTurno(), s.cliente(), Origen.WEB,
-                s.metodoPago(), null, null, null));
+        RegistroReservaSolicitud solicitud = conDniDeLaCuenta(s);
+        Reserva r = operaciones.crear(new OperacionesReserva.NuevaReserva(solicitud.turnos(), solicitud.cliente(), Origen.WEB,
+                solicitud.metodoPago(), null, null, null));
         return mapeador.creada(r);
+    }
+
+    /** Con sesión de cliente (token CLIENTE) se reserva SIEMPRE a nombre del DNI de la cuenta. */
+    static RegistroReservaSolicitud conDniDeLaCuenta(RegistroReservaSolicitud s) {
+        return SeguridadUtil.actual().filter(UsuarioToken::esCliente).map(UsuarioToken::dni)
+                .filter(dni -> dni != null && !dni.isBlank() && s.cliente() != null)
+                .map(dni -> s.conCliente(new ClienteSolicitud(dni, s.cliente().nombres(), s.cliente().apellidos(),
+                        s.cliente().telefono(), s.cliente().correo())))
+                .orElse(s);
     }
 
     @Override

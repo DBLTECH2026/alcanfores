@@ -18,6 +18,8 @@ import pe.alcanfores.reservas.dto.TurnoDtos.AgendaTurno;
 import pe.alcanfores.reservas.dto.TurnoDtos.BloqueoRangoRespuesta;
 import pe.alcanfores.reservas.dto.TurnoDtos.BloqueoRangoSolicitud;
 import pe.alcanfores.reservas.dto.TurnoDtos.BloqueoSolicitud;
+import pe.alcanfores.reservas.dto.TurnoDtos.DesbloqueoRangoRespuesta;
+import pe.alcanfores.reservas.dto.TurnoDtos.DesbloqueoRangoSolicitud;
 import pe.alcanfores.reservas.dto.TurnoDtos.DesbloqueoSolicitud;
 import pe.alcanfores.reservas.dto.TurnoDtos.GeneracionRespuesta;
 import pe.alcanfores.reservas.dto.TurnoDtos.GenerarTurnosSolicitud;
@@ -42,7 +44,8 @@ public class TurnoAdminControlador {
 
     @PostMapping("/generar")
     @PreAuthorize("hasRole('ADMIN')")
-    @Operation(summary = "Generar turnos (ADMIN)", description = "Idempotente: no duplica turnos existentes.")
+    @Operation(summary = "Generar turnos (ADMIN, soporte)", description = "Los turnos se generan solos según el horario de "
+            + "cada cancha; esto solo fuerza la regeneración de un rango. Idempotente.")
     public GeneracionRespuesta generar(@Valid @RequestBody GenerarTurnosSolicitud solicitud) {
         return servicio.generar(solicitud);
     }
@@ -60,8 +63,16 @@ public class TurnoAdminControlador {
     }
 
     @PostMapping("/bloquear-rango")
-    @Operation(summary = "Bloquear un rango de horas", description = "Bloquea los turnos libres; los que tienen reserva se omiten.")
+    @Operation(summary = "Bloquear un rango", description = "Varias canchas, una fecha o varios días (hasta 31) y las horas "
+            + "desde–hasta: bloquea los turnos libres que se crucen; los que tienen reserva se omiten y se devuelven sus códigos.")
     public BloqueoRangoRespuesta bloquearRango(@Valid @RequestBody BloqueoRangoSolicitud solicitud) {
         return servicio.bloquearRango(solicitud);
+    }
+
+    @PostMapping("/desbloquear-rango")
+    @Operation(summary = "Desbloquear un rango", description = "Quita los bloqueos MANUALES del rango (los de feriado o día "
+            + "no laborable se quitan desde el calendario).")
+    public DesbloqueoRangoRespuesta desbloquearRango(@Valid @RequestBody DesbloqueoRangoSolicitud solicitud) {
+        return servicio.desbloquearRango(solicitud);
     }
 }

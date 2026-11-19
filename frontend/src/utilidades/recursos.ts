@@ -29,7 +29,11 @@ export type IdIlustracion =
   | 'IL-27-reporte-vacio'
   | 'IL-28-sesion-expirada'
   | 'IL-29-sin-permiso'
-  | 'IL-30-hoy-sin-reservas';
+  | 'IL-30-hoy-sin-reservas'
+  // v2: tarjetas de Configuración (del prototipo)
+  | 'ARQ-02-planificando'
+  | 'ARQ-03-canchas-techadas'
+  | 'ARQ-06-datos-ordenados';
 
 export type IdBusto =
   | 'BU-rosa-agenda'

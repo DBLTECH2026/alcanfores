@@ -5,15 +5,21 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import pe.alcanfores.reservas.cliente.CanchaCatalogo;
 import pe.alcanfores.reservas.cliente.CatalogoCliente;
+import pe.alcanfores.reservas.cliente.DiaEspecial;
 import pe.alcanfores.reservas.cliente.ParametrosComplejo;
 import pe.alcanfores.reservas.servicio.ComplejoServicio;
 
+import pe.alcanfores.comun.util.Tiempo;
+
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 @Service
@@ -24,6 +30,9 @@ public class ComplejoServicioImpl implements ComplejoServicio {
     private final CatalogoCliente catalogo;
     private volatile ParametrosComplejo parametros = ParametrosComplejo.porDefecto();
     private final Map<Long, CanchaCatalogo> canchas = new ConcurrentHashMap<>();
+    private final Map<LocalDate, DiaEspecial> calendario = new ConcurrentHashMap<>();
+    private volatile boolean canchasLeidas;
+    private volatile boolean calendarioLeido;
 
     public ComplejoServicioImpl(CatalogoCliente catalogo) {
         this.catalogo = catalogo;
@@ -56,10 +65,11 @@ public class ComplejoServicioImpl implements ComplejoServicio {
         try {
             List<CanchaCatalogo> recibidas = catalogo.canchas();
             if (recibidas != null) {
+                canchasLeidas = true;
                 for (CanchaCatalogo c : recibidas) {
                     if (c != null && c.id() != null && c.precioDia() != null && c.precioNoche() != null) {
                         CanchaCatalogo anterior = canchas.put(c.id(), c);
-                        if (!iguales(anterior, c)) {
+                        if (!c.mismosDatos(anterior)) {
                             cambiadas.add(c);
                         }
                     }
@@ -76,9 +86,53 @@ public class ComplejoServicioImpl implements ComplejoServicio {
         canchas.put(cancha.id(), cancha);
     }
 
-    private static boolean iguales(CanchaCatalogo a, CanchaCatalogo b) {
-        return a != null && Objects.equals(a.nombre(), b.nombre()) && Objects.equals(a.deporte(), b.deporte())
-                && a.precioDia().compareTo(b.precioDia()) == 0 && a.precioNoche().compareTo(b.precioNoche()) == 0
-                && a.activa() == b.activa();
+    @Override
+    public Optional<DiaEspecial> diaEspecial(LocalDate fecha) {
+        return fecha == null ? Optional.empty() : Optional.ofNullable(calendario.get(fecha));
+    }
+
+    @Override
+    public List<LocalDate> refrescarCalendario() {
+        LocalDate hoy = Tiempo.hoy();
+        List<DiaEspecial> recibidos;
+        try {
+            recibidos = catalogo.calendario(hoy, hoy.plusDays(parametros.horizonte()));
+        } catch (RuntimeException e) {
+            log.warn("Catálogo no respondió el calendario; se mantiene el actual ({})", e.getMessage());
+            return List.of();
+        }
+        Map<LocalDate, DiaEspecial> nuevo = new java.util.HashMap<>();
+        if (recibidos != null) {
+            recibidos.stream().filter(d -> d != null && d.fecha() != null && d.tipo() != null)
+                    .forEach(d -> nuevo.put(d.fecha(), d));
+        }
+        Set<LocalDate> fechas = new HashSet<>(calendario.keySet());
+        fechas.addAll(nuevo.keySet());
+        List<LocalDate> cambiadas = fechas.stream()
+                .filter(f -> !Objects.equals(sinId(calendario.get(f)), sinId(nuevo.get(f)))).sorted().toList();
+        calendario.keySet().retainAll(nuevo.keySet());
+        calendario.putAll(nuevo);
+        calendarioLeido = true;
+        return cambiadas;
+    }
+
+    @Override
+    public boolean catalogoLeido() {
+        return canchasLeidas && calendarioLeido;
+    }
+
+    @Override
+    public void actualizarDia(LocalDate fecha, DiaEspecial dia) {
+        if (dia == null) {
+            calendario.remove(fecha);
+        } else {
+            calendario.put(fecha, dia);
+        }
+    }
+
+    /** El id no importa para saber si cambió (el evento no lo trae). */
+    private static DiaEspecial sinId(DiaEspecial d) {
+        return d == null ? null : new DiaEspecial(null, d.fecha(), d.tipo(), d.nombre(),
+                d.canchas() == null || d.canchas().isEmpty() ? null : d.canchas());
     }
 }

@@ -162,7 +162,7 @@ class PanelTest extends PruebaIntegracion {
                 .andExpect(status().isUnprocessableEntity());
 
         Turno reservado = turno(3, HOY.plusDays(1), 10);
-        reservarWeb(reservado.getId(), "70123321");
+        String codigoReservado = reservarWeb(reservado.getId(), "70123321").path("codigoReserva").asText();
         mvc.perform(post("/api/admin/turnos/" + reservado.getId() + "/bloquear").header("Authorization", admin)
                         .contentType(MediaType.APPLICATION_JSON).content("{\"motivo\":\"Evento privado\"}"))
                 .andExpect(status().isConflict())
@@ -172,8 +172,8 @@ class PanelTest extends PruebaIntegracion {
                                 + "\"motivo\":\"Campeonato interno\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.bloqueados").value(3))
-                .andExpect(jsonPath("$.omitidos").value(1))
-                .andExpect(jsonPath("$.horasOmitidas[0]").value("10:00"));
+                .andExpect(jsonPath("$.omitidosConReserva.length()").value(1))
+                .andExpect(jsonPath("$.omitidosConReserva[0]").value(codigoReservado));
         mvc.perform(post("/api/admin/turnos/bloquear-rango").header("Authorization", admin).contentType(MediaType.APPLICATION_JSON)
                         .content("{\"idCancha\":3,\"fecha\":\"" + HOY.plusDays(1) + "\",\"horaDesde\":\"12:00\",\"horaHasta\":\"10:00\","
                                 + "\"motivo\":\"Campeonato interno\"}"))

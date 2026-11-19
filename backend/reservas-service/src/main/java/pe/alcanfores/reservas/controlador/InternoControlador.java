@@ -13,8 +13,10 @@ import org.springframework.web.bind.annotation.RestController;
 import pe.alcanfores.reservas.dto.InternoDtos.ElegibilidadResena;
 import pe.alcanfores.reservas.dto.InternoDtos.ReservaInterna;
 import pe.alcanfores.reservas.dto.InternoDtos.ReservaSemilla;
+import pe.alcanfores.reservas.dto.InternoDtos.ReservasVigentes;
 import pe.alcanfores.reservas.servicio.InternoServicio;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -25,6 +27,14 @@ import java.util.List;
 public class InternoControlador {
 
     private final InternoServicio servicio;
+
+    @GetMapping("/vigentes")
+    @Operation(summary = "Reservas vigentes de un día", description = "PENDIENTE o CONFIRMADA con algún turno esa fecha en "
+            + "esas canchas (sin idsCancha = todas). Catálogo lo usa antes de cerrar un día (409 DIA_CON_RESERVAS).")
+    public ReservasVigentes vigentes(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
+                                     @RequestParam(required = false) List<Long> idsCancha) {
+        return servicio.vigentes(fecha, idsCancha);
+    }
 
     @GetMapping("/{codigo}")
     @Operation(summary = "Datos de la reserva", description = "DatosReserva + estado, estadoPago, montoPagado, saldo e inicio.")
