@@ -55,7 +55,7 @@ import { esquemaReenvio, type DatosReenvio, type ReenvioEntrada } from '@/esquem
 import { rucValido } from '@/utilidades/documentos';
 import { aplicarErroresServidor } from '@/hooks/useErroresServidor';
 import { ahoraLima, deLima, fmtDuracion, fmtFecha, fmtFechaHora } from '@/utilidades/fecha';
-import { enmascararCelular, fmtSoles, nombreConDeporte, normalizarCodigo } from '@/utilidades/formato';
+import { enmascararCelular, fmtSoles, nombreConDeporte, normalizarCodigo, desgloseIgv } from '@/utilidades/formato';
 
 const CLAVE = 'alc-mi-reserva';
 interface Consulta {
@@ -599,6 +599,14 @@ function Detalle({ consulta, inicial, alSalir }: { consulta: Consulta; inicial: 
                 Total
               </span>
               <b>{fmtSoles(reserva.montoTotal)}</b>
+            </div>
+            <div className="fila-monto fila-igv">
+              <span>Valor de venta (sin IGV)</span>
+              <span>{fmtSoles(desgloseIgv(reserva.montoTotal).base)}</span>
+            </div>
+            <div className="fila-monto fila-igv">
+              <span>IGV (18 %)</span>
+              <span>{fmtSoles(desgloseIgv(reserva.montoTotal).igv)}</span>
             </div>
             <div className="fila-monto">
               <span className="inline-flex items-center gap-2">

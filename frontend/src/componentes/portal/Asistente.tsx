@@ -28,7 +28,7 @@ import type { SeleccionTurnos } from '@/contexto/ReservaContext';
 import { IconoDeporte } from '@/componentes/ui/Marca';
 import { cx } from '@/utilidades/cx';
 import { fmtFecha, fmtHora12 } from '@/utilidades/fecha';
-import { fmtCelular, fmtSoles, nombreConDeporte, plural } from '@/utilidades/formato';
+import { fmtCelular, fmtSoles, nombreConDeporte, plural, desgloseIgv } from '@/utilidades/formato';
 
 /** Adelanto = total × pct / 100 con HALF_UP a 2 decimales (igual que el back). */
 export function calcularAdelanto(total: number, pct: number): number {
@@ -268,6 +268,12 @@ export function ResumenReserva({
       )}
       <div className="resumen-montos">
         <Monto icono={Banknote} etiqueta="Total" valor={fmtSoles(total)} />
+        {total > 0 && (
+          <div className="fila-monto fila-igv">
+            <span>Incluye IGV (18 %)</span>
+            <span>{fmtSoles(desgloseIgv(total).igv)}</span>
+          </div>
+        )}
         <Monto icono={Store} etiqueta="Saldo al llegar" valor={fmtSoles(total - adelanto)} />
         <Monto icono={Smartphone} etiqueta={`Adelanto ${datos.adelantoPct} %`} valor={fmtSoles(adelanto)} destacado />
       </div>

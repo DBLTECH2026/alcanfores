@@ -64,3 +64,10 @@ export function nombreConDeporte(nombre: string, deporte: string): string {
   const raiz = sinTildes(dep).split(/[ (]/)[0] ?? '';
   return sinTildes(nombre).includes(sinTildes(dep)) || (raiz.length > 3 && sinTildes(nombre).includes(raiz)) ? nombre : `${nombre} · ${dep}`;
 }
+
+/** IGV (18 %) incluido en el precio, como en las boletas: valor de venta = total / 1.18 (al céntimo) e IGV = total − valor. */
+export function desgloseIgv(total: number): { base: number; igv: number } {
+  const t = Math.round(Number(total || 0) * 100);
+  const base = Math.round(t / 1.18);
+  return { base: base / 100, igv: (t - base) / 100 };
+}

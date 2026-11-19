@@ -463,6 +463,7 @@ body .check.is-foco { outline: 0; }
 .resumen-montos { background: var(--superficie-suave); border-top: 1px solid var(--borde); padding: 14px 18px; display: grid; gap: 8px; }
 .fila-monto { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 14px; color: var(--texto-suave); font-variant-numeric: tabular-nums; }
 .fila-monto b { color: var(--texto); font-weight: 600; }
+.fila-monto.fila-igv { font-size: 12.5px; padding-left: 24px; margin-top: -4px; color: var(--texto-suave); }
 .fila-monto.destacada { color: var(--texto); font-weight: 700; font-size: 15px; padding-top: 8px; border-top: 1px dashed var(--borde-campo); }
 .fila-monto.destacada b { font-family: var(--f-titular); font-weight: 800; font-size: 24px; color: var(--verde); }
 .resumen-nota { display: flex; gap: 8px; align-items: flex-start; padding: 12px 18px; font-size: 13px; color: var(--texto); background: var(--amarillo-tinte); border-top: 1px solid #F1DC8E; }
