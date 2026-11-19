@@ -36,7 +36,8 @@ DOCKER_BUILDKIT=1 "${COMPOSE[@]}" build --pull
 # está, se genera una y se agrega al .env (con respaldo).
 asegurar_bd_asistente() {
   local clave existe
-  clave="$(grep -E '^ASISTENTE_DB_CLAVE=' deploy/.env | tail -1 | cut -d= -f2- | tr -d "\r\"'")"
+  # «|| true»: con set -euo pipefail, un grep sin coincidencias (primer despliegue, clave aún no creada) cortaba el script.
+  clave="$( { grep -E '^ASISTENTE_DB_CLAVE=' deploy/.env || true; } | tail -1 | cut -d= -f2- | tr -d "\r\"'")"
   if [ -z "$clave" ] || [ "$clave" = "cambiar" ]; then
     clave="$(openssl rand -hex 24)"
     cp deploy/.env "deploy/.env.antes-asistente-$(date +%Y%m%d%H%M%S)"
