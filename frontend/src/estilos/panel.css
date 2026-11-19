@@ -201,18 +201,17 @@ body:has(.ma) .modal.centrado .modal-cab { justify-content: center; text-align: 
 .ma b, .ma strong, body:has(.ma) .modal b, body:has(.ma) .modal strong, .panel-filtros b { font-weight: 700; }
 .mt-avisos i, .bb-filtros i { font-style: normal; }
 
-/* componentes «de papel» dentro del modal oscuro: conservan sus colores claros (comprobante, vista del cliente, turno del portal) */
+/* componentes «de papel» dentro del modal: conservan sus colores claros (comprobante, vista del cliente, turno del portal) */
 body:has(.ma) .modal .visor-lienzo > :not(.visor-estado), body:has(.ma) .modal .observacion, body:has(.ma) .modal .chip-turno {
   --texto: #091A2A; --texto-suave: #5B6B63; --borde: #DDE7E1; --superficie-suave: #F4F8F5; --menta: #E8F3EC; --borde-campo: #7A8A82; color: #091A2A;
 }
 body:has(.ma) .modal .observacion .control, body:has(.ma) .modal .observacion input { background: #fff; color: #091A2A; }
-/* cajas de Tailwind con fondo claro fijo → superficie translúcida */
-body:has(.ma) .modal .bg-superficie-suave { background: rgba(255,255,255,.05) !important; }
-/* selector de segmentos */
-body:has(.ma) .modal .seg { background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.12); }
-body:has(.ma) .modal .seg-op { color: #A9B9B1; }
-body:has(.ma) .modal .seg-op:hover { background: rgba(255,255,255,.08); color: #fff; }
+/* selector de segmentos dentro de los modales CLAROS: pista gris, texto legible, hover suave y activo en verde */
+body:has(.ma) .modal .seg { background: #F1F5F3; border: 1px solid #E3EAE6; }
+body:has(.ma) .modal .seg-op { color: #4A5C54; }
+body:has(.ma) .modal .seg-op:hover { background: #E3ECE7; color: var(--noche); }
 body:has(.ma) .modal .seg-op.seg-activo { background: var(--verde); color: #fff; box-shadow: none; }
+body:has(.ma) .modal .seg-op.seg-activo:hover { background: var(--verde-profundo, #0B5D33); color: #fff; }
 body:has(.ma) .modal .seg-op.seg-activo .ico { color: #fff; }
 /* el comprobante de muestra se ve como captura real (fondo claro) */
 body:has(.ma) .modal .visor-lienzo .bg-white { background: #fff !important; }
