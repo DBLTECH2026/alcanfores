@@ -111,3 +111,37 @@ funcionaron contra el back real; esto es lo que conviene corregir o tener en cue
 - `POST /api/admin/whatsapp/conectar` → 409 `WHATSAPP_NO_CONFIGURADO`. El panel lo muestra en la pestaña WhatsApp de Configuración y en el modal
   del QR con lo que falta (`EVOLUTION_URL`, `EVOLUTION_APIKEY`, opcional `EVOLUTION_INSTANCIA`). La prueba de envío queda SIMULADO.
 - **Sin cambio (esperado):** se configura con `EVOLUTION_URL`, `EVOLUTION_APIKEY` y `EVOLUTION_INSTANCIA`.
+
+## v2
+
+Probado el 19/11/2026 (01:00–01:15) contra los servicios **v2** (reinicio 00:52), con el front en `npm run dev`. Todo el contrato de
+`SPEC_V2.md` + `SPEC_V2_CAMBIOS.md` calzó; abajo solo observaciones menores y decisiones del front.
+
+### V1. El calendario de disponibilidad no dice qué días son feriado o están cerrados (baja, sugerencia)
+- `GET /api/disponibilidad/calendario?desde&dias&idCancha` → `[{fecha, libres, total}]`. Para marcar en el portal «Feriado +S/ 10» o
+  «Cerrado: motivo», el front cruza `GET /api/catalogo/calendario` con `feriado` del detalle de la cancha (3 pedidos en vez de 1).
+- Sugerencia (opcional): agregar `diaEspecial:{tipo, nombre} | null` y `recargo` a cada día. El front ya funciona sin eso.
+
+### V2. `DIA_CON_RESERVAS` repite los códigos en `mensaje` y en `errores[0].mensaje` (muy baja)
+- `POST /api/admin/calendario {fecha:"2026-11-21", tipo:"NO_LABORABLE", …}` → 409 con «Ese día ya hay reservas en esas canchas: ALC-…» y
+  `errores:[{campo:"fecha", mensaje:"ALC-…"}]`. El front muestra solo `mensaje` (si no trae los códigos, los arma con `errores`).
+
+### V3. Límite de ingresos de clientes al probar en serie (informativo)
+- Con 10 ingresos/min por IP, un recorrido automático que inicia sesión varias veces seguidas puede recibir 429 y quedarse en `/ingresar`.
+  En uso normal no pasa; el script de capturas espera 61 s y reintenta.
+
+### Decisiones del front (sin cambio en el back)
+- «Mis reservas» abre el detalle de siempre (`GET /api/reservas/{codigo}?dni=`) con el DNI de la cuenta, pasado en el estado de la navegación
+  (no en la URL), así cancelar, reenviar comprobante, constancia y comprobantes siguen igual.
+- El token del cliente solo viaja a `/auth/clientes/**`, `/cliente/**`, `POST /reservas` y `POST /catalogo/canchas/{id}/resenas`; el del panel a
+  lo demás. Con sesión, el paso 2 manda los datos de la cuenta (el back toma el DNI del token).
+- Varios turnos: con 1 turno se sigue mandando `idTurno`; con 2 o más, `idsTurno`.
+- La vista previa del horario usa `POST …/horario/vista-previa`; si se están cambiando los precios (que el back no recibe en ese cuerpo)
+  o el back no responde, la calcula el front con la misma regla.
+- Reintentos: un GET con 502/503/504 o sin red se reintenta 3 veces (0,8 · 1,6 · 3,2 s) con el aviso «Actualizando el sistema, un momento…»;
+  no se reintentan POST/PUT ni `/documentos/**` (RENIEC/SUNAT).
+
+### Datos de prueba que quedaron en local
+- Cuenta de cliente DNI 99010003 (contraseña `Cancha2026`), reseñas de esa cuenta en Losa multiusos y Cancha 2, reseña del complejo
+  «Club Los Halcones» en Cancha 1, reserva web ALC-3QZ3TG (2 turnos, Yape en revisión) y reserva manual ALC-G75AJQ (2 turnos, sin pago).
+  La reserva de depuración ALC-VFD7EX quedó CANCELADA y la reseña duplicada (id 34) se borró. El bloqueo 10:00–17:00 del 20/11 se desbloqueó.

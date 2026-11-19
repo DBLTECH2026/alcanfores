@@ -278,8 +278,9 @@ function ModalDia({ abierto, dia, fecha, canchas, alCerrar, alHecho }: { abierto
       alHecho();
     } catch (e) {
       if (esErrorApi(e) && e.codigo === 'DIA_CON_RESERVAS') {
-        const codigos = e.errores.map((x) => x.mensaje).filter(Boolean);
-        setConReservas(codigos.length ? `${e.message} ${codigos.join(', ')}` : e.message);
+        // El mensaje del back ya trae los códigos; si no, se arman con `errores`.
+        const codigos = e.errores.map((x) => x.mensaje).filter(Boolean).join(', ');
+        setConReservas(codigos && !e.message.includes(codigos.slice(0, 10)) ? `${e.message} ${codigos}` : e.message);
         return;
       }
       const { aplicados } = aplicarErroresServidor(e, setError, ['fecha', 'tipo', 'nombre', 'canchas']);
@@ -371,14 +372,16 @@ function ModalDia({ abierto, dia, fecha, canchas, alCerrar, alHecho }: { abierto
           )}
           {ef.cierran.length > 0 && (
             <div>
-              <Moon className="ico" aria-hidden />
+              <Lock className="ico" aria-hidden />
               {`Cierran: ${ef.cierran.map((c) => corto(c.nombre)).join(', ')}`}
             </div>
           )}
-          <div>
-            <Lock className="ico" aria-hidden />
-            Las reservas ya hechas no se tocan
-          </div>
+          {ef.cierran.length > 0 && (
+            <div>
+              <Moon className="ico" aria-hidden />
+              Si ya hay reservas en las que cierran, primero cancélalas
+            </div>
+          )}
         </div>
         {conReservas && <Alerta tipo="advertencia" titulo="Ese día ya tiene reservas">{conReservas}</Alerta>}
       </form>

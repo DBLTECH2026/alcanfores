@@ -27,7 +27,6 @@ import {
 import { calendarioApi, reservasAdminApi, turnosApi } from '@/api/admin';
 import type { AgendaDia, TurnoAgenda } from '@/api/admin/tipos';
 import { esErrorApi } from '@/api/cliente';
-import { useAuth } from '@/contexto/AuthContext';
 import { useToast } from '@/contexto/ToastContext';
 import { useCarga } from '@/hooks/useCarga';
 import { useTituloPagina } from '@/hooks/useTituloPagina';
@@ -70,17 +69,15 @@ export default function Agenda() {
   useTituloPagina('Agenda');
   const navigate = useNavigate();
   const toast = useToast();
-  const { tieneRol } = useAuth();
-  const esAdmin = tieneRol('ADMIN');
   const movil = useEsMovil();
   const [sp, setSp] = useSearchParams();
   const fecha = sp.get('fecha') || hoyLima();
   const ponerFecha = (f: string) => setSp(f === hoyLima() ? {} : { fecha: f }, { replace: true });
   const [version, setVersion] = useState(0);
   const ag = useCarga(() => turnosApi.agenda(fecha), `${fecha}-${version}`);
-  // Día especial (feriado / no laborable) de la fecha: se lee del calendario del año (solo ADMIN puede leerlo).
+  // Día especial (feriado / no laborable) de la fecha: se lee del calendario del año (ADMIN y recepción).
   const anio = fecha.slice(0, 4);
-  const cal = useCarga(() => (esAdmin ? calendarioApi.listar(Number(anio)) : Promise.resolve([])), `cal-${anio}-${version}`);
+  const cal = useCarga(() => calendarioApi.listar(Number(anio)).catch(() => []), `cal-${anio}-${version}`);
   const diaEspecial = cal.datos?.find((d) => d.fecha === fecha) ?? null;
   const [verPasados, setVerPasados] = useState(false);
   const [canchaMovil, setCanchaMovil] = useState<number | null>(null);

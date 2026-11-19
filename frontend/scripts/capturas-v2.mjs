@@ -366,6 +366,7 @@ if (QUE === 'portal' || QUE === 'todo') {
 }
 if (QUE === 'panel' || QUE === 'todo') await panel();
 if (QUE === 'retoque') await retoque();
+if (QUE === 'portal390') await portal(390);
 if (QUE === 'barra') {
   const { page, foto, ctx } = await sesion(1440);
   await entrarPanel(page);
