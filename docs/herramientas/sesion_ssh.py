@@ -24,10 +24,12 @@ ANSI = __import__('re').compile(r'\x1b\[[0-9;]*[A-Za-z]')
 
 def ejecutar(usuario, cwd, comando):
     llave = os.path.expanduser(LLAVES[usuario])
-    remoto = f'cd {cwd} 2>/dev/null; {comando}' if cwd else comando
+    # La salida de error se une a la normal EN EL SERVIDOR para conservar el orden real de los mensajes
+    remoto = (f'cd {cwd} || exit 1; ' if cwd else '') + f'{{ {comando} ; }} 2>&1'
     r = subprocess.run(['ssh', '-i', llave, '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=20', f'{usuario}@{HOST}', remoto],
-                       capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=3600)
-    return (r.stdout + r.stderr).rstrip('\n'), r.returncode
+                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace',
+                       timeout=3600)
+    return r.stdout.rstrip('\n'), r.returncode
 
 
 def recortar(lineas, maximo):
@@ -73,6 +75,22 @@ def dibujar(titulo, bloques, salida, ancho_col=150):
     img.save(salida)
 
 
+def redibujar(a):
+    """Vuelve a dibujar una captura a partir de la salida REAL guardada en el registro (no ejecuta nada)."""
+    texto = open(a.registro, encoding='utf-8').read()
+    secciones = [s for s in texto.split('===== ') if s.startswith(a.redibujar)]
+    if not secciones:
+        raise SystemExit('No encuentro ese bloque en el registro')
+    titulo, _, cuerpo = secciones[-1].partition('\n')
+    signo = '#' if a.usuario == 'root' else '$'
+    import re
+    patron = re.compile(rf'^{re.escape(signo)} (.*?)\n(.*?)\n?\[código de salida -?\d+\]$', re.S | re.M)
+    bloques = [((f'{a.usuario}@srv2164565', a.ruta_visible or '~', signo), comando,
+                '\n'.join(recortar(salida.splitlines(), a.max_lineas))) for comando, salida in patron.findall(cuerpo)]
+    dibujar(titulo.strip(), bloques, a.salida)
+    print('redibujada:', a.salida, len(bloques), 'comandos')
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--usuario', default='sirac', choices=list(LLAVES))
@@ -82,7 +100,18 @@ def main():
     ap.add_argument('--comando', action='append', required=True)
     ap.add_argument('--max-lineas', type=int, default=40)
     ap.add_argument('--registro', default='', help='archivo .txt donde guardar la salida completa')
+    ap.add_argument('--redibujar', default='', help='redibuja desde el registro el bloque cuyo título empieza así')
+    ap.add_argument('--ruta-visible', default='', help='con --redibujar: ruta que mostrar en el prompt')
+    ap.add_argument('--filtro', default='', help='con --redibujar: solo las líneas que cumplan esta expresión regular (extracto)')
+    ap.add_argument('--nota', default='', help='con --redibujar: comentario que se agrega al comando mostrado')
     a = ap.parse_args()
+    # Git Bash convierte «/opt/x» en «C:/Program Files/Git/opt/x»: se deshace la conversión
+    for prefijo in ('C:/Program Files/Git', 'C:\\Program Files\\Git'):
+        if a.cwd.startswith(prefijo):
+            a.cwd = a.cwd[len(prefijo):].replace('\\', '/')
+    if a.redibujar:
+        redibujar(a)
+        return
     bloques, completo = [], []
     ruta = a.cwd or ('~' if a.usuario != 'root' else '/root')
     ruta_corta = ruta.replace('/root', '~') if a.usuario == 'root' else ruta.replace('/home/sirac', '~')

@@ -245,6 +245,13 @@ def main():
     paso('Bitácora de auditoría registra las acciones', bit.get('totalElementos', 0) > 0,
          '; '.join(f"{b['actor']}:{b['accion']}" for b in bit.get('contenido', [])[:5]))
 
+    # 12. Limpieza (producción): la reserva de prueba usa un celular ficticio; se cancela para que su recordatorio
+    #     nunca llegue a un número real cuando se conecte el WhatsApp.
+    if os.environ.get('E2E_LIMPIAR') == '1':
+        lim = requests.post(f'{API}/admin/reservas/{codigo}/cancelar', headers=h,
+                            json={'motivo': 'Reserva creada por la prueba automática de punta a punta', 'devolucion': False}, timeout=20)
+        paso('Limpieza: reserva de prueba cancelada (su recordatorio queda CANCELADO)', lim.status_code == 200)
+
     total, buenos = len(resultados), sum(1 for _, ok in resultados if ok)
     print(f'\nResultado: {buenos} de {total} comprobaciones correctas.')
     sys.exit(0 if buenos == total else 1)

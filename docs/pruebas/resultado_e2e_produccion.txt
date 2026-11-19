@@ -1,0 +1,42 @@
+Prueba de punta a punta contra https://alcanfores.dbltech.tech · 18/11/2026 22:31
+
+[OK] Los 7 microservicios están UP en Eureka · discovery-server=UP, api-gateway=UP, auth-service=UP, catalogo-service=UP, reservas-service=UP, pagos-service=UP, notificaciones-service=UP
+[OK] Catálogo público con 4 canchas · Cancha 1 · Fútbol 5, Cancha 2 · Fútbol 6, Cancha 3 · Fútbol 7, Losa multiusos
+[OK] Detalle de cancha con fotos y reseñas · 3 fotos · 5 reseñas · promedio 4.2
+[FALLO] La foto de la cancha se descarga
+[OK] Validación: 400 con error por cada campo inválido · aceptaPrivacidad, aceptaTerminos, cliente.apellidos, cliente.correo, cliente.dni, cliente.nombres, cliente.telefono, idTurno, metodoPago
+[OK] RUC con dígito verificador incorrecto se rechaza sin consultar
+[OK] Consulta SUNAT por RUC (Factiliza) · SUPERINTENDENCIA NACIONAL DE ADUANAS Y DE ADMINISTRACION TRIBUTARIA - SUNAT
+[OK] Reserva web registrada (PENDIENTE, con plazo para pagar) · {"codigoReserva":"ALC-XZ5C8P","estado":"PENDIENTE","estadoPago":"SIN_PAGO","venceEn":"2026-11-18T22:51:11","cancha":{"id":2,"nombre":"Cancha 2 · Fútbol 6","depo
+      código ALC-XZ5C8P · Cancha 2 · Fútbol 6 · 2026-11-19 21:00 · adelanto S/ 45.0
+[OK] Doble reserva del mismo turno: 409 TURNO_OCUPADO
+[OK] Comprobante de Yape subido (pago PENDIENTE) · {"idPago":163,"estado":"PENDIENTE","mensaje":"Recibimos tu comprobante. Lo validaremos en unos minutos y te avisaremos p
+[OK] Imagen falsa (extensión cambiada) rechazada
+[OK] Evento pago.registrado → reserva EN_REVISION (RabbitMQ)
+[OK] Panel sin token: 401
+[OK] RECEPCION no puede ver reportes: 403
+[OK] Login del administrador (JWT)
+[OK] Administradora valida el comprobante · {"idPago":163,"estado":"VALIDADO","monto":45.00,"comprobante":{"id":157,"tipo":"BOLETA","serieNumero":"B001-00000110","e
+[OK] Evento pago.validado → reserva CONFIRMADA · pagado S/ 45.0 · saldo S/ 45.0
+[OK] Boleta electrónica (simulada) emitida · B001-00000110
+[OK] PDF de la boleta descargable por el cliente · 114 KB
+[OK] Constancia de reserva en PDF · 111 KB
+[OK] Notificaciones por correo y WhatsApp (registrada, comprobante, confirmada, boleta) · comprobante.emitido/CORREO/SIMULADO, comprobante.emitido/WHATSAPP/FALLIDO, pago.registrado/CORREO/SIMULADO, pago.registrado/WHATSAPP/FALLIDO, reserva.confirmada/CORREO/SIMULADO, reserva.confirmada/WHATSAPP/FALLIDO, reserva.registrada/CORREO/SIMULADO, reserva.registrada/WHATSAPP/FALLIDO
+[OK] Recordatorio programado 2 horas antes (cron) · enviar en 2026-11-19T19:00:00 · PROGRAMADO
+[OK] Pasarela beta: tarjeta sin fondos rechazada · Fondos insuficientes. Prueba con otra tarjeta.
+[OK] Pasarela beta: Visa de prueba aprobada · autorización 213173 · Visa ****1111
+[OK] Webhook firmado → pago automático → reserva CONFIRMADA y PAGADO_TOTAL
+[OK] Factura electrónica (simulada) emitida al RUC · F001-00000048
+[OK] Cliente cancela con motivo (≥ 24 h: con devolución)
+[OK] Evento reserva.cancelada → reembolso simulado y nota de crédito · FC01-00000001
+[OK] El turno cancelado vuelve a estar DISPONIBLE
+[OK] Reseña verificada publicada (código + DNI de una reserva jugada) · ALC-BBGTSM
+[OK] Reseña repetida: 409 RESENA_DUPLICADA
+[OK] Reseña de una reserva aún no jugada: rechazada (422) · Podrás calificar la cancha cuando empiece tu turno.
+[OK] Dashboard del día · {"reservasHoy": 1, "porValidar": 4, "confirmadasHoy": 1, "ocupacionHoyPct": 1.7, "noShowMesPct": 14.3, "reservasSemana": 17}
+[OK] Reporte de ingresos · total S/ 7570.0 en 153 pagos
+[OK] Reporte de reservas en Excel · 12 KB
+[OK] Bitácora de auditoría registra las acciones · Bruno H.:CREAR_RESENA; Sistema:REEMBOLSO_SIMULADO; Cliente 4****912:CANCELAR_RESERVA; rhuaman:VALIDAR_PAGO; rhuaman:LOGIN_EXITOSO
+[OK] Limpieza: reserva de prueba cancelada (su recordatorio queda CANCELADO)
+
+Resultado: 36 de 37 comprobaciones correctas.
