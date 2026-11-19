@@ -26,13 +26,15 @@ import {
   Upload,
   UserRound,
   Banknote,
+  Building2,
+  MapPin,
   Store,
   Wallet,
 } from 'lucide-react';
-import { pagosApi, reservasApi } from '@/api/servicios';
-import { esErrorApi } from '@/api/cliente';
-import type { PagoCliente, ReservaDetalle } from '@/api/tipos';
-import { guardarUltimaReserva } from '@/contexto/ReservaContext';
+import { documentosApi, pagosApi, reservasApi } from '@/api/servicios';
+import { esErrorApi, urlApi } from '@/api/cliente';
+import type { ComprobanteEnlace, DatosComprobante, PagoCliente, ReservaDetalle } from '@/api/tipos';
+import { guardarFacturacion, guardarUltimaReserva, leerFacturacion } from '@/contexto/ReservaContext';
 import { useToast } from '@/contexto/ToastContext';
 import { useCarga } from '@/hooks/useCarga';
 import { useComplejo, useMetodosPago } from '@/hooks/useDatosPublicos';
@@ -48,10 +50,11 @@ import { CodigoReserva, LineaTiempo } from '@/componentes/ui/Reserva';
 import { SubidaImagen } from '@/componentes/ui/SubidaImagen';
 import { HeroEstado, estadoCliente, hitosDeReserva } from '@/componentes/portal/EstadoReserva';
 import { esquemaCancelacion, esquemaConsulta, type ConsultaEntrada, type DatosCancelacion } from '@/esquemas/otros';
-import { esquemaReenvio, type DatosReenvio } from '@/esquemas/reserva';
+import { esquemaReenvio, type DatosReenvio, type ReenvioEntrada } from '@/esquemas/reserva';
+import { rucValido } from '@/utilidades/documentos';
 import { aplicarErroresServidor } from '@/hooks/useErroresServidor';
 import { ahoraLima, deLima, fmtDuracion, fmtFecha, fmtFechaHora, fmtRango12 } from '@/utilidades/fecha';
-import { enmascararCelular, fmtSoles, normalizarCodigo, textoDeporte } from '@/utilidades/formato';
+import { enmascararCelular, fmtSoles, nombreConDeporte, normalizarCodigo } from '@/utilidades/formato';
 
 const CLAVE = 'alc-mi-reserva';
 interface Consulta {
@@ -121,6 +124,27 @@ function FormConsulta({ codigoInicial, alEncontrar }: { codigoInicial: string; a
 }
 
 // ------------------------------ Pagos ------------------------------
+const TIPO_COMPROBANTE: Record<ComprobanteEnlace['tipo'], string> = { BOLETA: 'Boleta', FACTURA: 'Factura', NOTA_CREDITO: 'Nota de crédito' };
+
+/** Boleta, factura o nota de crédito con sus descargas (el back ya manda las URL con código y DNI). */
+function FilaComprobante({ c, codigo, dni }: { c: ComprobanteEnlace; codigo: string; dni: string }) {
+  return (
+    <div className="flex flex-wrap items-center gap-2 pl-[52px]">
+      <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold">
+        <Receipt className={`ico ico-16 ${c.estado === 'ANULADO' ? 'text-gris' : 'text-verde'}`} aria-hidden />
+        {`${TIPO_COMPROBANTE[c.tipo] ?? 'Comprobante'} ${c.serieNumero}`}
+      </span>
+      {c.estado === 'ANULADO' && <span className="t-mini">(anulada)</span>}
+      <BotonExterno href={urlApi(c.urlPdf || pagosApi.urlComprobante(c.serieNumero, codigo, dni, 'pdf'))} target="_blank" variante="secundario" tamano="sm" icono={FileText}>
+        PDF
+      </BotonExterno>
+      <BotonExterno href={urlApi(c.urlXml || pagosApi.urlComprobante(c.serieNumero, codigo, dni, 'xml'))} target="_blank" variante="fantasma" tamano="sm" icono={FileCode2}>
+        XML
+      </BotonExterno>
+    </div>
+  );
+}
+
 function ListaPagos({ pagos, codigo, dni }: { pagos: PagoCliente[]; codigo: string; dni: string }) {
   if (!pagos.length) {
     return <p className="t-sec px-[18px] pb-[18px]">Aún no hay pagos registrados.</p>;
@@ -128,7 +152,7 @@ function ListaPagos({ pagos, codigo, dni }: { pagos: PagoCliente[]; codigo: stri
   return (
     <ul className="grid">
       {pagos.map((p, i) => (
-        <li key={`${p.fecha}-${i}`} className="grid gap-2 px-[18px] py-3.5 border-t border-borde first:border-t-0">
+        <li key={p.idPago ?? `${p.fecha}-${i}`} className="grid gap-2 px-[18px] py-3.5 border-t border-borde first:border-t-0">
           <div className="flex items-start gap-3">
             <span className="grid place-items-center w-10 h-10 rounded-12 bg-superficie-suave text-noche shrink-0">
               {p.metodo === 'TARJETA' ? <CreditCard className="ico ico-18" aria-hidden /> : p.metodo === 'EFECTIVO' ? <Banknote className="ico ico-18" aria-hidden /> : <Smartphone className="ico ico-18" aria-hidden />}
@@ -150,20 +174,8 @@ function ListaPagos({ pagos, codigo, dni }: { pagos: PagoCliente[]; codigo: stri
               <div className="observacion-texto">{`«${p.observacion}»`}</div>
             </section>
           )}
-          {p.comprobante && (
-            <div className="flex flex-wrap items-center gap-2 pl-[52px]">
-              <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold">
-                <Receipt className="ico ico-16 text-verde" aria-hidden />
-                {p.comprobante.serieNumero}
-              </span>
-              <BotonExterno href={p.comprobante.urlPdf || pagosApi.urlComprobante(p.comprobante.serieNumero, codigo, dni, 'pdf')} target="_blank" variante="secundario" tamano="sm" icono={FileText}>
-                PDF
-              </BotonExterno>
-              <BotonExterno href={pagosApi.urlComprobante(p.comprobante.serieNumero, codigo, dni, 'xml')} target="_blank" variante="fantasma" tamano="sm" icono={FileCode2}>
-                XML
-              </BotonExterno>
-            </div>
-          )}
+          {p.observacion && p.estado === 'REEMBOLSADO' && <p className="t-mini pl-[52px]">{p.observacion}</p>}
+          {[p.comprobante, p.notaCredito].map((c) => c && <FilaComprobante key={c.serieNumero} c={c} codigo={codigo} dni={dni} />)}
         </li>
       ))}
     </ul>
@@ -251,21 +263,65 @@ function ModalReenviar({ abierto, alCerrar, reserva, dni, alEnviar }: { abierto:
     setError,
     clearErrors,
     formState: { errors, isSubmitting },
-  } = useForm<DatosReenvio>({ resolver: zodResolver(esquemaReenvio), mode: 'onTouched', defaultValues: { metodo: 'YAPE', codigoOperacion: '', archivo: null } });
+    setValue,
+  } = useForm<ReenvioEntrada>({
+    resolver: zodResolver(esquemaReenvio),
+    mode: 'onTouched',
+    defaultValues: (() => {
+      const f = leerFacturacion(reserva.codigoReserva);
+      return {
+        metodo: reserva.metodoPagoPrevisto === 'PLIN' ? 'PLIN' : 'YAPE',
+        codigoOperacion: '',
+        archivo: null,
+        tipoComprobante: f?.tipo ?? 'BOLETA',
+        ruc: f?.ruc ?? '',
+        razonSocial: f?.razonSocial ?? '',
+        direccionFiscal: f?.direccionFiscal ?? '',
+      };
+    })(),
+  });
   const metodo = watch('metodo');
+  const tipoComprobante = watch('tipoComprobante');
+  const [rucConsultado, setRucConsultado] = useState('');
+  const ruc = watch('ruc') ?? '';
+  // Con 11 dígitos válidos trae razón social y dirección de SUNAT (si no responde, se escriben a mano).
+  useEffect(() => {
+    if (tipoComprobante !== 'FACTURA' || ruc === rucConsultado || !/^\d{11}$/.test(ruc) || !rucValido(ruc)) return;
+    if (leerFacturacion(reserva.codigoReserva)?.ruc === ruc && rucConsultado === '') {
+      setRucConsultado(ruc);
+      return;
+    }
+    setRucConsultado(ruc);
+    documentosApi
+      .ruc(ruc)
+      .then((d) => {
+        setValue('razonSocial', d.razonSocial, { shouldValidate: true });
+        setValue('direccionFiscal', d.direccion, { shouldValidate: true });
+      })
+      .catch(() => undefined);
+  }, [ruc, rucConsultado, tipoComprobante, reserva.codigoReserva, setValue]);
   const numero = metodo === 'PLIN' ? metodos.datos?.plin.numero ?? complejo?.pagos.plinNumero : metodos.datos?.yape.numero ?? complejo?.pagos.yapeNumero;
   const monto = Math.max(0, reserva.montoAdelanto - reserva.montoPagado) || reserva.montoAdelanto;
 
-  const enviar = handleSubmit(async (d) => {
+  const enviar = handleSubmit(async (entrada) => {
+    // zodResolver entrega los datos ya transformados (valores por defecto aplicados).
+    const d = entrada as DatosReenvio;
     setAviso(null);
     try {
       setProgreso(0);
-      await pagosApi.enviarComprobante({ codigoReserva: reserva.codigoReserva, dni, metodo: d.metodo, codigoOperacion: d.codigoOperacion, archivo: d.archivo as File, comprobante: { tipo: 'BOLETA' } }, setProgreso);
+      const comprobante: DatosComprobante =
+        d.tipoComprobante === 'FACTURA' ? { tipo: 'FACTURA', ruc: d.ruc, razonSocial: d.razonSocial, direccionFiscal: d.direccionFiscal } : { tipo: 'BOLETA' };
+      await pagosApi.enviarComprobante({ codigoReserva: reserva.codigoReserva, dni, metodo: d.metodo, codigoOperacion: d.codigoOperacion, archivo: d.archivo as File, comprobante }, setProgreso);
+      guardarFacturacion(reserva.codigoReserva, comprobante);
       toast.exito('Comprobante enviado');
       alEnviar();
     } catch (e) {
       setProgreso(null);
-      const { aplicados } = aplicarErroresServidor(e, setError, ['metodo', 'codigoOperacion', 'archivo']);
+      if (esErrorApi(e) && e.codigo === 'OPERACION_REPETIDA') {
+        setError('codigoOperacion', { type: 'servidor', message: e.message }, { shouldFocus: true });
+        return;
+      }
+      const { aplicados } = aplicarErroresServidor(e, setError, ['metodo', 'codigoOperacion', 'archivo', 'ruc', 'razonSocial', 'direccionFiscal']);
       if (!aplicados) setAviso(esErrorApi(e) ? e.message : 'No se pudo enviar.');
     }
   });
@@ -328,6 +384,29 @@ function ModalReenviar({ abierto, alCerrar, reserva, dni, alEnviar }: { abierto:
             />
           )}
         />
+        <Controller
+          name="tipoComprobante"
+          control={control}
+          render={({ field }) => (
+            <Segmentado
+              etiqueta="Comprobante"
+              bloque
+              valor={field.value ?? 'BOLETA'}
+              alCambiar={field.onChange}
+              opciones={[
+                { valor: 'BOLETA', texto: 'Boleta', icono: FileText },
+                { valor: 'FACTURA', texto: 'Factura', icono: Building2 },
+              ]}
+            />
+          )}
+        />
+        {tipoComprobante === 'FACTURA' && (
+          <div className="form-grid dos">
+            <CampoTexto label="RUC" requerido icono={Building2} inputMode="numeric" maxLength={11} autoComplete="off" error={errors.ruc?.message} {...register('ruc', { setValueAs: (v: string) => String(v ?? '').replace(/\D/g, '').slice(0, 11) })} />
+            <CampoTexto label="Razón social" requerido icono={Building2} maxLength={150} error={errors.razonSocial?.message} {...register('razonSocial')} />
+            <CampoTexto label="Dirección fiscal" requerido icono={MapPin} maxLength={200} className="md:col-span-2" error={errors.direccionFiscal?.message} {...register('direccionFiscal')} />
+          </div>
+        )}
         {aviso && <Alerta tipo="error">{aviso}</Alerta>}
       </form>
     </Modal>
@@ -359,12 +438,18 @@ function Detalle({ consulta, inicial, alSalir }: { consulta: Consulta; inicial: 
   const pagos = useCarga(() => pagosApi.pagosDeReserva(consulta.codigo, consulta.dni), `${consulta.codigo}-${version}`);
   useTituloPagina(`Reserva ${reserva.codigoReserva}`);
 
-  const recargar = async () => {
-    try {
-      setReserva(await reservasApi.detalle(consulta.codigo, consulta.dni));
-      setVersion((v) => v + 1);
-    } catch {
-      /* el interceptor ya avisó */
+  // Los cambios de pago llegan a la reserva por eventos (RabbitMQ): se vuelve a pedir unos segundos hasta verlos.
+  const recargar = async (listo: (r: ReservaDetalle) => boolean = () => true) => {
+    for (let i = 0; i < 8; i += 1) {
+      try {
+        const r = await reservasApi.detalle(consulta.codigo, consulta.dni);
+        setReserva(r);
+        setVersion((v) => v + 1);
+        if (listo(r)) return;
+      } catch {
+        return; /* el interceptor ya avisó */
+      }
+      await new Promise((ok) => window.setTimeout(ok, 1500));
     }
   };
 
@@ -375,7 +460,7 @@ function Detalle({ consulta, inicial, alSalir }: { consulta: Consulta; inicial: 
   const pagarConTarjeta = async () => {
     setPagando(true);
     try {
-      const i = await pagosApi.crearIntento({ codigoReserva: reserva.codigoReserva, dni: consulta.dni, tipoPago: 'ADELANTO', comprobante: { tipo: 'BOLETA' } });
+      const i = await pagosApi.crearIntento({ codigoReserva: reserva.codigoReserva, dni: consulta.dni, tipoPago: 'ADELANTO', comprobante: leerFacturacion(reserva.codigoReserva) ?? { tipo: 'BOLETA' } });
       guardarUltimaReserva({ reserva, dni: consulta.dni, metodo: 'TARJETA' });
       navigate(i.urlCheckout.startsWith('http') ? new URL(i.urlCheckout).pathname : i.urlCheckout);
     } catch (e) {
@@ -479,14 +564,14 @@ function Detalle({ consulta, inicial, alSalir }: { consulta: Consulta; inicial: 
         <aside className="resumen" aria-label="Resumen de la reserva">
           <div className="resumen-cab">
             <span className="kicker">Tu reserva</span>
-            <InsigniaEstado dominio="estadoPago" estado={reserva.estadoPago} tamano="sm" />
+            {reserva.estado === 'CANCELADA' ? <InsigniaEstado dominio="reserva" estado="CANCELADA" tamano="sm" /> : <InsigniaEstado dominio="estadoPago" estado={reserva.estadoPago} tamano="sm" />}
           </div>
           <div className="resumen-cuerpo">
             <div className="resumen-item !items-center">
               <span className="resumen-ico">
                 <IconoDeporte deporte={reserva.cancha.deporte} />
               </span>
-              <b>{`${reserva.cancha.nombre} · ${textoDeporte(reserva.cancha.deporte)}`}</b>
+              <b>{nombreConDeporte(reserva.cancha.nombre, reserva.cancha.deporte)}</b>
             </div>
             <div className="resumen-item !items-center">
               <span className="resumen-ico">
@@ -510,13 +595,24 @@ function Detalle({ consulta, inicial, alSalir }: { consulta: Consulta; inicial: 
               </span>
               <b>{fmtSoles(reserva.montoPagado)}</b>
             </div>
-            <div className="fila-monto destacada">
-              <span className="inline-flex items-center gap-2">
-                <Store className="ico ico-16" aria-hidden />
-                Saldo al llegar
-              </span>
-              <b>{fmtSoles(reserva.saldo)}</b>
-            </div>
+            {reserva.estado === 'CANCELADA' ? (
+              // Cancelada: ya no hay saldo que pagar (el back conserva `saldo`); se muestra lo devuelto.
+              <div className="fila-monto destacada">
+                <span className="inline-flex items-center gap-2">
+                  <HandCoins className="ico ico-16" aria-hidden />
+                  Devuelto
+                </span>
+                <b>{fmtSoles(reserva.cancelacion?.devolucion ? (reserva.cancelacion.montoDevolucion ?? 0) : 0)}</b>
+              </div>
+            ) : (
+              <div className="fila-monto destacada">
+                <span className="inline-flex items-center gap-2">
+                  <Store className="ico ico-16" aria-hidden />
+                  Saldo al llegar
+                </span>
+                <b>{fmtSoles(reserva.saldo)}</b>
+              </div>
+            )}
           </div>
         </aside>
 
@@ -558,9 +654,11 @@ function Detalle({ consulta, inicial, alSalir }: { consulta: Consulta; inicial: 
         reserva={reserva}
         dni={consulta.dni}
         devolucionHoras={devolucionHoras}
-        alCancelar={() => {
+        alCancelar={(r) => {
           setCancelar(false);
-          void recargar();
+          if (r?.estado) setReserva(r);
+          // La nota de crédito (si hubo devolución) la emite pagos al recibir `reserva.cancelada`.
+          void recargar().then(() => window.setTimeout(() => setVersion((v) => v + 1), 4000));
         }}
       />
       <ModalReenviar
@@ -570,7 +668,8 @@ function Detalle({ consulta, inicial, alSalir }: { consulta: Consulta; inicial: 
         dni={consulta.dni}
         alEnviar={() => {
           setReenviar(false);
-          void recargar();
+          setReserva((r) => ({ ...r, estadoPago: 'EN_REVISION', venceEn: null, puedeReenviarComprobante: false }));
+          void recargar((r) => r.estadoPago !== 'OBSERVADO' && r.estadoPago !== 'SIN_PAGO');
         }}
       />
     </div>

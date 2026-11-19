@@ -54,15 +54,16 @@ function Contenido() {
 
   const cta =
     r.paso === 1 ? (
-      <Boton bloque iconoDer={ArrowRight} disabled={!r.turno} onClick={() => r.irAPaso(2)}>
+      // `key` por paso: si React reutiliza el mismo <button>, el clic del paso 1 termina enviando el formulario del paso 2.
+      <Boton key="cta-1" bloque iconoDer={ArrowRight} disabled={!r.turno} onClick={() => r.irAPaso(2)}>
         Continuar
       </Boton>
     ) : r.paso === 2 ? (
-      <Boton bloque iconoDer={ArrowRight} type="submit" form="form-paso2">
+      <Boton key="cta-2" bloque iconoDer={ArrowRight} type="submit" form="form-paso2">
         Continuar
       </Boton>
     ) : (
-      <Boton bloque tamano="lg" icono={Check} type="submit" form="form-paso3" cargando={enviando} textoCargando="Confirmando…">
+      <Boton key="cta-3" bloque tamano="lg" icono={Check} type="submit" form="form-paso3" cargando={enviando} textoCargando="Confirmando…">
         {r.reserva ? 'Completar pago' : 'Confirmar reserva'}
       </Boton>
     );

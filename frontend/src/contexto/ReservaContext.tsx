@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Deporte, Franja, MetodoPagoWeb, ReservaCreada, TipoPago } from '@/api/tipos';
+import type { DatosComprobante, Deporte, Franja, MetodoPagoWeb, ReservaCreada, TipoPago } from '@/api/tipos';
 import type { DatosClienteEntrada } from '@/esquemas/reserva';
 
 /**
@@ -149,6 +149,27 @@ export function leerUltimaReserva(codigo?: string): UltimaReserva | null {
     const u = JSON.parse(sessionStorage.getItem(CLAVE_ULTIMA) ?? 'null') as UltimaReserva | null;
     if (!u) return null;
     return !codigo || u.reserva.codigoReserva === codigo ? u : null;
+  } catch {
+    return null;
+  }
+}
+
+// ------------------------------ facturación pedida al reservar ------------------------------
+// El back no expone la facturación en «Mi reserva» y, al reenviar o pagar de nuevo, emite con lo que se mande en ESE
+// pedido. Se recuerda en este navegador para volver a enviarla (en otro dispositivo, el cliente la elige otra vez).
+const CLAVE_FACTURACION = 'alc-facturacion';
+export function guardarFacturacion(codigo: string, comprobante: DatosComprobante) {
+  try {
+    const todo = JSON.parse(localStorage.getItem(CLAVE_FACTURACION) ?? '{}') as Record<string, DatosComprobante>;
+    todo[codigo] = comprobante;
+    localStorage.setItem(CLAVE_FACTURACION, JSON.stringify(todo));
+  } catch {
+    /* sin almacenamiento: se elige de nuevo */
+  }
+}
+export function leerFacturacion(codigo: string): DatosComprobante | null {
+  try {
+    return (JSON.parse(localStorage.getItem(CLAVE_FACTURACION) ?? '{}') as Record<string, DatosComprobante>)[codigo] ?? null;
   } catch {
     return null;
   }

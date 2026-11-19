@@ -89,7 +89,8 @@ export const pagosApi = {
     fd.append('metodo', d.metodo);
     fd.append('codigoOperacion', d.codigoOperacion);
     fd.append('archivo', d.archivo, d.archivo.name);
-    fd.append('comprobante', new Blob([JSON.stringify(d.comprobante)], { type: 'application/json' }));
+    // El back lo lee como texto (`@RequestParam String comprobante`): si va como Blob llega como archivo y se ignora la factura.
+    fd.append('comprobante', JSON.stringify(d.comprobante));
     return http
       .post<ComprobanteEnviado>('/pagos/comprobante', fd, {
         silenciarToast: true,

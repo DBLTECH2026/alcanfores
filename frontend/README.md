@@ -38,7 +38,8 @@ src/
   hooks/        useCarga · useDatosPublicos (complejo, canchas, métodos) · useCuentaRegresiva · useErroresServidor · useTituloPagina
   mocks/        bd.ts (datos simulados) · manejadores.ts (MSW) · navegador.ts
   paginas/portal/  Inicio · Canchas · CanchaDetalle · reservar/(Reservar, Paso1, Paso2, Paso3) · ReservaListo · MiReserva · Pasarela · PagoResultado · Legales
-  paginas/panel/   Login · Hoy (provisional) · Cuenta · EnConstruccion
+  paginas/panel/   Login · Hoy · Reservas (+ReservaDetalle) · NuevaReserva · Agenda · Canchas (+CanchaFormulario) · Resenas · Pagos · Clientes ·
+                   Reportes · Notificaciones · Configuracion (pestaña WhatsApp) · Usuarios · Bitacora · EstadoSistema · Cuenta · esquemasPanel.ts
   rutas/        router.tsx · RutaProtegida.tsx · menuPanel.ts (menú, roles y bustos del panel)
   estilos/      tailwind.css · alcanfores.css + panel.css (portados del prototipo) · app.css (piezas nuevas) · utilidades.css
   utilidades/   fecha.ts (Lima) · formato.ts · documentos.ts (RUC módulo 11, Luhn, marcas, bytes mágicos) · recursos.ts · cx.ts
@@ -105,6 +106,18 @@ Hooks: `useCarga(fn, clave)` (carga con `datos/error/cargando/recargar`), `useCu
    el toast de errores y el cierre de sesión ante 401 ya los hace el interceptor.
 4. Para datos simulados agrega manejadores en `src/mocks/manejadores.ts` (hoy `/api/admin/*` responde 503 «sin datos simulados», salvo el tablero).
 
+## Panel (hecho)
+
+- Clientes HTTP del panel: `src/api/admin/` (`index.ts` por servicio, `tipos.ts` con las respuestas reales). Archivos con token (PDF, XML, Excel,
+  imagen del comprobante): `componentes/panel/archivos.ts` (`abrirArchivo`, `descargarArchivo`, `useArchivo`).
+- Piezas del panel en `componentes/panel/`: `Herramientas.tsx` (barra de búsqueda, filtros laterales, chips de filtros, menú ⋯, `ModalConfirmar`,
+  `useFiltrosUrl` con filtros en la URL), `ModalesReserva.tsx` (validar, rechazar, cobrar en caja, cancelar), `VisorComprobante`,
+  `BloqueComprobante` (boleta/factura con lupa SUNAT) y `panel-extra.css` (se carga desde `PanelLayout`).
+- Esquemas Zod del panel: `paginas/panel/esquemasPanel.ts`, con los mensajes que devuelve el back (comprobados contra el back real).
+- WhatsApp ya no es ítem del menú: es la pestaña de Configuración (`/admin/whatsapp` redirige ahí).
+- El gateway solo acepta el `Origin` de `FRONT_URL` (5186). Si corres el panel en otro puerto, el proxy debe enviar `Origin: http://localhost:5186`.
+- Capturas reales: `../docs/capturas-reales/panel/INDICE.md`. Pendientes del back: `../docs/PENDIENTES_BACK.md` (sección «Panel»).
+
 ## Validación
 
 - Esquemas Zod en `src/esquemas` con los **mismos mensajes** del SPEC §3 (`MSJ` en `comunes.ts`).
@@ -140,9 +153,16 @@ Se guardan en `localStorage` (`alc-mock-bd`) y se regeneran cada día. Consola: 
   prueba se rechaza («solo funcionan las tarjetas de prueba»).
 - Mensajes que el SPEC deja como «etc.»: vencimiento «Revisa la fecha de vencimiento (MM/AA).», CVV «Revisa el CVV (3 dígitos; 4 en Amex).»,
   titular «Escribe el nombre como figura en la tarjeta.», puntuación «Elige de 1 a 5 estrellas.», código 3DS/Yape «El código de aprobación tiene 6 dígitos.»
-- Reenvío de comprobante desde «Mi reserva» manda `comprobante: {tipo:'BOLETA'}` (el back conserva la factura si se pidió al reservar).
+- Reenvío de comprobante desde «Mi reserva»: el modal pide Boleta o Factura (RUC con consulta SUNAT). El back emite con los datos de ESE
+  envío (si no van, boleta), así que el asistente guarda la facturación por código en `localStorage` (`alc-facturacion`) y la prellena;
+  «Pagar con tarjeta» desde «Mi reserva» también la usa. Ver `docs/PENDIENTES_BACK.md` §Portal 1.
 - Yape/Plin se muestran sin QR (no hay QR real del complejo); número grande + Copiar + monto, como el prototipo pero sin el «QR demo».
-- `linea[].evento` del back se traduce con un diccionario (`REGISTRADA`, `PAGO_REGISTRADO`, `PAGO_VALIDADO`, `PAGO_RECHAZADO`, `CONFIRMADA`,
-  `CANCELADA`, `ASISTIO`, `NO_ASISTIO`, `RECORDATORIO`, `COMPROBANTE_EMITIDO`); otro valor se muestra legible.
-- `GET /api/pagos/intentos/{ref}/estado` se asume `{referencia, estado, codigoReserva, motivo}`; `tarjetasPrueba[]` como `{numero, marca, resultado}`.
+- `linea[].evento` reales del back: `REGISTRADA`, `COMPROBANTE_RECIBIDO`, `OBSERVADO`, `PAGO_VALIDADO`, `CONFIRMADA`, `ASISTENCIA` (el `detalle` y
+  `asistencia` dicen si vino) y `CANCELADA`; se traducen con un diccionario (otro valor se muestra legible).
+- `GET /api/pagos/intentos/{ref}/estado` → `{referencia, proveedor, estado, tipoPago, monto, codigoReserva, motivoRechazo, expiraEn, idPago, comprobante}`;
+  `tarjetasPrueba[]` → `{numero, marca, resultado}`; `GET /api/pagos/reserva/{codigo}` trae `comprobante` y `notaCredito` con `urlPdf`/`urlXml`.
+- Multipart de `/api/pagos/comprobante`: `comprobante` va como TEXTO JSON (el back lo lee con `@RequestParam String`; como Blob se perdía la factura).
+- Los cambios de pago llegan a la reserva por RabbitMQ con unos segundos de retraso: «Listo» y «Mi reserva» vuelven a consultar (hasta ~12 s)
+  tras subir un comprobante, pagar en la pasarela o cancelar (nota de crédito).
+- Capturas con el back real: `docs/capturas-reales/portal/` (índice en `INDICE.md`).
 - Ruta del panel para la reserva manual: `/admin/nueva-reserva`; cambio de contraseña: `/admin/cuenta`.

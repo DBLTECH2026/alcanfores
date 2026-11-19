@@ -78,9 +78,13 @@ export interface CanchaResumen {
 }
 export interface FotoCancha {
   id: number;
+  /** Ruta del gateway: `/api/catalogo/fotos/{uuid}.jpg`. */
   url: string;
   leyenda: string | null;
   principal: boolean;
+  orden?: number;
+  ancho?: number | null;
+  alto?: number | null;
 }
 export interface CanchaDetalle extends CanchaResumen {
   descripcionLarga: string | null;
@@ -96,6 +100,7 @@ export interface Resena {
   comentario: string;
   fecha: string;
   respuesta: string | null;
+  respondidoEn?: string | null;
   verificada: boolean;
 }
 export type OrdenResenas = 'recientes' | 'mejor' | 'peor';
@@ -165,6 +170,10 @@ export interface ReservaCreada {
   montoAdelanto: number;
   cliente: { nombres: string; apellidos: string; dniEnmascarado: string; telefono: string; correo: string };
 }
+/**
+ * Hito de la línea de tiempo (`reserva_historial`). Eventos reales del back: REGISTRADA, COMPROBANTE_RECIBIDO, OBSERVADO,
+ * PAGO_VALIDADO, CONFIRMADA, ASISTENCIA (el `detalle` dice si asistió o no) y CANCELADA.
+ */
 export interface EventoLinea {
   evento: string;
   fecha: string;
@@ -179,6 +188,7 @@ export interface Cancelacion {
 }
 export interface ReservaDetalle extends ReservaCreada {
   asistencia: Asistencia;
+  metodoPagoPrevisto?: MetodoPagoWeb | string | null;
   montoPagado: number;
   saldo: number;
   cancelacion: Cancelacion | null;
@@ -224,9 +234,21 @@ export interface MetodosPago {
   mercadoPago: boolean;
   tarjetasPrueba: TarjetaPrueba[];
   yapePrueba: { codigoAprueba: string; codigoRechaza: string };
+  codigo3dsPrueba?: string;
+  adelantoPct?: number;
 }
 export type EstadoValidacion = 'PENDIENTE' | 'VALIDADO' | 'RECHAZADO' | 'ANULADO' | 'REEMBOLSADO';
+/** Enlace a un comprobante para el cliente (rutas del gateway con `?codigo=&dni=` ya incluidos). */
+export interface ComprobanteEnlace {
+  id: number;
+  tipo: 'BOLETA' | 'FACTURA' | 'NOTA_CREDITO';
+  serieNumero: string;
+  estado: 'EMITIDO' | 'ANULADO';
+  urlPdf: string;
+  urlXml: string;
+}
 export interface PagoCliente {
+  idPago: number;
   metodo: string;
   canal: 'COMPROBANTE' | 'PASARELA' | 'CAJA';
   tipoPago: 'ADELANTO' | 'TOTAL' | 'SALDO';
@@ -234,7 +256,9 @@ export interface PagoCliente {
   estado: EstadoValidacion;
   observacion: string | null;
   fecha: string;
-  comprobante: { serieNumero: string; urlPdf: string } | null;
+  comprobante: ComprobanteEnlace | null;
+  /** Nota de crédito emitida al cancelar con devolución. */
+  notaCredito: ComprobanteEnlace | null;
 }
 export interface ComprobanteEnviado {
   idPago: number;
@@ -257,6 +281,7 @@ export interface IntentoPasarela {
   estado: EstadoIntento;
   expiraEn: string;
   codigoReserva: string;
+  motivoRechazo?: string | null;
 }
 export interface ResultadoPasarela {
   estado: 'APROBADO' | 'RECHAZADO' | 'REQUIERE_3DS';
@@ -267,13 +292,21 @@ export interface ResultadoPasarela {
 }
 export interface EstadoIntentoRespuesta {
   referencia: string;
+  proveedor: 'BETA' | 'MERCADO_PAGO';
   estado: EstadoIntento;
+  tipoPago: TipoPago;
+  monto: number;
   codigoReserva: string;
-  motivo?: string | null;
+  motivoRechazo: string | null;
+  expiraEn: string | null;
+  idPago: number | null;
+  comprobante: ComprobanteEnlace | null;
 }
 export interface PreferenciaMp {
   referencia: string;
   initPoint: string;
+  sandbox?: boolean;
+  expiraEn?: string;
 }
 
 // ------------------------------ panel ------------------------------

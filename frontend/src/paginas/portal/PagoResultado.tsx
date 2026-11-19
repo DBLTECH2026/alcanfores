@@ -74,7 +74,7 @@ export default function PagoResultado() {
           <Vacio
             ilustracion="IL-13-rechazado"
             titulo={estado.estado === 'EXPIRADO' ? 'El pago venció' : 'Pago rechazado'}
-            texto={estado.motivo ?? 'Puedes intentarlo de nuevo desde «Mi reserva».'}
+            texto={estado.motivoRechazo ?? 'Puedes intentarlo de nuevo desde «Mi reserva».'}
             acciones={
               <BotonEnlace to={codigo ? `/mi-reserva?codigo=${codigo}` : '/mi-reserva'} icono={Ticket} tamano="lg">
                 Mi reserva

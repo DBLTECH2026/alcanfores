@@ -64,6 +64,19 @@ const perezosa = (cargar: () => Promise<{ default: ComponentType }>): Pick<Route
  */
 const PAGINAS_PANEL: Record<string, Pick<RouteObject, 'lazy'>> = {
   '/admin/hoy': perezosa(() => import('@/paginas/panel/Hoy')),
+  '/admin/reservas': perezosa(() => import('@/paginas/panel/Reservas')),
+  '/admin/nueva-reserva': perezosa(() => import('@/paginas/panel/NuevaReserva')),
+  '/admin/agenda': perezosa(() => import('@/paginas/panel/Agenda')),
+  '/admin/canchas': perezosa(() => import('@/paginas/panel/Canchas')),
+  '/admin/resenas': perezosa(() => import('@/paginas/panel/Resenas')),
+  '/admin/pagos': perezosa(() => import('@/paginas/panel/Pagos')),
+  '/admin/clientes': perezosa(() => import('@/paginas/panel/Clientes')),
+  '/admin/reportes': perezosa(() => import('@/paginas/panel/Reportes')),
+  '/admin/notificaciones': perezosa(() => import('@/paginas/panel/Notificaciones')),
+  '/admin/configuracion': perezosa(() => import('@/paginas/panel/Configuracion')),
+  '/admin/usuarios': perezosa(() => import('@/paginas/panel/Usuarios')),
+  '/admin/bitacora': perezosa(() => import('@/paginas/panel/Bitacora')),
+  '/admin/estado': perezosa(() => import('@/paginas/panel/EstadoSistema')),
 };
 
 export const router = createBrowserRouter([
@@ -100,6 +113,8 @@ export const router = createBrowserRouter([
             children: [
               { index: true, element: <Navigate to="/admin/hoy" replace /> },
               { path: '/admin/cuenta', ...perezosa(() => import('@/paginas/panel/Cuenta')) },
+              // WhatsApp vive como pestaña de Configuración (solo ADMIN).
+              { path: '/admin/whatsapp', element: <Navigate to="/admin/configuracion?pestana=whatsapp" replace /> },
               ...MENU_PANEL.map<RouteObject>((item) => ({
                 path: item.ruta,
                 element: <RutaProtegida roles={item.roles} />,

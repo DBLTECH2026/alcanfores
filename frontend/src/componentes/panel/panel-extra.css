@@ -1,0 +1,262 @@
+/* =====================================================================
+   Piezas nuevas de las pantallas del panel (sobre panel.css, mismo lenguaje del prototipo «ELESS»).
+   Solo clases nuevas: no cambia nada del portal.
+   ===================================================================== */
+
+@keyframes entrar-der { from { transform: translateX(24px); opacity: 0; } to { transform: none; opacity: 1; } }
+.animate-entrar-der { animation: entrar-der .2s ease-out; }
+
+/* buscador con «x» y chips de filtro con botón */
+.bb-limpiar { border: 0; background: transparent; color: var(--texto-3); display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; cursor: pointer; }
+.bb-limpiar:hover { background: #EEF2F0; color: var(--noche); }
+.bb-activos .fa-x { border: 0; background: transparent; color: inherit; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 6px; cursor: pointer; padding: 0; }
+.bb-activos .fa-x:hover { background: rgba(11,93,51,.12); }
+.bb-select { height: 44px; padding: 0 34px 0 12px; border: 1px solid var(--borde-p); border-radius: 10px; background: #fff; font: 600 13px/1 var(--f-texto, Inter); color: var(--noche); }
+.bb-fecha { height: 44px; padding: 0 10px; border: 1px solid var(--borde-p); border-radius: 10px; background: #fff; font: 500 13px/1 var(--f-texto, Inter); color: var(--noche); }
+.pf-cab .td-ico { width: 38px; height: 38px; }
+.pf-fechas { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.pf-fechas label { display: grid; gap: 4px; font-size: 12px; color: var(--texto-3); }
+.pf-fechas input, .pf-cuerpo select { height: 40px; border: 1px solid var(--borde-p); border-radius: 10px; padding: 0 10px; font: 500 13.5px/1 var(--f-texto, Inter); color: var(--noche); background: #fff; width: 100%; }
+
+/* menú ⋯ de la fila */
+.menu-fila { position: fixed; z-index: 80; min-width: 210px; background: #fff; border: 1px solid var(--borde-p); border-radius: 12px; box-shadow: 0 18px 40px rgba(9,26,42,.16); padding: 6px; display: grid; gap: 2px; }
+.menu-fila button { display: flex; align-items: center; gap: 10px; min-height: 38px; padding: 0 10px; border-radius: 8px; border: 0; background: transparent; font: 500 13.5px/1.2 var(--f-texto, Inter); color: var(--noche); cursor: pointer; text-align: left; }
+.menu-fila button:hover, .menu-fila button:focus-visible { background: #F1F5F3; outline: none; }
+.menu-fila .ico { width: 16px; height: 16px; color: var(--texto-3); }
+.menu-fila .peligro { color: var(--rojo); }
+.menu-fila .peligro .ico { color: var(--rojo); }
+.td-mas { cursor: pointer; }
+.td-mas:hover { background: #F1F5F3; }
+
+/* dato con ícono */
+.dato-ico { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--texto-3); }
+.dato-ico .ico { width: 15px; height: 15px; flex: none; }
+.dato-ico b, .dato-ico strong { color: var(--noche); }
+
+/* tarjetas del panel con cabecera e ícono */
+.pc { background: #fff; border: 1px solid var(--borde-p); border-radius: 14px; overflow: hidden; }
+.pc-cab { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-bottom: 1px solid var(--borde-p); min-height: 54px; }
+.pc-cab h2, .pc-cab h3 { margin: 0; font: 600 15px/1.2 var(--f-texto, Inter); color: var(--noche); display: inline-flex; align-items: center; gap: 9px; }
+.pc-cab h2 .ico, .pc-cab h3 .ico { width: 18px; height: 18px; color: var(--texto-3); }
+.pc-cab .pc-der { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.pc-cuerpo { padding: 16px 18px; }
+.pc-titular, .pc-cab .pc-titular { font-family: var(--f-titular, 'Barlow Semi Condensed'); font-weight: 700; font-size: 20px; color: var(--noche); }
+
+/* bloque «hora grande + fecha + cancha» del detalle */
+.det-turno { display: flex; align-items: center; gap: 14px; padding: 18px; }
+.det-turno .td-ico { width: 48px; height: 48px; border-radius: 12px; background: var(--menta); border-color: #D4E6DA; color: var(--verde); }
+.det-turno .td-ico .ico { width: 22px; height: 22px; }
+.det-hora { font-family: var(--f-titular, 'Barlow Semi Condensed'); font-size: 30px; font-weight: 800; line-height: 1; color: var(--noche); font-variant-numeric: tabular-nums; }
+.montos3 { display: grid; grid-template-columns: repeat(3, 1fr); border-top: 1px solid var(--borde-p); }
+.montos3 > div { padding: 12px 18px; display: grid; gap: 2px; }
+.montos3 > div + div { border-left: 1px solid var(--borde-p); }
+.montos3 span { font-size: 12px; color: var(--texto-3); display: inline-flex; align-items: center; gap: 6px; }
+.montos3 span .ico { width: 14px; height: 14px; }
+.montos3 b { font-family: var(--f-titular, 'Barlow Semi Condensed'); font-size: 22px; font-weight: 700; color: var(--noche); font-variant-numeric: tabular-nums; }
+.montos3 b.verde { color: var(--verde); }
+.montos3 b.rojo { color: var(--rojo); }
+
+/* contador grande en tarjetas menta (cliente: reservas / no asistió) */
+.mini-kpis { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.mini-kpi { display: flex; align-items: center; gap: 10px; padding: 10px 14px; border-radius: 10px; background: #F4F8F5; color: var(--texto-3); font-size: 13px; }
+.mini-kpi .ico { width: 17px; height: 17px; color: var(--verde); }
+.mini-kpi b { font-family: var(--f-titular, 'Barlow Semi Condensed'); font-size: 20px; color: var(--noche); }
+.mini-kpi.rojo .ico { color: var(--rojo); }
+
+/* visor del comprobante dentro de la tarjeta (prototipo m10) */
+.visor-panel { background: #0E1E2D; border-radius: 12px; overflow: hidden; color: #DCE5E0; }
+.visor-panel-barra { display: flex; align-items: center; gap: 4px; padding: 8px 10px; border-bottom: 1px solid rgba(255,255,255,.08); font-size: 13px; }
+.visor-panel-barra button { width: 34px; height: 34px; border-radius: 9px; border: 0; background: transparent; color: #DCE5E0; display: grid; place-items: center; cursor: pointer; }
+.visor-panel-barra button:hover { background: rgba(255,255,255,.1); }
+.visor-panel-barra .ico { width: 17px; height: 17px; }
+.visor-panel-lienzo { height: 420px; overflow: auto; display: grid; place-items: center; padding: 14px; }
+.visor-panel-lienzo img { max-width: 100%; max-height: 392px; border-radius: 8px; transition: transform .2s; transform-origin: center center; cursor: zoom-in; background: #fff; }
+.visor-panel-lienzo.con-zoom { place-items: start center; }
+.visor-panel-lienzo.con-zoom img { max-width: none; max-height: none; cursor: zoom-out; }
+@media (max-width: 767px) { .visor-panel-lienzo { height: 340px; } .visor-panel-lienzo img { max-height: 312px; } }
+
+/* filas «ícono · dato · acción» (datos del pago) */
+.filas-dato { display: grid; }
+.filas-dato > div { display: flex; align-items: center; gap: 12px; min-height: 48px; padding: 6px 0; border-top: 1px solid #EEF2F0; font-size: 14px; color: var(--noche); }
+.filas-dato > div:first-child { border-top: 0; }
+.filas-dato .td-ico { width: 34px; height: 34px; }
+.filas-dato .der { margin-left: auto; font-size: 12.5px; color: var(--texto-3); display: inline-flex; align-items: center; gap: 6px; }
+
+/* comparación de montos del modal validar */
+.compara { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; padding: 14px 16px; border-radius: 12px; background: rgba(55,162,50,.14); }
+.compara.distinto { background: rgba(229,57,53,.16); }
+.compara > div { display: grid; justify-items: center; gap: 2px; }
+.compara span { font-size: 12px; color: #C9D6CF; display: inline-flex; align-items: center; gap: 6px; }
+.compara b { font-family: var(--f-titular, 'Barlow Semi Condensed'); font-size: 26px; color: #fff; }
+.compara i { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.12); font-style: normal; color: #fff; font-weight: 700; }
+.cajas2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.caja-osc { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.14); color: #fff; font-weight: 600; font-variant-numeric: tabular-nums; }
+.caja-osc .ico { width: 17px; height: 17px; color: #A9B9B1; }
+.flecha-estados { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.caja-aviso { display: grid; gap: 8px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); font-size: 13.5px; color: #E6EEEA; }
+.caja-aviso > div { display: flex; align-items: center; gap: 10px; }
+.caja-aviso .ico { width: 16px; height: 16px; color: #6FD06A; flex: none; }
+.chips-motivo { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-motivo { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,.2); background: transparent; color: #E6EEEA; font: 600 13px/1.2 var(--f-texto, Inter); cursor: pointer; }
+.chip-motivo .ico { width: 15px; height: 15px; }
+.chip-motivo[aria-pressed="true"] { background: var(--verde); border-color: var(--verde); color: #fff; }
+.etiqueta-osc { font-size: 13px; font-weight: 600; color: #F2F6F4; }
+
+/* agenda: grilla canchas × horas */
+.agenda { display: grid; gap: 8px; }
+.agenda-cab, .agenda-fila { display: grid; grid-template-columns: 64px repeat(var(--cols, 4), minmax(150px, 1fr)); gap: 8px; align-items: stretch; }
+.agenda-cab { position: sticky; top: 0; z-index: 2; background: #fff; padding-bottom: 6px; }
+.agenda-hora { font: 700 15px/1.1 var(--f-titular, 'Barlow Semi Condensed'); color: var(--noche); padding-top: 10px; font-variant-numeric: tabular-nums; }
+.agenda-hora small { display: block; font: 500 11px/1.2 var(--f-texto, Inter); color: var(--texto-3); }
+.agenda-cancha { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: #F8FAF9; border: 1px solid var(--borde-p); min-width: 0; }
+.agenda-cancha b { display: block; font-size: 13.5px; color: var(--noche); }
+.agenda-cancha small { display: block; font-size: 11.5px; color: var(--texto-3); }
+.agenda-cancha .libres { margin-left: auto; font: 700 10.5px/1 var(--f-texto, Inter); letter-spacing: .06em; text-transform: uppercase; color: var(--verde); background: var(--menta); border-radius: 6px; padding: 5px 7px; white-space: nowrap; }
+.agenda-scroll { overflow-x: auto; }
+.agenda-celda { position: relative; min-height: 70px; border: 1px solid var(--borde-p); border-left: 4px solid var(--grass); border-radius: 10px; background: #fff; padding: 8px 10px; display: grid; gap: 4px; align-content: start; text-align: left; font: inherit; color: var(--noche); }
+.agenda-celda.libre { cursor: pointer; }
+.agenda-celda.libre:hover { background: var(--menta); }
+.agenda-celda .fila { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+.agenda-celda .precio { font: 700 16px/1 var(--f-titular, 'Barlow Semi Condensed'); font-variant-numeric: tabular-nums; }
+.agenda-celda .cod { font-size: 12.5px; font-weight: 700; letter-spacing: .02em; }
+.agenda-celda .sub { font-size: 12px; color: var(--texto-3); display: inline-flex; align-items: center; gap: 4px; min-width: 0; }
+.agenda-celda .sub .ico { width: 13px; height: 13px; flex: none; }
+.agenda-celda.pendiente { background: #FFFCF0; border-color: #EEDC9C; border-left-color: var(--amarillo); }
+.agenda-celda.confirmada { background: #F6FBF7; border-color: #CFE5D7; border-left-color: var(--verde); }
+.agenda-celda.bloqueado { background: repeating-linear-gradient(135deg, #fff 0 8px, #F1F7F3 8px 16px); border-style: dashed; border-left: 4px solid var(--profundo); color: var(--profundo); }
+.agenda-celda.pasado { opacity: .55; border-left-color: var(--borde-p); background: #FAFBFA; }
+.agenda-celda.inactiva { opacity: .6; }
+.agenda-celda button.mas { position: absolute; right: 6px; bottom: 6px; }
+.agenda-ahora { display: flex; align-items: center; gap: 10px; margin: 2px 0; }
+.agenda-ahora span { flex: none; font: 700 12px/1 var(--f-texto, Inter); background: var(--noche); color: #fff; border-radius: 8px; padding: 5px 8px; font-variant-numeric: tabular-nums; }
+.agenda-ahora i { flex: 1; height: 2px; background: var(--amarillo); }
+.leyenda-panel { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--texto-3); }
+.leyenda-panel span { display: inline-flex; align-items: center; gap: 6px; }
+.leyenda-panel i { width: 14px; height: 10px; border-radius: 3px; border: 1px solid var(--borde-p); border-left-width: 4px; }
+
+/* tarjetas de cancha del panel */
+.canchas-panel { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); }
+.cancha-panel { background: #fff; border: 1px solid var(--borde-p); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; }
+.cancha-panel-media { position: relative; height: 160px; background: var(--menta); overflow: hidden; }
+.cancha-panel-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cancha-panel-media .il { width: 100%; height: 100%; object-fit: contain; }
+.cancha-panel-media .dep { position: absolute; left: 12px; top: 12px; display: inline-flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; border-radius: 999px; background: var(--noche); color: #fff; font-size: 12px; font-weight: 600; }
+.cancha-panel-media .dep svg { width: 14px; height: 14px; }
+.cancha-panel.inactiva .cancha-panel-media img { filter: grayscale(1); opacity: .7; }
+.cancha-panel-cuerpo { padding: 14px 16px; display: grid; gap: 10px; flex: 1; }
+.cancha-panel-cuerpo h3 { margin: 0; font: 700 19px/1.15 var(--f-titular, 'Barlow Semi Condensed'); color: var(--noche); }
+.cancha-panel-pie { display: flex; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--borde-p); }
+.oculta-portal { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px dashed var(--borde-campo); border-radius: 10px; font-size: 13px; font-weight: 600; color: var(--texto-3); }
+.oculta-portal .ico { width: 16px; height: 16px; }
+
+/* fotos de la cancha */
+.fotos-panel { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+.foto-panel { border: 1px solid var(--borde-p); border-radius: 12px; overflow: hidden; background: #fff; display: grid; }
+.foto-panel .img { position: relative; aspect-ratio: 4 / 3; background: #F1F5F3; }
+.foto-panel .img img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: zoom-in; }
+.foto-panel .img .principal { position: absolute; left: 8px; top: 8px; }
+.foto-panel .acc { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; padding: 8px 10px; border-top: 1px solid var(--borde-p); }
+.foto-panel .leyenda-foto { padding: 8px 10px 0; font-size: 13px; color: var(--noche); min-height: 26px; }
+
+/* reseñas del panel */
+.resena-panel { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; padding: 14px 16px; border-top: 1px solid #EEF2F0; }
+.resena-panel:first-child { border-top: 0; }
+.resena-panel.oculta { background: #FAFBFA; }
+.resena-panel.oculta .texto { color: var(--texto-3); }
+.resena-panel .respuesta { border-left: 3px solid var(--verde); background: var(--menta); border-radius: 0 10px 10px 0; padding: 8px 12px; font-size: 13.5px; }
+
+/* vista previa de notificaciones */
+.prev-correo { width: 100%; height: 520px; border: 1px solid var(--borde-p); border-radius: 12px; background: #fff; }
+.prev-wa { background: #E9E2D7; border-radius: 12px; padding: 18px 14px; min-height: 240px; display: grid; align-content: start; }
+.prev-wa .burbuja { justify-self: end; max-width: 88%; background: #DCF8C6; color: #111B21; border-radius: 10px 0 10px 10px; padding: 8px 10px 18px; font-size: 14px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; position: relative; box-shadow: 0 1px 1px rgba(0,0,0,.12); }
+.prev-wa .burbuja small { position: absolute; right: 8px; bottom: 4px; font-size: 10.5px; color: #667781; }
+.prev-wa .doc { justify-self: end; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; background: #fff; border-radius: 8px; padding: 10px 12px; font-size: 13px; color: #111B21; max-width: 88%; }
+.prev-wa .doc .ico { color: #E53935; }
+
+/* WhatsApp: QR */
+.qr-caja { display: grid; place-items: center; gap: 12px; padding: 18px; background: #fff; border-radius: 14px; border: 1px solid var(--borde-p); }
+.qr-caja img { width: 260px; height: 260px; image-rendering: pixelated; }
+.codigo-par { font: 800 26px/1 var(--f-titular, 'Barlow Semi Condensed'); letter-spacing: .18em; color: var(--noche); background: var(--menta); border-radius: 10px; padding: 10px 16px; font-variant-numeric: tabular-nums; }
+.estado-wa { display: flex; align-items: center; gap: 14px; padding: 16px 18px; }
+.estado-wa .punto-wa { width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center; background: #EEF2F0; color: var(--texto-3); flex: none; }
+.estado-wa .punto-wa.ok { background: #E3F6E8; color: #128C7E; }
+.estado-wa .punto-wa.no { background: var(--amarillo-tinte); color: #8A6600; }
+.pasos-wa { display: grid; gap: 10px; counter-reset: paso; }
+.pasos-wa li { list-style: none; display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; color: var(--noche); }
+.pasos-wa li::before { counter-increment: paso; content: counter(paso); flex: none; width: 24px; height: 24px; border-radius: 8px; background: var(--noche); color: #fff; font: 700 12px/24px var(--f-texto, Inter); text-align: center; }
+
+/* estado del sistema */
+.servicios { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.servicio { background: #fff; border: 1px solid var(--borde-p); border-radius: 14px; padding: 14px 16px; display: grid; gap: 10px; }
+.servicio.caido { border-color: #F2B8B5; background: #FFF7F6; }
+.servicio .lat { font: 700 22px/1 var(--f-titular, 'Barlow Semi Condensed'); color: var(--noche); font-variant-numeric: tabular-nums; }
+.servicio .lat small { font: 500 12px/1 var(--f-texto, Inter); color: var(--texto-3); margin-left: 4px; }
+.barra-lat { height: 6px; border-radius: 4px; background: #EEF2F0; overflow: hidden; }
+.barra-lat i { display: block; height: 100%; border-radius: 4px; background: var(--grass); }
+
+/* reportes */
+.graficos { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr)); }
+.grafico { height: 280px; }
+.grafico-alto { height: 320px; }
+.rango-rapido { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; border-radius: 12px; background: #F1F5F3; border: 1px solid var(--borde-p); }
+.rango-rapido button { height: 34px; padding: 0 12px; border-radius: 9px; border: 1px solid transparent; background: transparent; font: 600 13px/1 var(--f-texto, Inter); color: var(--texto-3); cursor: pointer; }
+.rango-rapido button[aria-pressed="true"] { background: #fff; color: var(--noche); border-color: var(--noche); }
+
+/* formularios del panel en tarjetas numeradas (reserva manual, cancha) */
+.paso-cab { display: flex; align-items: center; gap: 10px; }
+.paso-num { width: 26px; height: 26px; border-radius: 50%; background: var(--noche); color: #fff; display: grid; place-items: center; font: 700 12.5px/1 var(--f-texto, Inter); flex: none; }
+.cliente-encontrado { display: flex; align-items: center; gap: 12px; padding: 12px 14px; border-radius: 12px; background: var(--menta); border: 1px solid #CFE3D6; }
+.chips-cancha { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip-cancha-p { display: flex; align-items: center; gap: 10px; padding: 8px 12px 8px 8px; border-radius: 12px; border: 1px solid var(--borde-p); background: #fff; cursor: pointer; text-align: left; font: inherit; }
+.chip-cancha-p .td-ico { background: var(--menta); color: var(--verde); }
+.chip-cancha-p b { display: block; font-size: 13.5px; color: var(--noche); }
+.chip-cancha-p small { display: block; font-size: 11.5px; color: var(--texto-3); }
+.chip-cancha-p[aria-pressed="true"] { border: 2px solid var(--noche); padding: 7px 11px 7px 7px; }
+.chip-cancha-p[aria-pressed="true"] .td-ico { background: var(--noche); color: var(--amarillo); }
+.tira-dias { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 4px; }
+.tira-dias button { flex: none; width: 58px; padding: 8px 0; border-radius: 12px; border: 1px solid var(--borde-p); background: #fff; display: grid; justify-items: center; gap: 2px; cursor: pointer; font: inherit; color: var(--noche); }
+.tira-dias button small { font: 700 10.5px/1 var(--f-texto, Inter); letter-spacing: .08em; text-transform: uppercase; color: var(--texto-3); }
+.tira-dias button b { font: 800 22px/1 var(--f-titular, 'Barlow Semi Condensed'); }
+.tira-dias button[aria-pressed="true"] { background: var(--noche); border-color: var(--noche); color: #fff; }
+.tira-dias button[aria-pressed="true"] small { color: var(--amarillo); }
+.turnos-libres { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
+.turno-p { min-height: 56px; border-radius: 10px; border: 1.5px solid var(--grass); background: #fff; display: grid; place-items: center; gap: 2px; cursor: pointer; font: inherit; color: var(--noche); padding: 6px; }
+.turno-p b { font: 700 15px/1 var(--f-texto, Inter); font-variant-numeric: tabular-nums; }
+.turno-p small { font-size: 12px; color: var(--texto-3); }
+.turno-p:hover { background: var(--menta); }
+.turno-p[aria-pressed="true"] { background: var(--verde); border-color: var(--verde); color: #fff; }
+.turno-p[aria-pressed="true"] small { color: #E8F3EC; }
+.turno-p:disabled { cursor: not-allowed; opacity: .45; border-color: var(--borde-p); background: #F4F6F5; }
+.resumen-manual { position: sticky; top: 16px; }
+.resumen-manual .linea { display: flex; align-items: center; gap: 12px; padding: 8px 0; font-weight: 600; color: var(--noche); font-size: 14px; }
+.resumen-manual .linea .td-ico { background: #F4F8F5; }
+.tot-fila { display: flex; align-items: center; justify-content: space-between; font-size: 14px; padding: 4px 0; color: var(--texto-3); }
+.tot-fila b { color: var(--noche); font-variant-numeric: tabular-nums; }
+.tot-fila.grande { border-top: 1px dashed var(--borde-p); padding-top: 12px; margin-top: 6px; }
+.tot-fila.grande b { font: 800 24px/1 var(--f-titular, 'Barlow Semi Condensed'); color: var(--verde); }
+
+/* listas de chips de características */
+.caracts { display: flex; flex-wrap: wrap; gap: 6px; }
+.caract { display: inline-flex; align-items: center; gap: 6px; height: 30px; padding: 0 6px 0 10px; border-radius: 8px; background: var(--menta); border: 1px solid #CFE3D6; font-size: 13px; color: var(--profundo); font-weight: 600; }
+.caract button { border: 0; background: transparent; color: inherit; width: 22px; height: 22px; border-radius: 6px; display: grid; place-items: center; cursor: pointer; }
+
+/* bitácora: detalle largo en una línea */
+.celda-larga { max-width: 420px; white-space: normal; font-size: 12.5px; color: var(--texto-3); }
+
+/* utilidades del panel */
+.grid-det { display: grid; gap: 16px; }
+@media (min-width: 1100px) { .grid-det { grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); align-items: start; } }
+.grid-form { display: grid; gap: 16px; }
+@media (min-width: 1100px) { .grid-form { grid-template-columns: minmax(0, 1fr) 340px; align-items: start; } }
+.form-2 { display: grid; gap: 14px; }
+@media (min-width: 640px) { .form-2 { grid-template-columns: 1fr 1fr; } }
+.form-3 { display: grid; gap: 14px; }
+@media (min-width: 640px) { .form-3 { grid-template-columns: repeat(3, 1fr); } }
+.sec-titulo { font: 700 10.5px/1 var(--f-texto, Inter); letter-spacing: .1em; text-transform: uppercase; color: var(--texto-3); margin: 4px 0 -4px; }
+@media (max-width: 767px) {
+  .montos3 b { font-size: 18px; }
+  .montos3 > div { padding: 10px 12px; }
+  .det-hora { font-size: 24px; }
+  .cajas2 { grid-template-columns: 1fr; }
+  .prev-correo { height: 440px; }
+}

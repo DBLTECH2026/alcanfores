@@ -510,9 +510,9 @@ export const manejadores = [
     const bd = obtenerBd();
     if (bd.pagos.some((p) => p.codigoOperacion === op && p.estado !== 'RECHAZADO')) return validacion(ruta(request), [{ campo: 'codigoOperacion', mensaje: 'Ese número de operación ya se usó en otro pago.' }]);
     const comp = fd.get('comprobante');
-    if (comp instanceof Blob) {
+    if (comp) {
       try {
-        r.comprobante = JSON.parse(await comp.text()) as ReservaMock['comprobante'];
+        r.comprobante = JSON.parse(typeof comp === 'string' ? comp : await comp.text()) as ReservaMock['comprobante'];
       } catch {
         /* boleta por defecto */
       }
@@ -522,7 +522,7 @@ export const manejadores = [
     bd.pagos.push({ id, codigo: r.codigo, metodo, canal: 'COMPROBANTE', tipoPago: 'ADELANTO', monto, estado: 'PENDIENTE', observacion: null, codigoOperacion: op, fecha: isoLima(), comprobante: null });
     r.estadoPago = 'EN_REVISION';
     r.venceEn = null;
-    r.linea.push({ evento: 'PAGO_REGISTRADO', fecha: isoLima(), detalle: `${metodo === 'YAPE' ? 'Yape' : 'Plin'} · op. ${op}` });
+    r.linea.push({ evento: 'COMPROBANTE_RECIBIDO', fecha: isoLima(), detalle: `${metodo === 'YAPE' ? 'Yape' : 'Plin'} · op. ${op}` });
     guardarBd();
     return ok({ idPago: id, estado: 'PENDIENTE', mensaje: 'Recibimos tu comprobante. Lo validamos en minutos.' }, 201);
   }),
@@ -542,7 +542,18 @@ export const manejadores = [
           estado: p.estado,
           observacion: p.observacion,
           fecha: p.fecha,
-          comprobante: p.comprobante ? { serieNumero: p.comprobante.serieNumero, urlPdf: `/api/comprobantes/${p.comprobante.serieNumero}.pdf?codigo=${r.codigo}&dni=${dni}` } : null,
+          idPago: p.id,
+          comprobante: p.comprobante
+            ? {
+                id: p.id,
+                tipo: p.comprobante.tipo ?? 'BOLETA',
+                serieNumero: p.comprobante.serieNumero,
+                estado: 'EMITIDO',
+                urlPdf: `/api/comprobantes/${p.comprobante.serieNumero}.pdf?codigo=${r.codigo}&dni=${dni}`,
+                urlXml: `/api/comprobantes/${p.comprobante.serieNumero}.xml?codigo=${r.codigo}&dni=${dni}`,
+              }
+            : null,
+          notaCredito: null,
         })),
     );
   }),
@@ -607,7 +618,7 @@ export const manejadores = [
     // Mercado Pago simulado: el webhook «llega» en la segunda consulta.
     if (i.proveedor === 'MERCADO_PAGO' && i.estado === 'CREADO' && i.consultas >= 2) aprobarIntento(i, 'MERCADO_PAGO', '0000');
     guardarBd();
-    return ok({ referencia: i.referencia, estado: i.estado, codigoReserva: i.codigoReserva, motivo: i.motivo });
+    return ok({ referencia: i.referencia, proveedor: i.proveedor, estado: i.estado, tipoPago: i.tipoPago, monto: i.monto, codigoReserva: i.codigoReserva, motivoRechazo: i.motivo, expiraEn: i.expiraEn, idPago: null, comprobante: null });
   }),
 
   // ===== pasarela Alcanfores Pay (beta) =====

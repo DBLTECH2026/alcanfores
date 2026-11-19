@@ -56,3 +56,11 @@ const DEPORTES: Record<string, string> = { FUTBOL_5: 'Fútbol 5', FUTBOL_6: 'Fú
 export function textoDeporte(d: string): string {
   return DEPORTES[d] ?? d;
 }
+
+/** «Cancha 2 · Fútbol 6» ya trae el deporte en el nombre (semilla real): no se repite. */
+export function nombreConDeporte(nombre: string, deporte: string): string {
+  const sinTildes = (t: string) => t.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const dep = textoDeporte(deporte);
+  const raiz = sinTildes(dep).split(/[ (]/)[0] ?? '';
+  return sinTildes(nombre).includes(sinTildes(dep)) || (raiz.length > 3 && sinTildes(nombre).includes(raiz)) ? nombre : `${nombre} · ${dep}`;
+}

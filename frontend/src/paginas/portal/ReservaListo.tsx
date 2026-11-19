@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { CalendarPlus, CreditCard, Download, Mail, MessageCircle, Smartphone, Ticket, UserRound } from 'lucide-react';
 import { reservasApi } from '@/api/servicios';
@@ -26,7 +27,23 @@ export default function ReservaListo() {
   const ultima = leerUltimaReserva(codigo);
   const { datos: complejo } = useComplejo();
   const det = useCarga<ReservaDetalle | null>(() => (ultima ? reservasApi.detalle(codigo, ultima.dni) : Promise.resolve(null)), ultima ? codigo : null);
-  const base = det.datos ?? ultima?.reserva ?? null;
+  // El pago se refleja en la reserva por eventos (RabbitMQ): justo al volver puede seguir SIN_PAGO unos segundos.
+  const [sondeos, setSondeos] = useState(0);
+  const esperando =
+    !!det.datos && det.datos.estado === 'PENDIENTE' && det.datos.estadoPago === 'SIN_PAGO' && !!ultima && (ultima.reserva.estadoPago === 'EN_REVISION' || ultima.metodo === 'TARJETA' || ultima.metodo === 'MERCADO_PAGO');
+  const { recargar } = det;
+  useEffect(() => {
+    if (!esperando || sondeos >= 8) return undefined;
+    const t = window.setTimeout(() => {
+      setSondeos((n) => n + 1);
+      recargar();
+    }, 1500);
+    return () => window.clearTimeout(t);
+  }, [esperando, sondeos, recargar]);
+  const base =
+    det.datos && esperando && ultima?.reserva.estadoPago === 'EN_REVISION'
+      ? { ...det.datos, estadoPago: 'EN_REVISION' as const, venceEn: null }
+      : (det.datos ?? ultima?.reserva ?? null);
   const plazo = useCuentaRegresiva(base?.estado === 'PENDIENTE' && base.estadoPago === 'SIN_PAGO' ? base.venceEn : null);
 
   if (!RE_CODIGO_RESERVA.test(codigo)) {

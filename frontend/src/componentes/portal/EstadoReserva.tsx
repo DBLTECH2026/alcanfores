@@ -100,8 +100,10 @@ export function turnoDeReserva(r: ReservaCreada): TurnoElegido {
 const EVENTOS: Record<string, { titulo: string; icono: LucideIcon; estado?: Hito['estado'] }> = {
   REGISTRADA: { titulo: 'Registrada', icono: Ticket },
   RESERVA_REGISTRADA: { titulo: 'Registrada', icono: Ticket },
+  COMPROBANTE_RECIBIDO: { titulo: 'Comprobante enviado', icono: Upload },
   PAGO_REGISTRADO: { titulo: 'Comprobante enviado', icono: Upload },
   COMPROBANTE_ENVIADO: { titulo: 'Comprobante enviado', icono: Upload },
+  OBSERVADO: { titulo: 'Comprobante observado', icono: TriangleAlert, estado: 'error' },
   PAGO_VALIDADO: { titulo: 'Pago validado', icono: BadgeCheck },
   PAGO_RECHAZADO: { titulo: 'Comprobante observado', icono: TriangleAlert, estado: 'error' },
   CONFIRMADA: { titulo: 'Confirmada', icono: CircleCheck },
@@ -122,7 +124,14 @@ function titulo(evento: string): string {
 /** Línea de tiempo de la reserva: eventos reales del back + hitos pendientes (confirmación y partido). */
 export function hitosDeReserva(r: ReservaDetalle, eventos: EventoLinea[] = r.linea): Hito[] {
   const hitos: Hito[] = eventos.map((e) => {
-    const def = EVENTOS[e.evento.toUpperCase()];
+    const clave = e.evento.toUpperCase();
+    // El back guarda un solo evento ASISTENCIA; el detalle y `asistencia` dicen si vino o no.
+    const def =
+      clave === 'ASISTENCIA'
+        ? r.asistencia === 'NO_ASISTIO' || /no asisti/i.test(e.detalle ?? '')
+          ? EVENTOS.NO_ASISTIO
+          : EVENTOS.ASISTIO
+        : EVENTOS[clave];
     return { titulo: def?.titulo ?? titulo(e.evento), icono: def?.icono, fecha: e.fecha, detalle: e.detalle, estado: def?.estado ?? 'hecho' };
   });
   if (r.estado === 'PENDIENTE') {

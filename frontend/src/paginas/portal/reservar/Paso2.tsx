@@ -284,12 +284,17 @@ export default function Paso2() {
                 placeholder="11 dígitos"
                 error={errors.ruc?.message}
                 valido={rucOk}
-                ayuda={rucOk ? (rucMensaje || <Insignia tono="menta" icono={BadgeCheck} tamano="sm">Verificado con SUNAT</Insignia>) : rucEstado === 'buscando' ? 'Consultando SUNAT…' : 'Empieza con 10 o 20'}
+                ayuda={rucOk ? (rucMensaje ? 'Datos traídos de SUNAT' : <Insignia tono="menta" icono={BadgeCheck} tamano="sm">Verificado con SUNAT</Insignia>) : rucEstado === 'buscando' ? 'Consultando SUNAT…' : 'Empieza con 10 o 20'}
                 accion={<BotonLupa etiqueta="Buscar RUC en SUNAT" buscando={rucEstado === 'buscando'} alPulsar={() => void consultarRuc(getValues('ruc') ?? '')} />}
                 {...register('ruc', { setValueAs: (v: string) => String(v ?? '').replace(/\D/g, '').slice(0, 11) })}
               />
               <CampoTexto label="Razón social" requerido icono={Building2} maxLength={150} lectura={rucOk} valido={rucOk} error={errors.razonSocial?.message} {...register('razonSocial')} />
               <CampoTexto label="Dirección fiscal" requerido icono={MapPin} maxLength={200} lectura={rucOk} valido={rucOk} className="md:col-span-2" error={errors.direccionFiscal?.message} {...register('direccionFiscal')} />
+              {rucOk && rucMensaje && (
+                <Alerta tipo="advertencia" className="md:col-span-2">
+                  {`${rucMensaje}. Revisa el RUC: SUNAT no lo tiene activo.`}
+                </Alerta>
+              )}
               {(rucEstado === 'no-encontrado' || rucEstado === 'no-disponible') && (
                 <Alerta tipo="advertencia" className="md:col-span-2">
                   {rucMensaje}

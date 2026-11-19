@@ -55,10 +55,26 @@ export const esquemaPago = z
 export type PagoEntrada = z.input<typeof esquemaPago>;
 export type DatosPago = z.output<typeof esquemaPago>;
 
-/** Reenvío de comprobante desde «Mi reserva» (Yape/Plin obligatorio). */
-export const esquemaReenvio = z.object({
-  metodo: z.enum(['YAPE', 'PLIN'], { errorMap: () => ({ message: MSJ.metodo }) }),
-  codigoOperacion: esquemaOperacion,
-  archivo: z.custom<File | null>((v) => v instanceof File, MSJ.imagen),
-});
-export type DatosReenvio = z.infer<typeof esquemaReenvio>;
+/**
+ * Reenvío de comprobante desde «Mi reserva» (Yape/Plin obligatorio). Lleva otra vez boleta o factura: el back emite
+ * el comprobante con los datos de ESTE envío (si no se mandan, emite boleta aunque al reservar se pidió factura).
+ */
+export const esquemaReenvio = z
+  .object({
+    metodo: z.enum(['YAPE', 'PLIN'], { errorMap: () => ({ message: MSJ.metodo }) }),
+    codigoOperacion: esquemaOperacion,
+    archivo: z.custom<File | null>((v) => v instanceof File, MSJ.imagen),
+    tipoComprobante: z.enum(['BOLETA', 'FACTURA']).default('BOLETA'),
+    ruc: z.string().trim().optional().default(''),
+    razonSocial: z.string().trim().optional().default(''),
+    direccionFiscal: z.string().trim().optional().default(''),
+  })
+  .superRefine((d, ctx) => {
+    if (d.tipoComprobante !== 'FACTURA') return;
+    if (!rucValido(d.ruc)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['ruc'], message: MSJ.ruc });
+    else if (!/^(10|20)/.test(d.ruc)) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['ruc'], message: MSJ.factura });
+    if (d.razonSocial.length < 3 || d.razonSocial.length > 150) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['razonSocial'], message: MSJ.factura });
+    if (d.direccionFiscal.length < 5 || d.direccionFiscal.length > 200) ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['direccionFiscal'], message: MSJ.factura });
+  });
+export type ReenvioEntrada = z.input<typeof esquemaReenvio>;
+export type DatosReenvio = z.output<typeof esquemaReenvio>;

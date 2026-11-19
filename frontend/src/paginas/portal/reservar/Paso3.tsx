@@ -20,7 +20,7 @@ import {
 import { pagosApi, reservasApi } from '@/api/servicios';
 import { esErrorApi } from '@/api/cliente';
 import type { DatosComprobante, MetodoPagoWeb, ReservaCreada } from '@/api/tipos';
-import { guardarUltimaReserva, useReserva } from '@/contexto/ReservaContext';
+import { guardarFacturacion, guardarUltimaReserva, useReserva } from '@/contexto/ReservaContext';
 import { useToast } from '@/contexto/ToastContext';
 import { useComplejo, useMetodosPago } from '@/hooks/useDatosPublicos';
 import { useCuentaRegresiva } from '@/hooks/useCuentaRegresiva';
@@ -185,6 +185,7 @@ export default function Paso3({ alCambiarEnvio }: { alCambiarEnvio: (v: boolean)
           aceptaPrivacidad: Boolean(r.cliente.aceptaPrivacidad),
         });
         r.registrarReserva(reserva);
+        guardarFacturacion(reserva.codigoReserva, comprobante());
       } catch (e) {
         if (esErrorApi(e) && (e.codigo === 'TURNO_OCUPADO' || e.status === 409)) {
           setConflicto(true);
@@ -233,6 +234,8 @@ export default function Paso3({ alCambiarEnvio }: { alCambiarEnvio: (v: boolean)
     } catch (e) {
       setProgreso(null);
       const porCampo = erroresPorCampo(e);
+      // 409 sin campo del back: el número de operación ya sustenta otro pago.
+      if (esErrorApi(e) && e.codigo === 'OPERACION_REPETIDA') porCampo.codigoOperacion = e.message;
       let ubicados = 0;
       for (const campo of ['codigoOperacion', 'archivo'] as const) {
         if (porCampo[campo]) {

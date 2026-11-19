@@ -28,7 +28,7 @@ import type { TurnoElegido } from '@/contexto/ReservaContext';
 import { IconoDeporte } from '@/componentes/ui/Marca';
 import { cx } from '@/utilidades/cx';
 import { diaSemanaCorto, fmtFecha, fmtHora12, fmtRango12, hoyLima, numeroDia } from '@/utilidades/fecha';
-import { fmtCelular, fmtSoles, textoDeporte } from '@/utilidades/formato';
+import { fmtCelular, fmtSoles, nombreConDeporte } from '@/utilidades/formato';
 
 /** Adelanto = total × pct / 100 con HALF_UP a 2 decimales (igual que el back). */
 export function calcularAdelanto(total: number, pct: number): number {
@@ -312,7 +312,7 @@ export function ResumenReserva({
     <aside className={cx('resumen', className)} aria-label="Resumen de la reserva">
       {cab}
       <div className="resumen-cuerpo">
-        <Fila icono={<IconoDeporte deporte={t.deporte} />} dato={`${t.nombreCancha} · ${textoDeporte(t.deporte)}`} etiqueta="Cancha" />
+        <Fila icono={<IconoDeporte deporte={t.deporte} />} dato={nombreConDeporte(t.nombreCancha, t.deporte)} etiqueta="Cancha" />
         <Fila icono={<CalendarDays className="ico" aria-hidden />} dato={fmtFecha(t.fecha)} etiqueta="Fecha" />
         <Fila icono={<Clock className="ico" aria-hidden />} dato={fmtRango12(t.horaInicio, t.horaFin)} etiqueta="Hora" />
       </div>

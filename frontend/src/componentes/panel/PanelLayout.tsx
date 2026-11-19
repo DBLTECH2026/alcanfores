@@ -11,6 +11,7 @@ import { ahoraLima, fmtFecha } from '@/utilidades/fecha';
 import { iniciales } from '@/utilidades/formato';
 import { MODO_MOCK, type IdBusto } from '@/utilidades/recursos';
 import { cx } from '@/utilidades/cx';
+import './panel-extra.css';
 
 const ROL_TEXTO = { ADMIN: 'Administrador', RECEPCION: 'Recepción' } as const;
 
