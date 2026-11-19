@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useCuenta } from '@/contexto/CuentaContext';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -695,7 +696,9 @@ export default function MiReserva() {
   const [params, setParams] = useSearchParams();
   const delParam = params.get('codigo') ? normalizarCodigo(params.get('codigo') ?? '') : '';
   // v2: desde «Mi cuenta» llega el DNI en el estado de la navegación (no en la URL).
-  const dniCuenta = (useLocation().state as { dni?: string } | null)?.dni;
+  // Con sesión de cliente no se piden código ni DNI: sin código va a «Mis reservas» y con código se usa el DNI de la cuenta.
+  const { cliente } = useCuenta();
+  const dniCuenta = (useLocation().state as { dni?: string } | null)?.dni ?? cliente?.dni;
   const guardada = delParam && dniCuenta ? { codigo: delParam, dni: dniCuenta } : leerConsulta();
   const [consulta, setConsulta] = useState<Consulta | null>(guardada && (!delParam || guardada.codigo === delParam) ? guardada : null);
   const [inicial, setInicial] = useState<ReservaDetalle | null>(null);
@@ -711,6 +714,7 @@ export default function MiReserva() {
     }
   }, [carga.error]);
 
+  if (cliente && !delParam && !consulta) return <Navigate to="/mi-cuenta" replace />;
   if (consulta && !inicial) return <Cargando texto="Buscando tu reserva…" />;
   if (consulta && inicial) {
     return (

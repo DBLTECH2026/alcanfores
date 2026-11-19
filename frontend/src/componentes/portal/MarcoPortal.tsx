@@ -46,6 +46,8 @@ const SELLO = MODO_MOCK ? 'Proyecto UTP · datos simulados' : 'Proyecto UTP · D
 export function MarcoPortal({ children, modo = 'completo' }: { children: ReactNode; modo?: 'completo' | 'flujo' }) {
   const { datos: complejo } = useComplejo();
   const { cliente } = useCuenta();
+  const aMiReserva = cliente ? '/mi-cuenta' : '/mi-reserva';
+  const nav = NAV.map((n) => (n.a === '/mi-reserva' && cliente ? { ...n, a: '/mi-cuenta', texto: 'Mis reservas' } : n));
   const [menu, setMenu] = useState(false);
   const [salir, setSalir] = useState(false);
   const { pathname } = useLocation();
@@ -83,7 +85,7 @@ export function MarcoPortal({ children, modo = 'completo' }: { children: ReactNo
             ) : (
               <>
                 <nav className="mc-nav" aria-label="Principal">
-                  {NAV.map(({ a, texto, icono: Icono }) => (
+                  {nav.map(({ a, texto, icono: Icono }) => (
                     <NavLink key={a} to={a} className="gap-2" aria-current={pathname.startsWith(a) ? 'page' : undefined}>
                       <Icono className="ico ico-18" aria-hidden />
                       {texto}
@@ -103,8 +105,8 @@ export function MarcoPortal({ children, modo = 'completo' }: { children: ReactNo
                       <span>Ingresar</span>
                     </Link>
                   )}
-                  <BotonEnlace to="/mi-reserva" variante="secundario" tamano="sm" icono={Ticket} className="mc-mireserva-movil">
-                    Mi reserva
+                  <BotonEnlace to={aMiReserva} variante="secundario" tamano="sm" icono={Ticket} className="mc-mireserva-movil">
+                    {cliente ? 'Mis reservas' : 'Mi reserva'}
                   </BotonEnlace>
                   <Boton variante="fantasma" icono={Menu} etiqueta="Abrir menú" className="mc-hamburguesa" aria-expanded={menu} onClick={() => setMenu(true)} />
                   <span className="solo-tablet-arriba">
@@ -164,9 +166,9 @@ export function MarcoPortal({ children, modo = 'completo' }: { children: ReactNo
                     <CalendarPlus className="ico ico-16" aria-hidden />
                     Reservar
                   </Link>
-                  <Link to="/mi-reserva" className="inline-flex items-center gap-1.5">
+                  <Link to={aMiReserva} className="inline-flex items-center gap-1.5">
                     <Ticket className="ico ico-16" aria-hidden />
-                    Mi reserva
+                    {cliente ? 'Mis reservas' : 'Mi reserva'}
                   </Link>
                   <Link to="/terminos" className="inline-flex items-center gap-1.5">
                     <ShieldCheck className="ico ico-16" aria-hidden />
@@ -202,7 +204,7 @@ export function MarcoPortal({ children, modo = 'completo' }: { children: ReactNo
               <nav className="drawer-nav">
                 {[
                   { a: '/reservar', texto: 'Reservar', icono: CalendarPlus },
-                  ...NAV,
+                  ...nav,
                   cliente ? { a: '/mi-cuenta', texto: 'Mi cuenta', icono: UserRound } : { a: '/ingresar', texto: 'Ingresar', icono: LogIn },
                   { a: '/terminos', texto: 'Términos', icono: ShieldCheck },
                   { a: '/privacidad', texto: 'Privacidad', icono: Lock },
