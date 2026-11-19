@@ -124,7 +124,7 @@ for (const ancho of [390, 1440]) {
   await ir('/reservar');
   await elegirTurno(page, { cancha: 'Cancha 3', dia: 2 });
   await boton(/^Continuar$/).click();
-  await datos(page, { dni: '45678912', correo: 'jorge.chuco@correo.pe', factura: '20612345679' });
+  await datos(page, { dni: '45678912', correo: 'jorge.chuco@correo.pe', factura: '20000000001' });
   await foto('16-paso2-factura');
   await boton(/^Continuar$/).click();
   await page.getByRole('radio', { name: /Alcanfores Pay/ }).click();

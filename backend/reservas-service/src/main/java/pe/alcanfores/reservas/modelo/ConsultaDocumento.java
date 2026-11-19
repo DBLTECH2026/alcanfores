@@ -16,13 +16,19 @@ import org.hibernate.type.SqlTypes;
 import java.io.Serializable;
 import java.time.LocalDateTime;
 
-/** Caché (30 días) de las consultas a RENIEC/SUNAT para no repetir llamadas al proveedor. */
+/**
+ * Caché de las consultas a RENIEC/SUNAT para no repetir llamadas al proveedor: 30 días si se encontró el documento y
+ * 1 día si el proveedor dijo que no existe ({@link #FUENTE_NO_ENCONTRADO}, respuesta {@code {}}).
+ */
 @Entity
 @Table(name = "consulta_documento")
 @Getter
 @Setter
 @NoArgsConstructor
 public class ConsultaDocumento {
+
+    /** Fuente de una consulta cuyo documento no existe (caché negativa). */
+    public static final String FUENTE_NO_ENCONTRADO = "NO_ENCONTRADO";
 
     @EmbeddedId
     private Clave clave;
@@ -37,6 +43,10 @@ public class ConsultaDocumento {
 
     @Column(nullable = false)
     private LocalDateTime consultadoEn;
+
+    public boolean encontrado() {
+        return !FUENTE_NO_ENCONTRADO.equals(fuente);
+    }
 
     @Embeddable
     @Getter

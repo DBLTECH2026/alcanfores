@@ -86,7 +86,7 @@ React (Vite)  ──HTTPS──>  api-gateway :8086  ──lb://──>  auth-se
 
 Límites (token bucket en memoria, por IP): `POST /api/auth/login` 10/min, `/api/documentos/**` 20/min,
 `POST /api/reservas` 10/min, `/api/pasarela/**` 30/min → 429 con el cuerpo de error estándar.
-Tamaño máximo de cuerpo 6 MB. CORS: `FRONT_URL` (lista separada por comas). Fallback del circuit breaker →
+Tamaño máximo de cuerpo 6 MB. CORS: `FRONT_URL` (lista separada por comas; en local por defecto `http://localhost:5186,http://localhost:5187`); un `Origin` no permitido recibe 403 `ORIGEN_NO_PERMITIDO` con el cuerpo de error estándar. `/api/documentos/**` tiene 20 s de respuesta (las demás rutas 10 s). Fallback del circuit breaker →
 503 `{codigo:"SERVICIO_NO_DISPONIBLE", mensaje:"El servicio de <x> no responde. Intenta en unos segundos."}`.
 
 ---------------------------------------------------------------------------------------------------------------
@@ -198,7 +198,7 @@ copiados por la semilla desde `src/main/resources/semilla/fotos/`). 4–6 reseñ
 | GET | `/api/catalogo/canchas` | público | activas: `[{id, slug, nombre, deporte, deporteTexto, superficie, capacidad, techada, iluminacionLed, descripcion, precioDia, precioNoche, fotoPrincipal (URL), calificacion:{promedio, total}}]` |
 | GET | `/api/catalogo/canchas/{idOSlug}` | público | lo anterior + `descripcionLarga, medidas, caracteristicas[], fotos:[{id, url, leyenda, principal}], resumenResenas:{promedio, total, distribucion:{"5":n,…,"1":n}}` |
 | GET | `/api/catalogo/canchas/{id}/resenas` | público | paginado, `orden=recientes|mejor|peor`: `[{id, autor, puntuacion, comentario, fecha, respuesta, verificada:true}]` |
-| POST | `/api/catalogo/canchas/{id}/resenas` | público | `{codigoReserva, dni, puntuacion, comentario}` → verifica con reservas `GET /interno/reservas/{codigo}/elegible-resena?dni&idCancha` (elegible si la reserva es de esa cancha, el DNI coincide, está CONFIRMADA y su hora de inicio ya pasó o tiene asistencia ASISTIO). Una reseña por reserva (409 `RESENA_DUPLICADA`). Autor = nombre + inicial del apellido. |
+| POST | `/api/catalogo/canchas/{id}/resenas` | público | `{codigoReserva, dni, puntuacion, comentario}` → primero verifica código + DNI con reservas (el 409 de duplicada solo se responde después) `GET /interno/reservas/{codigo}/elegible-resena?dni&idCancha` (elegible si la reserva es de esa cancha, el DNI coincide, está CONFIRMADA y su hora de inicio ya pasó o tiene asistencia ASISTIO). Una reseña por reserva (409 `RESENA_DUPLICADA`). Autor = nombre + inicial del apellido. |
 | GET | `/api/catalogo/fotos/{archivo}` | público | sirve la imagen (Cache-Control 7 días; nombre UUID) |
 | GET/POST/PUT | `/api/admin/canchas`, `/api/admin/canchas/{id}` | ADMIN | CRUD (incluye inactivas). Publica `cancha.actualizada`. |
 | PATCH | `/api/admin/canchas/{id}/estado` | ADMIN | `{estado}` |
@@ -209,15 +209,16 @@ copiados por la semilla desde `src/main/resources/semilla/fotos/`). 4–6 reseñ
 | POST | `/api/admin/resenas/{id}/respuesta` | ADMIN | `{respuesta}` (10–500) |
 | GET/PUT | `/api/admin/configuracion` | GET token, PUT ADMIN | todas las claves `{clave: valor}` validadas |
 | GET | `/interno/canchas`, `/interno/canchas/{id}`, `/interno/configuracion` | interno | para reservas y pagos |
+| GET | `/interno/resenas/{codigoReserva}` | interno | `{codigoReserva, existe}` (reservas lo usa para `puedeResenar`) |
 
 ### 5.3 reservas-service (BD `alcanfores_reservas`)
 Tablas (respetan el diccionario del informe y lo amplían):
 - `cliente(id_cliente PK, dni CHAR(8) UQ, nombres, apellidos, telefono CHAR(9), correo, verificado_reniec, fecha_registro, actualizado_en)`
 - `turno(id_turno PK, id_cancha, nombre_cancha, deporte, fecha, hora_inicio, hora_fin, precio, franja ENUM('DIA','NOCHE'), estado ENUM('DISPONIBLE','RESERVADO','BLOQUEADO'), motivo_bloqueo, UQ(id_cancha, fecha, hora_inicio))`
-- `reserva(id_reserva PK, codigo_reserva VARCHAR(12) UQ, id_cliente FK, id_turno FK, estado ENUM('PENDIENTE','CONFIRMADA','CANCELADA'), estado_pago ENUM('SIN_PAGO','EN_REVISION','OBSERVADO','ADELANTO_PAGADO','PAGADO_TOTAL'), asistencia ENUM('PENDIENTE','ASISTIO','NO_ASISTIO'), origen ENUM('WEB','PRESENCIAL','TELEFONICA'), metodo_pago_previsto, monto_total, monto_adelanto, monto_pagado, vence_en DATETIME NULL, fecha_registro, confirmada_en, registrado_por (id admin, NULL si web), nota VARCHAR(255), turno_activo INT GENERATED (id_turno si estado IN ('PENDIENTE','CONFIRMADA'), si no NULL) STORED UQ)`
+- `reserva(id_reserva PK, codigo_reserva VARCHAR(12) UQ, id_cliente FK, id_turno FK, estado ENUM('PENDIENTE','CONFIRMADA','CANCELADA'), estado_pago ENUM('SIN_PAGO','EN_REVISION','OBSERVADO','ADELANTO_PAGADO','PAGADO_TOTAL','REEMBOLSADO'), asistencia ENUM('PENDIENTE','ASISTIO','NO_ASISTIO'), origen ENUM('WEB','PRESENCIAL','TELEFONICA'), metodo_pago_previsto, monto_total, monto_adelanto, monto_pagado, vence_en DATETIME NULL, fecha_registro, confirmada_en, registrado_por (id admin, NULL si web), nota VARCHAR(255), turno_activo INT GENERATED (id_turno si estado IN ('PENDIENTE','CONFIRMADA'), si no NULL) STORED UQ)`
   ← la columna generada + UQ es la garantía de **no doble reserva** (RNF-11); además `SELECT … FOR UPDATE` del turno en `@Transactional`.
 - `cancelacion(id_cancelacion PK, id_reserva FK UQ, id_administrador NULL, cancelado_por ENUM('CLIENTE','ADMINISTRADOR','SISTEMA'), motivo, devolucion BOOLEAN, monto_devolucion, fecha_cancelacion)`
-- `consulta_documento(tipo ENUM('DNI','RUC'), numero, respuesta JSON, fuente, consultado_en, PK(tipo, numero))` (caché 30 días)
+- `consulta_documento(tipo ENUM('DNI','RUC'), numero, respuesta JSON, fuente, consultado_en, PK(tipo, numero))` (caché 30 días; el «no encontrado» 1 día con `fuente = NO_ENCONTRADO`)
 - `evento_procesado`.
 Código de reserva: `ALC-` + 6 caracteres de `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (SecureRandom; reintenta si existe).
 Montos: `monto_total` = precio del turno; `monto_adelanto` = total × adelantoPct / 100 (redondeo a 0.50 hacia arriba no; HALF_UP a 2 decimales).
@@ -228,14 +229,14 @@ Públicos:
 |---|---|---|
 | GET | `/api/disponibilidad?fecha=YYYY-MM-DD[&idCancha=]` | `{fecha, canchas:[{idCancha, nombre, deporte, turnos:[{idTurno, horaInicio, horaFin, precio, franja, estado:"DISPONIBLE|OCUPADO|BLOQUEADO|PASADO"}]}]}` (OCUPADO si tiene reserva vigente; PASADO si empieza en < 30 min) |
 | GET | `/api/disponibilidad/calendario?desde=&dias=14[&idCancha=]` | `[{fecha, libres, total}]` para pintar el calendario |
-| POST | `/api/reservas` | `{idTurno, cliente:{dni, nombres, apellidos, telefono, correo}, metodoPago, aceptaTerminos, aceptaPrivacidad}` → 201 `{codigoReserva, estado, estadoPago, venceEn, cancha:{id, nombre, deporte}, fecha, horaInicio, horaFin, montoTotal, montoAdelanto, cliente:{nombres, apellidos, dniEnmascarado, telefono, correo}}`. Transacción: upsert del cliente por DNI (actualiza teléfono/correo), bloquea el turno, crea la reserva PENDIENTE/SIN_PAGO con `venceEn = ahora + minutosParaPagar`, publica `reserva.registrada` (tras commit: `@TransactionalEventListener(AFTER_COMMIT)`). 409 `TURNO_OCUPADO` si choca. |
-| GET | `/api/reservas/{codigo}?dni=` | detalle para el cliente: lo anterior + `asistencia, montoPagado, saldo, cancelacion:{canceladoPor, motivo, fecha, devolucion, montoDevolucion}, linea:[{evento, fecha, detalle}]` (línea de tiempo), `puedeCancelar`, `puedeReenviarComprobante`, `puedeResenar`. 404 si código+DNI no calzan (mismo mensaje para ambos casos). |
+| POST | `/api/reservas` | `{idTurno, cliente:{dni, nombres, apellidos, telefono, correo}, metodoPago, aceptaTerminos, aceptaPrivacidad}` → 201 `{codigoReserva, estado, estadoPago, venceEn, cancha:{id, nombre, deporte}, fecha, horaInicio, horaFin, montoTotal, montoAdelanto, cliente:{nombres, apellidos, dniEnmascarado, telefono, correo}}`. Transacción: upsert del cliente por DNI (actualiza teléfono/correo; los nombres de un cliente existente solo los cambia la reserva manual si no está verificado por RENIEC), bloquea el turno, crea la reserva PENDIENTE/SIN_PAGO con `venceEn = ahora + minutosParaPagar`, publica `reserva.registrada` (tras commit: `@TransactionalEventListener(AFTER_COMMIT)`). 409 `TURNO_OCUPADO` si choca. |
+| GET | `/api/reservas/{codigo}?dni=` | detalle para el cliente: lo anterior + `asistencia, montoPagado, saldo, cancelacion:{canceladoPor, motivo, fecha, devolucion, montoDevolucion}, linea:[{evento, fecha, detalle}]` (línea de tiempo), `puedeCancelar`, `puedeReenviarComprobante`, `puedeResenar` (falso si la reserva ya tiene reseña en catálogo). 404 si código+DNI no calzan (mismo mensaje para ambos casos). Cancelada con devolución → `estadoPago: REEMBOLSADO`, `montoPagado` neto y `saldo: 0` (toda CANCELADA tiene `saldo: 0`). |
 | POST | `/api/reservas/{codigo}/cancelar` | `{dni, motivo}` → reglas: solo PENDIENTE/CONFIRMADA y antes del inicio; `devolucion = true` si faltan ≥ `devolucionHoras` y hubo pago; publica `reserva.cancelada`. |
 | GET | `/api/reservas/{codigo}/constancia.pdf?dni=` | **Constancia de reserva PDF** (logo, código grande, QR con el código, cancha, fecha, hora, montos, estado, condiciones, dirección y mapa). |
 | GET | `/api/documentos/dni/{dni}` | `{dni, nombres, apellidoPaterno, apellidoMaterno, apellidos, fuente:"RENIEC (Factiliza)"|"CACHE"}` · 404 `DNI_NO_ENCONTRADO` · 503 `CONSULTA_NO_DISPONIBLE` (sin token o proveedor caído → el front permite llenar a mano) |
 | GET | `/api/documentos/ruc/{ruc}` | `{ruc, razonSocial, direccion, estado, condicion, fuente}` (valida dígito verificador antes de consultar) |
 
-Proveedor de documentos: **Factiliza** si `FACTILIZA_TOKEN` existe (`GET https://api.factiliza.com/v1/dni/info/{dni}` y `/v1/ruc/info/{ruc}`, cabecera `Authorization: Bearer`; respuesta `{success, data:{…}}`; DNI: `nombres, apellido_paterno, apellido_materno`; RUC: `nombre_o_razon_social, estado, condicion, direccion_completa`). Interfaz `ProveedorDocumentos` para cambiar de proveedor. Timeout 5 s.
+Proveedor de documentos: **Factiliza** si `FACTILIZA_TOKEN` existe (`GET https://api.factiliza.com/v1/dni/info/{dni}` y `/v1/ruc/info/{ruc}`, cabecera `Authorization: Bearer`; respuesta `{success, data:{…}}`; DNI: `nombres, apellido_paterno, apellido_materno`; RUC: `nombre_o_razon_social, estado, condicion, direccion_completa`). Interfaz `ProveedorDocumentos` para cambiar de proveedor. Timeout 15 s (Factiliza tarda ~11 s en responder 404); el gateway da 20 s a `/api/documentos/**`. 404 del proveedor → 404 `DNI_NO_ENCONTRADO`/`RUC_NO_ENCONTRADO`.
 
 Administración (token):
 | Método | Ruta | Notas |
@@ -267,8 +268,8 @@ Tablas:
 - `serie(serie PK, tipo, ultimo_correlativo)` → B001 (boleta), F001 (factura), BC01 / FC01 (notas de crédito). Numeración con `@Lock(PESSIMISTIC_WRITE)`.
 - `comprobante(id_comprobante PK, tipo ENUM('BOLETA','FACTURA','NOTA_CREDITO'), codigo_tipo ('03','01','07'), serie, correlativo, UQ(serie, correlativo), fecha_emision, codigo_reserva, id_pago, cliente_tipo_doc, cliente_num_doc, cliente_nombre, cliente_direccion, descripcion, op_gravada, igv, total, monto_letras, hash, cadena_qr, estado ENUM('EMITIDO','ANULADO'), estado_sunat VARCHAR (siempre «ACEPTADO (SIMULADO)»), id_referencia NULL (para NC), motivo NULL)`
 - `evento_procesado`.
-IGV 18 % **incluido** en el precio: `op_gravada = round(total / 1.18, 2)`, `igv = total − op_gravada`. Emisor ficticio: RUC `20612345679`
-(válido por módulo 11), razón social «Los Alcanfores Sport E.I.R.L. (ficticia)», dirección real del complejo.
+IGV 18 % **incluido** en el precio: `op_gravada = round(total / 1.18, 2)`, `igv = total − op_gravada`. Emisor ficticio: RUC `20000000001`
+(válido por módulo 11 y claramente ficticio; el anterior, 20612345679, existía en SUNAT y se reemplazó con migraciones), razón social «Los Alcanfores Sport E.I.R.L. (ficticia)», dirección real del complejo.
 **Un comprobante por cada cobro validado** (adelanto, total o saldo). Boleta al DNI del cliente si no pidió factura.
 
 Públicos:
@@ -276,13 +277,13 @@ Públicos:
 |---|---|---|
 | GET | `/api/pagos/metodos` | `{yape:{numero, titular}, plin:{numero}, tarjetaBeta:true, mercadoPago:<bool si hay MP_ACCESS_TOKEN>, tarjetasPrueba:[…], yapePrueba:{codigoAprueba:"123456", codigoRechaza:"000000"}}` |
 | POST | `/api/pagos/comprobante` | multipart: `codigoReserva, dni, metodo (YAPE/PLIN), codigoOperacion, archivo, comprobante (JSON: tipo, ruc?, razonSocial?, direccionFiscal?)` → valida con reservas (`/interno/reservas/{codigo}`: DNI, estado PENDIENTE, estadoPago SIN_PAGO u OBSERVADO) → pago PENDIENTE por el monto del adelanto → `pago.registrado` → 201 `{idPago, estado:"PENDIENTE", mensaje}` |
-| GET | `/api/pagos/reserva/{codigo}?dni=` | pagos de la reserva para el cliente `[{metodo, canal, tipoPago, monto, estado, observacion, fecha, comprobante:{serieNumero, urlPdf}}]` |
+| GET | `/api/pagos/reserva/{codigo}?dni=` | pagos de la reserva para el cliente `[{metodo, canal, tipoPago, monto, estado, observacion, fecha, comprobante:{serieNumero, urlPdf}, notaCredito, facturacion:{tipo, ruc, razonSocial, direccionFiscal}}]` (`facturacion` = lo que se pidió para ese pago). Si un envío (comprobante, intento en línea o cobro en caja) no trae `comprobante`, se repite la última facturación pedida de la reserva. |
 | POST | `/api/pagos/pasarela/intentos` | `{codigoReserva, dni, tipoPago: ADELANTO|TOTAL, comprobante:{…}}` → `{referencia, urlCheckout:"/pasarela/ALP-…", expiraEn}` |
 | GET | `/api/pasarela/intentos/{ref}` | `{referencia, comercio:"Complejo Deportivo Los Alcanfores", concepto, monto, moneda, estado, expiraEn, codigoReserva}` |
 | POST | `/api/pasarela/intentos/{ref}/tarjeta` | `{numero, titular, mesVencimiento, anioVencimiento, cvv, correo}` → `{estado: APROBADO|RECHAZADO|REQUIERE_3DS, codigoAutorizacion?, motivo?, marca, ultimos4}` |
 | POST | `/api/pasarela/intentos/{ref}/3ds` | `{codigo}` (123456 aprueba) |
 | POST | `/api/pasarela/intentos/{ref}/yape` | `{celular, codigoAprobacion}` |
-| GET | `/api/pagos/intentos/{ref}/estado` | sondeo desde la página de resultado |
+| GET | `/api/pagos/intentos/{ref}/estado` | sondeo desde la página de resultado (enlaces del comprobante completos, con `&dni=`) |
 | POST | `/api/pagos/mercadopago/preferencias` | `{codigoReserva, dni, tipoPago, comprobante}` → `{referencia, initPoint}` (sandbox_init_point si token TEST). 409 `MP_NO_CONFIGURADO` si falta token. |
 | POST | `/api/webhooks/mercadopago` | verifica `x-signature` (HMAC-SHA256 con `MP_WEBHOOK_SECRETO`, manifest `id:{data.id};request-id:{x-request-id};ts:{ts};`), consulta `GET /v1/payments/{id}`, si `approved` aprueba el intento (idempotente). |
 | POST | `/api/webhooks/pasarela-beta` | webhook de la pasarela beta, firmado con HMAC-SHA256 (`X-Firma`, secreto `PASARELA_BETA_SECRETO`). |

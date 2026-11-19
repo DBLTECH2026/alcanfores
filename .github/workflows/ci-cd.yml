@@ -28,8 +28,8 @@ jobs:
           --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
           --health-interval=10s --health-timeout=5s --health-retries=10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
@@ -59,11 +59,12 @@ jobs:
             e=$(cat $m/target/surefire-reports/*.xml | grep -o 'errors="[0-9]*"' | grep -o '[0-9]*' | paste -sd+ | bc)
             cov="—"
             if [ -f "$m/target/site/jacoco/jacoco.csv" ]; then
-              cov=$(awk -F, 'NR>1{m+=$4;c+=$5} END{if(m+c>0) printf "%.1f %%", 100*c/(m+c)}' $m/target/site/jacoco/jacoco.csv)
+              # El CSV de JaCoCo puede llevar comas dentro del nombre del grupo: se lee con un lector CSV real
+              cov=$(python3 -c "import csv,sys; f=list(csv.DictReader(open(sys.argv[1]))); m=sum(int(r['INSTRUCTION_MISSED']) for r in f); c=sum(int(r['INSTRUCTION_COVERED']) for r in f); print(f'{100*c/(m+c):.1f} %' if m+c else '—')" "$m/target/site/jacoco/jacoco.csv")
             fi
             echo "| $m | $t | $f | $e | $cov |" >> "$GITHUB_STEP_SUMMARY"
           done
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: reportes-backend
@@ -79,8 +80,8 @@ jobs:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -99,7 +100,7 @@ jobs:
       url: https://alcanfores.dbltech.tech
     steps:
       - name: Desplegar por SSH
-        uses: appleboy/ssh-action@v1.2.0
+        uses: appleboy/ssh-action@v1.2.5
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ vars.VPS_USER }}

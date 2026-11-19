@@ -29,7 +29,7 @@ import { useTituloPagina } from '@/hooks/useTituloPagina';
 import type { IdIlustracion } from '@/utilidades/recursos';
 
 /** Emisor FICTICIO (SPEC §5.4): proyecto académico, no es una empresa real. */
-const EMISOR = { ruc: '20612345679', razon: 'Los Alcanfores Sport E.I.R.L. (ficticia)' };
+const EMISOR = { ruc: '20000000001', razon: 'Los Alcanfores Sport E.I.R.L. (ficticia)' };
 
 function Pagina({ kicker, titulo, ilustracion, actualizado, children }: { kicker: string; titulo: string; ilustracion: IdIlustracion; actualizado: string; children: ReactNode }) {
   return (

@@ -17,11 +17,11 @@ class ComunTest {
 
     @Test
     void rucConDigitoVerificadorCorrectoEsValido() {
-        assertThat(Documentos.rucValido("20612345679")).isTrue();   // emisor ficticio del sistema
-        assertThat(Documentos.rucValido("20612345678")).isFalse();  // dígito verificador alterado
-        assertThat(Documentos.rucValido("30612345679")).isFalse();  // prefijo inexistente
-        assertThat(Documentos.rucValido("2061234567")).isFalse();   // 10 dígitos
-        assertThat(Documentos.rucParaFactura("20612345679")).isTrue();
+        assertThat(Documentos.rucValido("20000000001")).isTrue();   // emisor ficticio del sistema
+        assertThat(Documentos.rucValido("20000000002")).isFalse();  // dígito verificador alterado
+        assertThat(Documentos.rucValido("30000000001")).isFalse();  // prefijo inexistente
+        assertThat(Documentos.rucValido("2000000000")).isFalse();   // 10 dígitos
+        assertThat(Documentos.rucParaFactura("20000000001")).isTrue();
     }
 
     @Test

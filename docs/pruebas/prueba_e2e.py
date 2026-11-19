@@ -201,6 +201,10 @@ def main():
     # 9. Cancelación por el cliente con devolución → nota de crédito
     can = requests.post(f'{API}/reservas/{cod2}/cancelar', json={'dni': c2['dni'], 'motivo': 'Se suspendió el partido del equipo por lluvia'}, timeout=20)
     paso('Cliente cancela con motivo (≥ 24 h: con devolución)', can.status_code == 200 and can.json().get('estado') == 'CANCELADA')
+    cj = can.json() if can.status_code == 200 else {}
+    paso('Cancelada con devolución: estadoPago REEMBOLSADO y saldo 0', cj.get('estadoPago') == 'REEMBOLSADO' and cj.get('saldo') == 0,
+         f"estadoPago {cj.get('estadoPago')} · pagado S/ {cj.get('montoPagado')} · saldo S/ {cj.get('saldo')}")
+    paso('Línea de tiempo sin doble punto', all('..' not in (e.get('detalle') or '') for e in cj.get('linea', [])))
     nc = esperar(lambda: next((p['notaCredito'] for p in requests.get(f'{API}/pagos/reserva/{cod2}', params={'dni': c2['dni']}, timeout=10).json()
                                if p.get('notaCredito')), None), 30)
     paso('Evento reserva.cancelada → reembolso simulado y nota de crédito', bool(nc), nc and nc['serieNumero'])
@@ -241,6 +245,15 @@ def main():
     xlsx = requests.get(f'{API}/admin/reportes/reservas.xlsx', params={'desde': (date.today() - timedelta(days=30)).isoformat(),
                         'hasta': date.today().isoformat()}, headers=h, timeout=30)
     paso('Reporte de reservas en Excel', xlsx.status_code == 200 and xlsx.content[:2] == b'PK', f'{len(xlsx.content) // 1024} KB')
+    cors_mal = requests.post(f'{API}/auth/login', json={}, headers={'Origin': 'https://sitio-ajeno.example'}, timeout=10)
+    paso('CORS: origen no permitido → 403 ORIGEN_NO_PERMITIDO con cuerpo ErrorApi',
+         cors_mal.status_code == 403 and cors_mal.headers.get('Content-Type', '').startswith('application/json')
+         and cors_mal.json().get('codigo') == 'ORIGEN_NO_PERMITIDO', cors_mal.text[:90])
+    if 'localhost' in BASE:
+        panel = requests.options(f'{API}/admin/recordatorios/ejecutar', headers={'Origin': 'http://localhost:5187',
+                                 'Access-Control-Request-Method': 'POST'}, timeout=10)
+        paso('CORS local: el panel en 5187 está permitido', panel.status_code == 200
+             and panel.headers.get('Access-Control-Allow-Origin') == 'http://localhost:5187')
     bit = requests.get(f'{API}/admin/bitacora', params={'size': 5}, headers=h, timeout=10).json()
     paso('Bitácora de auditoría registra las acciones', bit.get('totalElementos', 0) > 0,
          '; '.join(f"{b['actor']}:{b['accion']}" for b in bit.get('contenido', [])[:5]))

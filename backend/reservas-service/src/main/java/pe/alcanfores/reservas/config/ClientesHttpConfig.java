@@ -18,7 +18,8 @@ import java.time.Duration;
 public class ClientesHttpConfig {
 
     private static final Duration TIMEOUT_INTERNO = Duration.ofSeconds(3);
-    private static final Duration TIMEOUT_FACTILIZA = Duration.ofSeconds(5);
+    /** Factiliza tarda ~11 s en responder 404 cuando el DNI no existe: con 5 s se cortaba y salía 503. */
+    static final Duration TIMEOUT_FACTILIZA = Duration.ofSeconds(15);
 
     /** Builder por defecto (sin balanceo): lo usan Eureka y cualquier otra librería que pida un RestClient.Builder. */
     @Bean
@@ -38,8 +39,13 @@ public class ClientesHttpConfig {
 
     @Bean
     ProveedorDocumentos proveedorDocumentos(RestClientBuilderConfigurer configurador, ReservasPropiedades propiedades) {
-        return new FactilizaProveedor(configurador.configure(RestClient.builder()).requestFactory(fabrica(TIMEOUT_FACTILIZA)),
+        return new FactilizaProveedor(configurador.configure(RestClient.builder()).requestFactory(fabricaDocumentos()),
                 propiedades.factiliza());
+    }
+
+    /** Conexión y lectura de la consulta RENIEC/SUNAT (15 s; el gateway le da 20 s a {@code /api/documentos/**}). */
+    public static SimpleClientHttpRequestFactory fabricaDocumentos() {
+        return fabrica(TIMEOUT_FACTILIZA);
     }
 
     private static SimpleClientHttpRequestFactory fabrica(Duration timeout) {

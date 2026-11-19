@@ -40,7 +40,7 @@ public enum ClaveConfiguracion {
     NOMBRE_COMPLEJO("nombre_complejo", Tipo.TEXTO, 3, 80, "Complejo Deportivo Los Alcanfores",
             "Nombre comercial del complejo."),
     LEMA("lema", Tipo.TEXTO, 3, 120, "Reserva tu cancha. Juega cuando quieras.", "Lema del portal."),
-    RUC_EMISOR("ruc_emisor", Tipo.RUC, 0, 0, "20612345679", "RUC del emisor de comprobantes (ficticio)."),
+    RUC_EMISOR("ruc_emisor", Tipo.RUC, 0, 0, "20000000001", "RUC del emisor de comprobantes (ficticio)."),
     RAZON_SOCIAL_EMISOR("razon_social_emisor", Tipo.TEXTO, 3, 150, "Los Alcanfores Sport E.I.R.L. (ficticia)",
             "Razón social del emisor (ficticia).");
 

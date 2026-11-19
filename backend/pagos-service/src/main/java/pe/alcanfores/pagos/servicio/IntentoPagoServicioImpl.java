@@ -185,9 +185,11 @@ public class IntentoPagoServicioImpl implements IntentoPagoServicio {
             sincronizarConMercadoPago(referencia);
             i = intentos.findByReferencia(referencia).orElseThrow();
         }
+        // Enlaces completos (con &dni=): la referencia ALP-… solo la conoce quien creó el pago.
+        String dni = i.getReserva().getClienteDni();
         ComprobanteEnlace comprobante = i.getIdPago() == null ? null
                 : ComprobanteMapeador.principal(comprobantes.findByIdPagoOrderByIdAsc(i.getIdPago()))
-                .map(c -> ComprobanteMapeador.enlaceCliente(c, null)).orElse(null);
+                .map(c -> ComprobanteMapeador.enlaceCliente(c, dni)).orElse(null);
         return new EstadoIntentoRespuesta(i.getReferencia(), i.getProveedor().name(), estadoVisible(i).name(),
                 i.getTipoPago().name(), i.getMonto(), i.getCodigoReserva(), i.getMotivoRechazo(), i.getExpiraEn(),
                 i.getIdPago(), comprobante);
@@ -293,7 +295,8 @@ public class IntentoPagoServicioImpl implements IntentoPagoServicio {
             anterior.setActualizadoEn(Tiempo.ahora());
         });
         intentos.save(i);
-        var df = FacturacionSolicitada.de(comprobante, i.getCodigoReserva(), i.getReserva());
+        var df = FacturacionSolicitada.de(comprobante, i.getCodigoReserva(), i.getReserva(),
+                facturacion.findFirstByCodigoReservaOrderByIdDesc(i.getCodigoReserva()));
         df.setReferenciaIntento(i.getReferencia());
         facturacion.save(df);
         return i;

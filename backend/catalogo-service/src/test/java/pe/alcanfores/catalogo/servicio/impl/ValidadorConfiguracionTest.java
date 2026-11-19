@@ -24,7 +24,7 @@ class ValidadorConfiguracionTest {
             "CORREO|Informes@Alcanfores.PE|informes@alcanfores.pe",
             "LATITUD|-12.0196|-12.0196",
             "LONGITUD|-76.8865|-76.8865",
-            "RUC_EMISOR|20612345679|20612345679",
+            "RUC_EMISOR|20000000001|20000000001",
             "LEMA|  Juega   cuando quieras |Juega cuando quieras",
             "MAPA_URL|https://maps.google.com/?q=1|https://maps.google.com/?q=1"
     })

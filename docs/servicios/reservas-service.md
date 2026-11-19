@@ -13,10 +13,10 @@ consulta RENIEC/SUNAT (Factiliza) con caché, constancia PDF, dashboard, cliente
 |---|---|
 | `cliente` | `dni CHAR(8) UNIQUE`; nombres en Título, celular de 9 dígitos, correo en minúsculas; `verificado_reniec` si el DNI se consultó a RENIEC. |
 | `turno` | `UNIQUE(id_cancha, fecha, hora_inicio)`; copia nombre/deporte de la cancha; `precio` según `franja` (DIA/NOCHE por `inicio_noche`); `estado` DISPONIBLE/RESERVADO/BLOQUEADO + `motivo_bloqueo`. |
-| `reserva` | Código `ALC-XXXXXX`, estados, montos, `vence_en`, `registrado_por`, `nota`, `es_semilla`, `version` (bloqueo optimista). **`turno_activo` = columna generada STORED** (`id_turno` si PENDIENTE/CONFIRMADA, si no NULL) con **UNIQUE**: garantía de no doble reserva. |
+| `reserva` | Código `ALC-XXXXXX`, estados (`estado_pago` incluye **REEMBOLSADO** desde V2), montos, `vence_en`, `registrado_por`, `nota`, `es_semilla`, `version` (bloqueo optimista). **`turno_activo` = columna generada STORED** (`id_turno` si PENDIENTE/CONFIRMADA, si no NULL) con **UNIQUE**: garantía de no doble reserva. |
 | `cancelacion` | Una por reserva: quién (CLIENTE/ADMINISTRADOR/SISTEMA), motivo, devolución y monto. |
 | `reserva_historial` | **Ampliación**: hitos de la línea de tiempo (REGISTRADA, COMPROBANTE_RECIBIDO, OBSERVADO, PAGO_VALIDADO, CONFIRMADA, ASISTENCIA, CANCELADA). |
-| `consulta_documento` | Caché de 30 días de RENIEC/SUNAT (`PK(tipo, numero)`, respuesta JSON). |
+| `consulta_documento` | Caché de RENIEC/SUNAT (`PK(tipo, numero)`, respuesta JSON): 30 días si se encontró; 1 día el «no encontrado» (`fuente = NO_ENCONTRADO`, respuesta `{}`). |
 | `evento_procesado` | Idempotencia de los consumidores. |
 
 ## No doble reserva (RNF-11) — dos candados
@@ -43,13 +43,14 @@ origen, q`; `sort` por `fecha, fechaRegistro, cancha, cliente, montoTotal, estad
 Internos (`X-Interno-Token`): `GET /interno/reservas/{codigo}` (campos de DatosReserva **planos** + estado, estadoPago,
 asistencia, origen, metodoPagoPrevisto, saldo, inicio, venceEn), `GET /interno/reservas/{codigo}/elegible-resena?dni&idCancha`
 → `{elegible, motivo, autor}` (siempre 200), `GET /interno/reservas/{codigo}/constancia.pdf`,
-`GET /interno/reservas/proximas?desde&hasta` (ISO fecha-hora; por defecto las próximas 24 h), `GET /interno/reservas/para-semilla`.
+`GET /interno/reservas/proximas?desde&hasta` (ISO fecha-hora; por defecto las próximas 24 h), `GET /interno/reservas/para-semilla`
+(incluye `montoDevolucion` de las canceladas con devolución).
 
 Swagger: `/swagger-ui.html`. Salud: `/actuator/health`.
 
 ## Reglas principales
 - **Registro web** (una transacción): bloquea el turno, valida fecha (hoy … hoy + `diasVisibles`), inicio ≥ ahora + 30 min,
-  turno no bloqueado ni ocupado; upsert del cliente por DNI (actualiza celular y correo); `montoAdelanto = total × adelantoPct / 100`
+  turno no bloqueado ni ocupado; upsert del cliente por DNI (ver «Cliente por DNI»); `montoAdelanto = total × adelantoPct / 100`
   (HALF_UP); `venceEn = min(ahora + minutosParaPagar, inicio)`; publica `reserva.registrada` tras el commit.
 - **Reserva manual**: PRESENCIAL/TELEFONICA, sin `venceEn`, admite turnos que aún no terminan. Con `pagoInicial` valida
   Yape/Plin con número de operación, factura con RUC 10/20 + razón social 3–150 + dirección 5–200, TOTAL = monto exacto y
@@ -57,9 +58,20 @@ Swagger: `/swagger-ui.html`. Salud: `/actuator/health`.
   PENDIENTE sin plazo y la respuesta trae `pagoRegistrado:false` y un `aviso`.
 - **Cancelación cliente**: solo PENDIENTE/CONFIRMADA y antes del inicio; `devolucion` si hubo pago y faltan ≥ `devolucionHoras`.
   **Panel**: cualquier reserva vigente sin asistencia; `devolucion` explícita o, si viene vacía, la misma regla.
+  **Con devolución** la reserva queda `estadoPago = REEMBOLSADO`, `montoPagado` neto (lo cobrado − lo devuelto, 0 si se
+  devolvió todo) y `saldo = 0`; el evento `reserva.cancelada` sigue llevando en `reserva.montoPagado` lo cobrado antes de
+  devolver (pagos reembolsa y emite la nota de crédito con eso). Toda reserva CANCELADA tiene `saldo = 0`.
+- **Cliente por DNI** (regla del upsert): celular y correo se actualizan siempre. Nombres y apellidos: un cliente nuevo
+  toma lo escrito; uno existente los conserva, **salvo en la reserva manual del panel cuando no está verificado por RENIEC**:
+  ahí se guardan los nombres que escribió recepción. Si el cliente está verificado (su DNI se consultó con éxito a RENIEC),
+  mandan los datos de RENIEC. En la web no se cambian los nombres de un cliente existente (cualquiera podría escribir un DNI ajeno).
+- **Línea de tiempo**: el motivo u observación se agrega sin doble punto (`ReglasReserva.frase`) y los plazos van en 12 h
+  («Reenvíalo antes del 19/11/2026 a las 10:40 a. m.»), igual que el hito REGISTRADA y el portal.
 - **Asistencia**: solo CONFIRMADA y desde 15 min antes del inicio; publica `reserva.asistencia`.
 - **Consulta del cliente**: el mismo 404 si el código no existe o el DNI no coincide. Banderas `puedeCancelar`,
-  `puedeReenviarComprobante`, `puedeResenar`.
+  `puedeReenviarComprobante`, `puedeResenar`. `puedeResenar` es falso si catálogo ya tiene la reseña de esa reserva
+  (`GET /interno/resenas/{codigo}` en catalogo-service, solo cuando la reserva ya permite reseñar; si catálogo no
+  responde se deja en verdadero y catálogo responde 409 al enviar).
 
 ## Eventos
 Publica (después del commit con `@TransactionalEventListener(AFTER_COMMIT)`): `reserva.registrada`, `reserva.confirmada`,
@@ -85,9 +97,12 @@ SIN_PAGO/OBSERVADO vencidas (cancelación SISTEMA «Venció el plazo para pagar�
 transacción). 00:05: genera turnos del nuevo día. Cada 5 min: refresca catálogo. Se apagan con `TAREAS_HABILITADAS=false`.
 
 ## Documentos (RENIEC/SUNAT)
-Interfaz `ProveedorDocumentos`; implementación `FactilizaProveedor` (`FACTILIZA_TOKEN`, timeout 5 s). Valida DNI/RUC antes
-de consultar; caché 30 días (`fuente: "CACHE"`); 404 `DNI_NO_ENCONTRADO`/`RUC_NO_ENCONTRADO`; 503 `CONSULTA_NO_DISPONIBLE`
-sin token o con el proveedor caído (el front deja escribir a mano). Nombres en Título.
+Interfaz `ProveedorDocumentos`; implementación `FactilizaProveedor` (`FACTILIZA_TOKEN`, **timeout de 15 s**: Factiliza tarda
+~11 s en responder 404 cuando el DNI no existe; con 5 s se cortaba y salía 503). El gateway da 20 s a `/api/documentos/**`
+(ruta `reservas-documentos`) y el front espera 25 s. Valida DNI/RUC antes de consultar; caché 30 días (`fuente: "CACHE"`);
+404/400/422 de Factiliza → 404 `DNI_NO_ENCONTRADO`/`RUC_NO_ENCONTRADO` con mensaje amable, y ese «no encontrado» se guarda
+**1 día** para no gastar consultas (no marca al cliente como verificado); 503 `CONSULTA_NO_DISPONIBLE` sin token o con el
+proveedor caído (el front deja escribir a mano). Nombres en Título.
 
 ## Constancia PDF
 Thymeleaf (`plantillas/constancia.html`) + openhtmltopdf con fuentes Barlow Semi Condensed e Inter embebidas, logo
@@ -108,7 +123,7 @@ confirmadas), con más demanda de noche y en fin de semana. `Random` con semilla
 Marca `es_semilla = true` (lo expone `/interno/reservas/para-semilla` para pagos-service).
 
 ## Pruebas
-61 pruebas (JUnit 5, Mockito, AssertJ, MockMvc, `@SpringBootTest` contra `alcanfores_reservas_test` en MariaDB; Flyway clean
+78 pruebas al 18/11/2026 (JUnit 5, Mockito, AssertJ, MockMvc, `@SpringBootTest` contra `alcanfores_reservas_test` en MariaDB; Flyway clean
 + migrate al iniciar; RabbitMQ, Eureka, catálogo y pagos simulados; reloj fijado con `Tiempo.fijar`):
 doble reserva concurrente (409), validaciones por campo (400), fecha/turno fuera de regla, disponibilidad y calendario,
 consulta con mismo 404, cancelación con y sin devolución, cancelación del panel, expiración, consumidores (confirmación por
@@ -125,4 +140,6 @@ bloqueos, generación idempotente, dashboard, listado, clientes) y semilla. Cobe
 - `POST /interno/pagos/caja` envía `registradoPor` como **id numérico** del administrador y `registradoPorUsuario` con su usuario.
 - `elegible-resena` responde siempre 200 con `{elegible, motivo, autor}`.
 - Tras `pago.rechazado` el nuevo plazo nunca es menor que `minutosParaPagar` (sin pasar del inicio), para que el cliente alcance a reenviar.
+- Migraciones de datos (18/11/2026): `V2__estado_pago_reembolsado` (enum + reservas ya canceladas con devolución) y
+  `V3__textos_linea_tiempo` (quita el doble punto de los hitos guardados).
 - El QR de la constancia lleva la URL de «Mi reserva» con el código (escaneable por el cliente y por recepción).

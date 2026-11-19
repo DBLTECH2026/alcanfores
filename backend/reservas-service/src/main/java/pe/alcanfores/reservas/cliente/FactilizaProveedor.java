@@ -19,7 +19,9 @@ import java.util.function.Function;
 
 /**
  * Factiliza ({@code https://api.factiliza.com/v1}): {@code GET /dni/info/{dni}} y {@code GET /ruc/info/{ruc}} con
- * {@code Authorization: Bearer <FACTILIZA_TOKEN>}. Respuesta {@code {success, data:{…}}}. Timeout de 5 s.
+ * {@code Authorization: Bearer <FACTILIZA_TOKEN>}. Respuesta {@code {success, data:{…}}}. Timeout de 15 s:
+ * Factiliza tarda ~11 s en responder 404 cuando el número no existe. 404/400/422 → «no encontrado» (vacío); cualquier
+ * otro error o falta de respuesta → 503 {@code CONSULTA_NO_DISPONIBLE}.
  */
 public class FactilizaProveedor implements ProveedorDocumentos {
 

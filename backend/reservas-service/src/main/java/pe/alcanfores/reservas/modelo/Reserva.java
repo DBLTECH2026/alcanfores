@@ -98,10 +98,23 @@ public class Reserva {
         return estado == EstadoReserva.PENDIENTE || estado == EstadoReserva.CONFIRMADA;
     }
 
-    /** Lo que falta pagar (nunca negativo). */
+    /** Lo que falta pagar (nunca negativo; 0 si la reserva está cancelada: ya no se cobra nada). */
     public BigDecimal saldo() {
+        if (estado == EstadoReserva.CANCELADA) {
+            return BigDecimal.ZERO.setScale(2);
+        }
         BigDecimal s = montoTotal.subtract(montoPagado);
         return s.signum() < 0 ? BigDecimal.ZERO.setScale(2) : s.setScale(2);
+    }
+
+    /**
+     * Cancelada con devolución: lo devuelto se descuenta de lo pagado ({@code montoPagado} queda neto, 0 si se devolvió
+     * todo) y el estado del pago pasa a {@code REEMBOLSADO}.
+     */
+    public void registrarDevolucion(BigDecimal devuelto) {
+        BigDecimal neto = montoPagado.subtract(devuelto);
+        montoPagado = (neto.signum() < 0 ? BigDecimal.ZERO : neto).setScale(2);
+        estadoPago = EstadoPago.REEMBOLSADO;
     }
 
     public LocalDateTime inicio() {

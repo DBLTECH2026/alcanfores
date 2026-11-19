@@ -150,7 +150,25 @@ class GatewayIntegracionTest {
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST")
                 .exchange()
                 .expectStatus().isForbidden()
-                .expectHeader().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN);
+                .expectHeader().doesNotExist(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN)
+                .expectHeader().contentTypeCompatibleWith(MediaType.APPLICATION_JSON)
+                .expectBody()
+                .jsonPath("$.status").isEqualTo(403)
+                .jsonPath("$.codigo").isEqualTo("ORIGEN_NO_PERMITIDO")
+                .jsonPath("$.mensaje").value(m -> assertThat(String.valueOf(m)).contains("no tiene permiso"))
+                .jsonPath("$.ruta").isEqualTo("/api/reservas")
+                .jsonPath("$.errores").isEmpty();
+    }
+
+    @Test
+    void solicitudSimpleDeOtroOrigenRecibe403ConErrorApi() {
+        web.post().uri("/api/auth/login").header(HttpHeaders.ORIGIN, "http://localhost:5999")
+                .contentType(MediaType.APPLICATION_JSON).bodyValue(Map.of())
+                .exchange()
+                .expectStatus().isForbidden()
+                .expectBody()
+                .jsonPath("$.codigo").isEqualTo("ORIGEN_NO_PERMITIDO")
+                .jsonPath("$.ruta").isEqualTo("/api/auth/login");
     }
 
     @Test

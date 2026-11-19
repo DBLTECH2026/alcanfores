@@ -32,6 +32,7 @@ public final class InternoDtos {
     public record ReservaSemilla(String codigoReserva, EstadoReserva estado, EstadoPago estadoPago, String metodoPagoPrevisto,
                                  BigDecimal montoTotal, BigDecimal montoAdelanto, BigDecimal montoPagado,
                                  LocalDateTime fechaRegistro, LocalDateTime confirmadaEn, Origen origen,
-                                 String nombreCancha, LocalDate fecha, LocalTime horaInicio, ClienteContacto cliente) {
+                                 String nombreCancha, LocalDate fecha, LocalTime horaInicio, ClienteContacto cliente,
+                                 BigDecimal montoDevolucion) {
     }
 }

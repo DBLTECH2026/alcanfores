@@ -139,7 +139,8 @@ export interface DiaCalendario {
 }
 
 export type EstadoReserva = 'PENDIENTE' | 'CONFIRMADA' | 'CANCELADA';
-export type EstadoPago = 'SIN_PAGO' | 'EN_REVISION' | 'OBSERVADO' | 'ADELANTO_PAGADO' | 'PAGADO_TOTAL';
+/** REEMBOLSADO: cancelada con devolución (montoPagado queda neto y saldo en 0). */
+export type EstadoPago = 'SIN_PAGO' | 'EN_REVISION' | 'OBSERVADO' | 'ADELANTO_PAGADO' | 'PAGADO_TOTAL' | 'REEMBOLSADO';
 export type Asistencia = 'PENDIENTE' | 'ASISTIO' | 'NO_ASISTIO';
 export type MetodoPagoWeb = 'YAPE' | 'PLIN' | 'TARJETA' | 'MERCADO_PAGO';
 
@@ -259,6 +260,14 @@ export interface PagoCliente {
   comprobante: ComprobanteEnlace | null;
   /** Nota de crédito emitida al cancelar con devolución. */
   notaCredito: ComprobanteEnlace | null;
+  /** Boleta o factura que se pidió para ese pago (misma forma que `comprobante` de las solicitudes). */
+  facturacion: FacturacionPedida | null;
+}
+export interface FacturacionPedida {
+  tipo: 'BOLETA' | 'FACTURA';
+  ruc: string | null;
+  razonSocial: string | null;
+  direccionFiscal: string | null;
 }
 export interface ComprobanteEnviado {
   idPago: number;

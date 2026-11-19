@@ -44,7 +44,7 @@ class FacturaCompletaTest {
 
     @Test
     void facturaCompletaEsValida() {
-        assertThat(errores(new DatosComprobanteSolicitud(TipoComprobante.FACTURA, "20612345679",
+        assertThat(errores(new DatosComprobanteSolicitud(TipoComprobante.FACTURA, "20000000001",
                 "Los Alcanfores Sport E.I.R.L.", "Carretera Central km 11.5"))).isEmpty();
         assertThat(errores(new DatosComprobanteSolicitud(TipoComprobante.FACTURA,
                 "1070123321" + pe.alcanfores.comun.validacion.Documentos.digitoVerificadorRuc("1070123321"),

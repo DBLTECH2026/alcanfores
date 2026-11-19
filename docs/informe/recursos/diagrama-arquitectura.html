@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>Arquitectura de microservicios · Alcanfores</title>
+<style>
+  html, body { margin: 0; padding: 0; background: #fff; }
+  svg { display: block; font-family: "Segoe UI", Inter, Arial, sans-serif; }
+  .t { font-size: 22px; font-weight: 700; fill: #091A2A; }
+  .tb { font-size: 22px; font-weight: 700; fill: #fff; }
+  .s { font-size: 17px; fill: #33463c; }
+  .sb { font-size: 17px; fill: #E8F3EC; }
+  .p { font-size: 15px; fill: #5B6B63; }
+  .x { font-size: 15px; fill: #0B5D33; font-weight: 600; }
+  .lbl { font-size: 15px; fill: #5B6B63; font-style: italic; }
+  .marco { font-size: 18px; font-weight: 700; fill: #5B6B63; }
+</style>
+</head>
+<body>
+<svg id="diagrama" width="1600" height="1130" viewBox="0 0 1600 1130" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="fl" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#091A2A"/>
+    </marker>
+    <marker id="flv" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8A6A00"/>
+    </marker>
+  </defs>
+
+  <!-- Navegador -->
+  <rect x="520" y="16" width="560" height="84" rx="14" fill="#E8F3EC" stroke="#27811F" stroke-width="2.5"/>
+  <text x="800" y="50" text-anchor="middle" class="t">Navegador del cliente y del personal</text>
+  <text x="800" y="80" text-anchor="middle" class="s">SPA React 18 · TypeScript · Vite · Tailwind CSS</text>
+  <line x1="800" y1="100" x2="800" y2="158" stroke="#091A2A" stroke-width="2.5" marker-end="url(#fl)"/>
+  <text x="815" y="112" class="lbl">HTTPS · JSON · token JWT</text>
+
+  <!-- Marco del VPS -->
+  <rect x="20" y="118" width="1560" height="880" rx="18" fill="none" stroke="#7A8A82" stroke-width="2" stroke-dasharray="10 8"/>
+  <text x="44" y="150" class="marco">VPS Hostinger KVM 2 (2 vCPU, 8 GB, Ubuntu 26.04) · Docker Compose</text>
+
+  <!-- Caddy -->
+  <rect x="540" y="162" width="520" height="66" rx="12" fill="#fff" stroke="#091A2A" stroke-width="2"/>
+  <text x="800" y="192" text-anchor="middle" class="t">Caddy</text>
+  <text x="800" y="217" text-anchor="middle" class="p">HTTPS con certificado Let's Encrypt · alcanfores.dbltech.tech</text>
+  <line x1="800" y1="228" x2="800" y2="262" stroke="#091A2A" stroke-width="2.5" marker-end="url(#fl)"/>
+
+  <!-- nginx -->
+  <rect x="540" y="264" width="520" height="66" rx="12" fill="#fff" stroke="#091A2A" stroke-width="2"/>
+  <text x="800" y="294" text-anchor="middle" class="t">alcanfores-web (nginx)</text>
+  <text x="800" y="319" text-anchor="middle" class="p">archivos de la SPA · proxy de /api/ hacia el gateway</text>
+  <line x1="800" y1="330" x2="800" y2="366" stroke="#091A2A" stroke-width="2.5" marker-end="url(#fl)"/>
+
+  <!-- Gateway -->
+  <rect x="470" y="368" width="660" height="96" rx="14" fill="#27811F" stroke="#1F6C18" stroke-width="2"/>
+  <text x="800" y="404" text-anchor="middle" class="tb">api-gateway :8086 · Spring Cloud Gateway</text>
+  <text x="800" y="436" text-anchor="middle" class="sb">rutas · CORS · validación JWT · límite de solicitudes</text>
+  <text x="800" y="456" text-anchor="middle" class="sb">circuit breaker con respuesta 503 · bloqueo de /interno/**</text>
+
+  <!-- Eureka -->
+  <rect x="50" y="368" width="340" height="96" rx="14" fill="#091A2A"/>
+  <text x="220" y="404" text-anchor="middle" class="tb">discovery-server :8761</text>
+  <text x="220" y="432" text-anchor="middle" class="sb">Eureka · registro de servicios</text>
+  <text x="220" y="454" text-anchor="middle" class="sb">los 7 servicios se registran</text>
+  <line x1="390" y1="416" x2="468" y2="416" stroke="#091A2A" stroke-width="2" stroke-dasharray="6 5" marker-start="url(#fl)" marker-end="url(#fl)"/>
+  <text x="396" y="398" class="lbl">lb://</text>
+
+  <!-- Bus del gateway hacia los servicios -->
+  <line x1="800" y1="464" x2="800" y2="500" stroke="#091A2A" stroke-width="2.5"/>
+  <line x1="265" y1="500" x2="1335" y2="500" stroke="#091A2A" stroke-width="2.5"/>
+  <g stroke="#091A2A" stroke-width="2.5" marker-end="url(#fl)">
+    <line x1="265" y1="500" x2="265" y2="536"/>
+    <line x1="532" y1="500" x2="532" y2="536"/>
+    <line x1="800" y1="500" x2="800" y2="536"/>
+    <line x1="1068" y1="500" x2="1068" y2="536"/>
+    <line x1="1335" y1="500" x2="1335" y2="536"/>
+  </g>
+  <text x="40" y="490" class="lbl">HTTP REST (llamadas internas a /interno con X-Interno-Token)</text>
+
+  <!-- Servicios: x = 140, 407, 675, 943, 1210 ; ancho 250 -->
+  <g>
+    <rect x="140" y="538" width="250" height="150" rx="14" fill="#fff" stroke="#27811F" stroke-width="2.5"/>
+    <text x="265" y="570" text-anchor="middle" class="t">auth-service</text>
+    <text x="265" y="595" text-anchor="middle" class="x">:8091</text>
+    <text x="265" y="622" text-anchor="middle" class="p">usuarios del panel, login JWT,</text>
+    <text x="265" y="643" text-anchor="middle" class="p">roles y bitácora de auditoría</text>
+
+    <rect x="407" y="538" width="250" height="150" rx="14" fill="#fff" stroke="#27811F" stroke-width="2.5"/>
+    <text x="532" y="570" text-anchor="middle" class="t">catalogo-service</text>
+    <text x="532" y="595" text-anchor="middle" class="x">:8092</text>
+    <text x="532" y="622" text-anchor="middle" class="p">canchas, fotos, reseñas</text>
+    <text x="532" y="643" text-anchor="middle" class="p">verificadas y configuración</text>
+
+    <rect x="675" y="538" width="250" height="150" rx="14" fill="#fff" stroke="#27811F" stroke-width="2.5"/>
+    <text x="800" y="570" text-anchor="middle" class="t">reservas-service</text>
+    <text x="800" y="595" text-anchor="middle" class="x">:8093</text>
+    <text x="800" y="622" text-anchor="middle" class="p">turnos, reservas, clientes,</text>
+    <text x="800" y="643" text-anchor="middle" class="p">constancia PDF y reportes</text>
+    <text x="800" y="672" text-anchor="middle" class="x">→ Factiliza (RENIEC / SUNAT)</text>
+
+    <rect x="943" y="538" width="250" height="150" rx="14" fill="#fff" stroke="#27811F" stroke-width="2.5"/>
+    <text x="1068" y="570" text-anchor="middle" class="t">pagos-service</text>
+    <text x="1068" y="595" text-anchor="middle" class="x">:8094</text>
+    <text x="1068" y="622" text-anchor="middle" class="p">pagos, pasarela beta,</text>
+    <text x="1068" y="643" text-anchor="middle" class="p">comprobantes simulados</text>
+    <text x="1068" y="672" text-anchor="middle" class="x">→ Alcanfores Pay · Mercado Pago</text>
+
+    <rect x="1210" y="538" width="250" height="150" rx="14" fill="#fff" stroke="#27811F" stroke-width="2.5"/>
+    <text x="1335" y="570" text-anchor="middle" class="t">notificaciones-service</text>
+    <text x="1335" y="595" text-anchor="middle" class="x">:8095</text>
+    <text x="1335" y="622" text-anchor="middle" class="p">correo y WhatsApp con PDF,</text>
+    <text x="1335" y="643" text-anchor="middle" class="p">recordatorio 2 h antes</text>
+    <text x="1335" y="672" text-anchor="middle" class="x">→ Evolution API · SMTP</text>
+  </g>
+
+  <!-- MySQL -->
+  <rect x="120" y="712" width="1360" height="128" rx="14" fill="#F4F8F5" stroke="#B9DCC6" stroke-width="2"/>
+  
+  <g stroke="#0B5D33" stroke-width="2" fill="#fff">
+    <!-- cilindros: centro x = col + 95 -->
+    <path d="M148,734 v48 a87,12 0 0 0 174,0 v-48"/><ellipse cx="235" cy="734" rx="87" ry="12"/>
+    <path d="M415,734 v48 a87,12 0 0 0 174,0 v-48"/><ellipse cx="502" cy="734" rx="87" ry="12"/>
+    <path d="M683,734 v48 a87,12 0 0 0 174,0 v-48"/><ellipse cx="770" cy="734" rx="87" ry="12"/>
+    <path d="M951,734 v48 a87,12 0 0 0 174,0 v-48"/><ellipse cx="1038" cy="734" rx="87" ry="12"/>
+    <path d="M1218,734 v48 a87,12 0 0 0 174,0 v-48"/><ellipse cx="1305" cy="734" rx="87" ry="12"/>
+  </g>
+  <g text-anchor="middle">
+    <text x="235" y="772" class="p" font-size="13.5">alcanfores_auth</text>
+    <text x="502" y="772" class="p" font-size="13.5">alcanfores_catalogo</text>
+    <text x="770" y="772" class="p" font-size="13.5">alcanfores_reservas</text>
+    <text x="1038" y="772" class="p" font-size="13.5">alcanfores_pagos</text>
+    <text x="1305" y="772" class="p" font-size="12.5">alcanfores_notificaciones</text>
+  </g>
+  <g stroke="#0B5D33" stroke-width="2" marker-end="url(#fl)">
+    <line x1="235" y1="688" x2="235" y2="720"/>
+    <line x1="502" y1="688" x2="502" y2="720"/>
+    <line x1="770" y1="688" x2="770" y2="720"/>
+    <line x1="1038" y1="688" x2="1038" y2="720"/>
+    <line x1="1305" y1="688" x2="1305" y2="720"/>
+  </g>
+
+  <!-- RabbitMQ -->
+  <g stroke="#8A6A00" stroke-width="2.5" stroke-dasharray="7 5">
+    <line x1="360" y1="688" x2="360" y2="876" marker-start="url(#flv)" marker-end="url(#flv)"/>
+    <line x1="627" y1="688" x2="627" y2="876" marker-start="url(#flv)" marker-end="url(#flv)"/>
+    <line x1="895" y1="688" x2="895" y2="876" marker-start="url(#flv)" marker-end="url(#flv)"/>
+    <line x1="1163" y1="688" x2="1163" y2="876" marker-start="url(#flv)" marker-end="url(#flv)"/>
+    <line x1="1430" y1="688" x2="1430" y2="876" marker-start="url(#flv)" marker-end="url(#flv)"/>
+  </g>
+  <rect x="400" y="812" width="800" height="26" fill="#F4F8F5"/>
+  <text x="800" y="830" text-anchor="middle" class="p" font-weight="700">MySQL 8.4 · una base de datos y un usuario por servicio (database per service)</text>
+  <rect x="120" y="878" width="1360" height="96" rx="14" fill="#FDF1C4" stroke="#8A6A00" stroke-width="2"/>
+  <text x="800" y="914" text-anchor="middle" class="t">RabbitMQ 4 · exchange topic «alcanfores.eventos»</text>
+  <text x="800" y="944" text-anchor="middle" class="s">eventos de dominio publicados tras el commit · una cola por servicio y evento</text>
+  <text x="800" y="966" text-anchor="middle" class="p">consumidores idempotentes (evento_procesado) · 3 reintentos · cola de mensajes muertos (DLX)</text>
+
+  <!-- Integraciones externas -->
+  <text x="40" y="1032" class="marco">Servicios externos (HTTPS):</text>
+  <g>
+    <rect x="300" y="1008" width="300" height="88" rx="12" fill="#fff" stroke="#5B6B63" stroke-width="2" stroke-dasharray="6 5"/>
+    <text x="450" y="1042" text-anchor="middle" class="t" font-size="19">Factiliza</text>
+    <text x="450" y="1072" text-anchor="middle" class="p">consulta de DNI (RENIEC) y RUC (SUNAT)</text>
+    <rect x="620" y="1008" width="300" height="88" rx="12" fill="#fff" stroke="#5B6B63" stroke-width="2" stroke-dasharray="6 5"/>
+    <text x="770" y="1042" text-anchor="middle" class="t" font-size="19">Evolution API</text>
+    <text x="770" y="1072" text-anchor="middle" class="p">WhatsApp (Baileys) con PDF adjunto</text>
+    <rect x="940" y="1008" width="300" height="88" rx="12" fill="#fff" stroke="#5B6B63" stroke-width="2" stroke-dasharray="6 5"/>
+    <text x="1090" y="1042" text-anchor="middle" class="t" font-size="19">Servidor SMTP</text>
+    <text x="1090" y="1072" text-anchor="middle" class="p">correo HTML con PDF adjunto</text>
+    <rect x="1260" y="1008" width="300" height="88" rx="12" fill="#fff" stroke="#5B6B63" stroke-width="2" stroke-dasharray="6 5"/>
+    <text x="1410" y="1042" text-anchor="middle" class="t" font-size="19">Mercado Pago</text>
+    <text x="1410" y="1072" text-anchor="middle" class="p">Checkout Pro (sandbox, opcional)</text>
+  </g>
+</svg>
+</body>
+</html>

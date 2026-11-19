@@ -35,6 +35,7 @@ import pe.alcanfores.reservas.dto.AdminDtos.ReservaManualSolicitud;
 import pe.alcanfores.reservas.dto.Mensajes;
 import pe.alcanfores.reservas.mapeador.ReservaMapeador;
 import pe.alcanfores.reservas.modelo.Asistencia;
+import pe.alcanfores.reservas.modelo.Cancelacion;
 import pe.alcanfores.reservas.modelo.CanceladoPor;
 import pe.alcanfores.reservas.modelo.EstadoPago;
 import pe.alcanfores.reservas.modelo.EstadoReserva;
@@ -142,9 +143,9 @@ public class ReservaAdminServicioImpl implements ReservaAdminServicio {
         }
         boolean devolucion = s.devolucion() == null ? operaciones.correspondeDevolucion(r, Tiempo.ahora()) : s.devolucion();
         UsuarioToken u = SeguridadUtil.requerido();
-        operaciones.cancelar(r, CanceladoPor.ADMINISTRADOR, u.id(), s.motivo(), devolucion);
+        Cancelacion c = operaciones.cancelar(r, CanceladoPor.ADMINISTRADOR, u.id(), s.motivo(), devolucion);
         auditor.registrar("CANCELAR_RESERVA", "reserva", r.getCodigoReserva(), Texto.limpiar(s.motivo())
-                + (devolucion && r.getMontoPagado().signum() > 0 ? " · con devolución de " + Dinero.formato(r.getMontoPagado()) : ""));
+                + (c.isDevolucion() ? " · con devolución de " + Dinero.formato(c.getMontoDevolucion()) : ""));
         return detalleDe(r);
     }
 

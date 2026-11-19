@@ -1,5 +1,6 @@
 package pe.alcanfores.pagos.mapeador;
 
+import pe.alcanfores.pagos.dto.FacturacionPedida;
 import pe.alcanfores.pagos.dto.PagoClienteRespuesta;
 import pe.alcanfores.pagos.dto.PagoDetalleRespuesta;
 import pe.alcanfores.pagos.dto.PagoResumenRespuesta;
@@ -8,6 +9,7 @@ import pe.alcanfores.pagos.modelo.DatosFacturacion;
 import pe.alcanfores.pagos.modelo.EstadoValidacion;
 import pe.alcanfores.pagos.modelo.InstantaneaReserva;
 import pe.alcanfores.pagos.modelo.Pago;
+import pe.alcanfores.pagos.modelo.TipoComprobante;
 
 import java.util.List;
 
@@ -42,10 +44,22 @@ public final class PagoMapeador {
                 p.getEstado() == EstadoValidacion.PENDIENTE);
     }
 
-    public static PagoClienteRespuesta paraCliente(Pago p, List<Comprobante> delPago, String dni) {
+    public static PagoClienteRespuesta paraCliente(Pago p, List<Comprobante> delPago, String dni, DatosFacturacion df) {
         return new PagoClienteRespuesta(p.getId(), p.getMetodo().name(), p.getCanal().name(), p.getTipoPago().name(),
                 p.getMonto(), p.getEstado().name(), p.getObservacion(), p.getFechaEnvio(),
                 ComprobanteMapeador.principal(delPago).map(c -> ComprobanteMapeador.enlaceCliente(c, dni)).orElse(null),
-                ComprobanteMapeador.notaCredito(delPago).map(c -> ComprobanteMapeador.enlaceCliente(c, dni)).orElse(null));
+                ComprobanteMapeador.notaCredito(delPago).map(c -> ComprobanteMapeador.enlaceCliente(c, dni)).orElse(null),
+                facturacionPedida(df));
+    }
+
+    /** Factura: RUC, razón social y dirección; boleta: solo el tipo (el DNI y el nombre son los del cliente). */
+    public static FacturacionPedida facturacionPedida(DatosFacturacion df) {
+        if (df == null) {
+            return null;
+        }
+        if (df.getTipo() == TipoComprobante.FACTURA) {
+            return new FacturacionPedida(df.getTipo().name(), df.getNumDoc(), df.getNombre(), df.getDireccion());
+        }
+        return new FacturacionPedida(df.getTipo().name(), null, null, null);
     }
 }

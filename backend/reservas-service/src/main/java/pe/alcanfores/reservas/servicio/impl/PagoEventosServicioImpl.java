@@ -21,6 +21,7 @@ import pe.alcanfores.reservas.modelo.ReservaHistorial;
 import pe.alcanfores.reservas.repositorio.ReservaRepositorio;
 import pe.alcanfores.reservas.servicio.ComplejoServicio;
 import pe.alcanfores.reservas.servicio.PagoEventosServicio;
+import pe.alcanfores.reservas.servicio.ReglasReserva;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -112,14 +113,13 @@ public class PagoEventosServicioImpl implements PagoEventosServicio {
         }
         Reserva r = encontrada.get();
         if (r.getEstado() != EstadoReserva.PENDIENTE) {
-            operaciones.registrarHito(r, ReservaHistorial.OBSERVADO, "Comprobante observado: " + e.observacion());
+            operaciones.registrarHito(r, ReservaHistorial.OBSERVADO, ReglasReserva.textoObservado(e.observacion(), null));
             return;
         }
         LocalDateTime nuevoPlazo = plazoTrasRechazo(r, Tiempo.ahora(), complejo.parametros().minutosParaPagar());
         r.setEstadoPago(EstadoPago.OBSERVADO);
         r.setVenceEn(nuevoPlazo);
-        operaciones.registrarHito(r, ReservaHistorial.OBSERVADO, "Comprobante observado: " + e.observacion()
-                + ". Reenvíalo antes del " + nuevoPlazo.format(Tiempo.FECHA_HORA) + ".");
+        operaciones.registrarHito(r, ReservaHistorial.OBSERVADO, ReglasReserva.textoObservado(e.observacion(), nuevoPlazo));
     }
 
     /**

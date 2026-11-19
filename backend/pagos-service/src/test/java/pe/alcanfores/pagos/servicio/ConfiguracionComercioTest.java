@@ -18,7 +18,7 @@ class ConfiguracionComercioTest {
         CatalogoCliente catalogo = mock(CatalogoCliente.class);
         when(catalogo.configuracion()).thenReturn(Map.of());
         ConfiguracionComercio c = new ConfiguracionComercio(catalogo);
-        assertThat(c.emisor().ruc()).isEqualTo("20612345679");
+        assertThat(c.emisor().ruc()).isEqualTo("20000000001");
         assertThat(c.emisor().razonSocial()).isEqualTo("Los Alcanfores Sport E.I.R.L. (ficticia)");
         assertThat(c.adelantoPct()).isEqualTo(50);
         assertThat(c.yapeTitular()).isEqualTo("Complejo Deportivo Los Alcanfores");
@@ -33,7 +33,7 @@ class ConfiguracionComercioTest {
         assertThat(c.yapeNumero()).isEqualTo("912345678");
         assertThat(c.plinNumero()).isEqualTo("914995187");
         assertThat(c.adelantoPct()).isEqualTo(50);
-        assertThat(c.emisor().ruc()).isEqualTo("20612345679");
+        assertThat(c.emisor().ruc()).isEqualTo("20000000001");
         assertThat(c.nombreComplejo()).isEqualTo("Complejo Los Alcanfores");
         verify(catalogo, times(1)).configuracion();
     }

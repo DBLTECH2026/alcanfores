@@ -107,30 +107,43 @@ class CancelacionYSemillaTest extends IntegracionBase {
         LocalDate fecha = hace.toLocalDate().plusDays(1);
         List<ReservaSemilla> lista = List.of(
                 new ReservaSemilla("ALC-SEMAAA", "CONFIRMADA", "ADELANTO_PAGADO", "YAPE", total, adelanto, adelanto,
-                        hace, hace.plusMinutes(15), cliente, "Cancha 1", "FUTBOL_5", fecha, LocalTime.of(18, 0), LocalTime.of(19, 0)),
+                        hace, hace.plusMinutes(15), cliente, "Cancha 1", "FUTBOL_5", fecha, LocalTime.of(18, 0), LocalTime.of(19, 0), null),
                 new ReservaSemilla("ALC-SEMBBB", "CONFIRMADA", "PAGADO_TOTAL", "TARJETA", total, adelanto, total,
-                        hace.plusHours(1), null, cliente, "Cancha 1", "FUTBOL_5", fecha, LocalTime.of(20, 0), LocalTime.of(21, 0)),
+                        hace.plusHours(1), null, cliente, "Cancha 1", "FUTBOL_5", fecha, LocalTime.of(20, 0), LocalTime.of(21, 0), null),
                 new ReservaSemilla("ALC-SEMCCC", "CONFIRMADA", "PAGADO_TOTAL", "EFECTIVO", total, adelanto, total,
-                        hace.plusHours(2), null, cliente, null, null, null, null, null),
+                        hace.plusHours(2), null, cliente, null, null, null, null, null, null),
                 new ReservaSemilla("ALC-SEMDDD", "CONFIRMADA", "ADELANTO_PAGADO", "MERCADO_PAGO", total, adelanto, adelanto,
-                        hace.plusHours(3), null, cliente, "Losa multiusos", "MULTIUSO", fecha, LocalTime.of(9, 0), LocalTime.of(10, 0)),
+                        hace.plusHours(3), null, cliente, "Losa multiusos", "MULTIUSO", fecha, LocalTime.of(9, 0), LocalTime.of(10, 0), null),
                 new ReservaSemilla("ALC-SEMEEE", "PENDIENTE", "EN_REVISION", "PLIN", total, adelanto, BigDecimal.ZERO,
-                        Tiempo.ahora().minusMinutes(5), null, cliente, null, null, null, null, null),
+                        Tiempo.ahora().minusMinutes(5), null, cliente, null, null, null, null, null, null),
                 new ReservaSemilla("ALC-SEMFFF", "PENDIENTE", "OBSERVADO", "YAPE", total, adelanto, BigDecimal.ZERO,
-                        Tiempo.ahora().minusHours(2), null, cliente, null, null, null, null, null),
+                        Tiempo.ahora().minusHours(2), null, cliente, null, null, null, null, null, null),
                 new ReservaSemilla("ALC-SEMGGG", "PENDIENTE", "SIN_PAGO", "YAPE", total, adelanto, BigDecimal.ZERO,
-                        Tiempo.ahora().minusMinutes(2), null, cliente, null, null, null, null, null));
+                        Tiempo.ahora().minusMinutes(2), null, cliente, null, null, null, null, null, null),
+                // Cancelada con devolución: reservas manda montoPagado neto (0) y lo devuelto en montoDevolucion.
+                new ReservaSemilla("ALC-SEMHHH", "CANCELADA", "REEMBOLSADO", "TARJETA", total, adelanto, BigDecimal.ZERO,
+                        Tiempo.ahora().minusMinutes(1), null, cliente, null, null, null, null, null, adelanto));
         when(reservas.paraSemilla()).thenReturn(lista);
 
-        assertThat(semilla.ejecutar()).isEqualTo(7);
+        assertThat(semilla.ejecutar()).isEqualTo(8);
         assertThat(semilla.ejecutar()).isZero();
 
         Map<String, Long> porEstado = Map.of(
                 "VALIDADO", jdbc.queryForObject("SELECT COUNT(*) FROM pago WHERE estado_validacion='VALIDADO'", Long.class),
                 "PENDIENTE", jdbc.queryForObject("SELECT COUNT(*) FROM pago WHERE estado_validacion='PENDIENTE'", Long.class),
-                "RECHAZADO", jdbc.queryForObject("SELECT COUNT(*) FROM pago WHERE estado_validacion='RECHAZADO'", Long.class));
-        assertThat(porEstado).containsEntry("VALIDADO", 5L).containsEntry("PENDIENTE", 1L).containsEntry("RECHAZADO", 1L);
-        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM comprobante", Integer.class)).isEqualTo(5);
+                "RECHAZADO", jdbc.queryForObject("SELECT COUNT(*) FROM pago WHERE estado_validacion='RECHAZADO'", Long.class),
+                "REEMBOLSADO", jdbc.queryForObject("SELECT COUNT(*) FROM pago WHERE estado_validacion='REEMBOLSADO'", Long.class));
+        assertThat(porEstado).containsEntry("VALIDADO", 5L).containsEntry("PENDIENTE", 1L).containsEntry("RECHAZADO", 1L)
+                .containsEntry("REEMBOLSADO", 1L);
+        // La observación del pago rechazado es la misma que muestra la línea de tiempo de reservas (semilla coherente).
+        assertThat(jdbc.queryForObject("SELECT observacion FROM pago WHERE estado_validacion='RECHAZADO'", String.class))
+                .isEqualTo("La imagen no permite leer el número de operación. Vuelve a subirla completa, por favor.");
+        // El reembolso tiene su nota de crédito (BC01) y la boleta original queda ANULADA.
+        assertThat(jdbc.queryForObject("SELECT CAST(monto * 100 AS SIGNED) FROM pago WHERE codigo_reserva='ALC-SEMHHH'", Integer.class))
+                .isEqualTo(4000);
+        assertThat(jdbc.queryForList("SELECT CONCAT(serie, ':', estado) FROM comprobante WHERE codigo_reserva='ALC-SEMHHH' "
+                + "ORDER BY id_comprobante", String.class)).containsExactly("B001:ANULADO", "BC01:EMITIDO");
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM comprobante WHERE serie <> 'BC01'", Integer.class)).isEqualTo(6);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM comprobante WHERE serie = 'F001'", Integer.class)).isEqualTo(1);
         assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM pago WHERE archivo_comprobante IS NOT NULL", Integer.class)).isEqualTo(3);
         // correlativos crecientes con la fecha de emisión

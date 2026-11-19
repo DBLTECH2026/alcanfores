@@ -32,7 +32,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class MuestrasComprobantesTest {
 
     static final Path CARPETA = Path.of("target", "muestras");
-    static final Emisor EMISOR = new Emisor("20612345679", "Los Alcanfores Sport E.I.R.L. (ficticia)",
+    static final Emisor EMISOR = new Emisor("20000000001", "Los Alcanfores Sport E.I.R.L. (ficticia)",
             "Carretera Central km 11.5, Santa Clara, Ate, Lima");
 
     final GeneradorXmlUbl xml = new GeneradorXmlUbl();
@@ -92,7 +92,7 @@ class MuestrasComprobantesTest {
         assertThat(c.getMontoLetras()).isEqualTo("CUARENTA Y CINCO CON 00/100 SOLES");
         assertThat(c.getHash()).isEqualTo(HuellaComprobante.sha256Base64(contenidoXml)).hasSize(44);
         assertThat(c.valorResumen()).hasSize(28);
-        assertThat(c.getCadenaQr()).isEqualTo("20612345679|03|B001|00000012|6.86|45.00|2026-11-18|1|70123321|" + c.valorResumen());
+        assertThat(c.getCadenaQr()).isEqualTo("20000000001|03|B001|00000012|6.86|45.00|2026-11-18|1|70123321|" + c.valorResumen());
         assertThat(contenidoXml).contains("<Invoice", "<cbc:ID>B001-00000012</cbc:ID>", "DOCUMENTO SIMULADO",
                 "unitCode=\"ZZ\"", "<cbc:PayableAmount currencyID=\"PEN\">45.00</cbc:PayableAmount>");
 
@@ -105,7 +105,7 @@ class MuestrasComprobantesTest {
                 LocalDateTime.of(2026, 11, 18, 20, 12));
         f.setId(3L);
         String xmlFactura = armador.xml(f, null);
-        assertThat(f.getCadenaQr()).startsWith("20612345679|01|F001|00000003|13.73|90.00|2026-11-18|6|20601234565|");
+        assertThat(f.getCadenaQr()).startsWith("20000000001|01|F001|00000003|13.73|90.00|2026-11-18|6|20601234565|");
         guardar("factura-F001-00000003", f, null, xmlFactura);
 
         Comprobante nc = armador.armarNotaCredito(f, ArmadorComprobante.serieNotaPara(f), 1,

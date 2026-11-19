@@ -467,7 +467,7 @@ export const manejadores = [
     await delay(450);
     const ruc = String(params.ruc);
     if (!rucValido(ruc)) return validacion(ruta(request), [{ campo: 'ruc', mensaje: MSJ.ruc }]);
-    if (ruc === '20612345679') return ok({ ruc, razonSocial: 'LOS ALCANFORES SPORT E.I.R.L. (FICTICIA)', direccion: 'CAR. CENTRAL KM 11.5, SANTA CLARA, ATE, LIMA', estado: 'ACTIVO', condicion: 'HABIDO', fuente: 'SUNAT (simulado)' });
+    if (ruc === '20000000001') return ok({ ruc, razonSocial: 'LOS ALCANFORES SPORT E.I.R.L. (FICTICIA)', direccion: 'CAR. CENTRAL KM 11.5, SANTA CLARA, ATE, LIMA', estado: 'ACTIVO', condicion: 'HABIDO', fuente: 'SUNAT (simulado)' });
     return ok({ ruc, razonSocial: `INVERSIONES DEMO ${ruc.slice(-4)} S.A.C.`, direccion: 'AV. JAVIER PRADO ESTE 1234, LA MOLINA, LIMA', estado: 'ACTIVO', condicion: 'HABIDO', fuente: 'SUNAT (simulado)' });
   }),
 
@@ -566,12 +566,12 @@ export const manejadores = [
     const total = p.monto;
     const gravada = Math.round((total / 1.18) * 100) / 100;
     if (ext === 'xml') {
-      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<!-- UBL 2.1 simulado, sin firma digital (proyecto académico) -->\n<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2">\n  <ID>${serieNumero}</ID>\n  <IssueDate>${p.fecha.slice(0, 10)}</IssueDate>\n  <AccountingSupplierParty>20612345679</AccountingSupplierParty>\n  <AccountingCustomerParty>${r.cliente.dni}</AccountingCustomerParty>\n  <TaxTotal>${(total - gravada).toFixed(2)}</TaxTotal>\n  <PayableAmount currencyID="PEN">${total.toFixed(2)}</PayableAmount>\n</Invoice>\n`;
+      const xml = `<?xml version="1.0" encoding="UTF-8"?>\n<!-- UBL 2.1 simulado, sin firma digital (proyecto académico) -->\n<Invoice xmlns="urn:oasis:names:specification:ubl:schema:xsd:Invoice-2">\n  <ID>${serieNumero}</ID>\n  <IssueDate>${p.fecha.slice(0, 10)}</IssueDate>\n  <AccountingSupplierParty>20000000001</AccountingSupplierParty>\n  <AccountingCustomerParty>${r.cliente.dni}</AccountingCustomerParty>\n  <TaxTotal>${(total - gravada).toFixed(2)}</TaxTotal>\n  <PayableAmount currencyID="PEN">${total.toFixed(2)}</PayableAmount>\n</Invoice>\n`;
       return new HttpResponse(xml, { headers: { 'Content-Type': 'application/xml' } });
     }
     return pdf(
       [
-        'Los Alcanfores Sport E.I.R.L. (ficticia) - RUC 20612345679',
+        'Los Alcanfores Sport E.I.R.L. (ficticia) - RUC 20000000001',
         `${p.comprobante?.tipo === 'NOTA_CREDITO' ? 'NOTA DE CREDITO' : p.comprobante?.tipo === 'FACTURA' ? 'FACTURA' : 'BOLETA'} ELECTRONICA ${serieNumero} (simulada)`,
         '',
         `Cliente: ${r.cliente.nombres} ${r.cliente.apellidos} - DNI ${r.cliente.dni}`,

@@ -46,7 +46,7 @@ import ReservaDetalle from './ReservaDetalle';
 
 const TEXTOS: Record<string, Record<string, string>> = {
   estado: { PENDIENTE: 'Pendiente', CONFIRMADA: 'Confirmada', CANCELADA: 'Cancelada' },
-  estadoPago: { SIN_PAGO: 'Sin pago', EN_REVISION: 'En revisión', OBSERVADO: 'Observado', ADELANTO_PAGADO: 'Adelanto pagado', PAGADO_TOTAL: 'Pagado' },
+  estadoPago: { SIN_PAGO: 'Sin pago', EN_REVISION: 'En revisión', OBSERVADO: 'Observado', ADELANTO_PAGADO: 'Adelanto pagado', PAGADO_TOTAL: 'Pagado', REEMBOLSADO: 'Devuelto' },
   origen: TEXTO_ORIGEN,
 };
 const TAMANIO = 15;

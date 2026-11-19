@@ -65,6 +65,17 @@ spring:
               filters:
                 - name: CircuitBreaker
                   args: { name: reservas-archivos, fallbackUri: "forward:/fallback/reservas" }
+            # Consulta RENIEC/SUNAT: Factiliza tarda hasta ~11 s en decir que un DNI no existe (reservas espera 15 s).
+            - id: reservas-documentos
+              order: -1
+              uri: lb://reservas-service
+              predicates:
+                - Path=/api/documentos/**
+              metadata:
+                response-timeout: ${alcanfores.gateway.timeout-documentos-ms}
+              filters:
+                - name: CircuitBreaker
+                  args: { name: reservas-documentos, fallbackUri: "forward:/fallback/reservas" }
             - id: reservas
               uri: lb://reservas-service
               predicates:
@@ -127,12 +138,14 @@ alcanfores:
     secreto: ${JWT_SECRETO:secreto-de-desarrollo-local-alcanfores-2026-cambiar-en-produccion}
     horas: ${JWT_HORAS:8}
   interno-token: ${INTERNO_TOKEN:token-interno-solo-para-desarrollo-local}
-  front-url: ${FRONT_URL:http://localhost:5186}
+  # Lista separada por comas: portal (5186) y panel en otro Vite (5187) en local.
+  front-url: ${FRONT_URL:http://localhost:5186,http://localhost:5187}
   public-api-url: ${PUBLIC_API_URL:http://localhost:8086}
   gateway:
     tamanio-maximo-cuerpo: 6MB
     timeout: 10s
     timeout-archivos-ms: 20000
+    timeout-documentos-ms: 20000
     servicios:
       - api-gateway
       - auth-service

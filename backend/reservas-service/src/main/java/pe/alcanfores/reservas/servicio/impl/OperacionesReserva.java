@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import pe.alcanfores.comun.error.NegocioExcepcion;
+import pe.alcanfores.comun.eventos.DatosReserva;
 import pe.alcanfores.comun.eventos.EventoDominio;
 import pe.alcanfores.comun.eventos.Eventos;
 import pe.alcanfores.comun.eventos.ReservaCanceladaEvento;
@@ -49,6 +50,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -111,7 +113,7 @@ public class OperacionesReserva {
 
         Reserva r = new Reserva();
         r.setCodigoReserva(nuevoCodigo());
-        r.setCliente(guardarCliente(n.cliente(), ahora));
+        r.setCliente(guardarCliente(n.cliente(), ahora, !web));
         r.setTurno(t);
         r.setEstado(EstadoReserva.PENDIENTE);
         r.setEstadoPago(EstadoPago.SIN_PAGO);
@@ -143,6 +145,8 @@ public class OperacionesReserva {
         LocalDateTime ahora = Tiempo.ahora();
         boolean hayDevolucion = devolucion && r.getMontoPagado().signum() > 0;
         BigDecimal monto = hayDevolucion ? r.getMontoPagado() : BigDecimal.ZERO.setScale(2);
+        // El evento lleva lo cobrado ANTES de la devolución (pagos reembolsa con eso y notificaciones lo muestra).
+        DatosReserva datos = mapeador.datos(r);
         r.setEstado(EstadoReserva.CANCELADA);
         r.setVenceEn(null);
         Turno t = r.getTurno();
@@ -159,14 +163,11 @@ public class OperacionesReserva {
         c.setMontoDevolucion(monto);
         c.setFechaCancelacion(ahora);
         cancelaciones.save(c);
-        String quien = switch (por) {
-            case CLIENTE -> "Cancelada por el cliente";
-            case ADMINISTRADOR -> "Cancelada por el complejo";
-            case SISTEMA -> "Cancelada por el sistema";
-        };
-        registrarHito(r, ReservaHistorial.CANCELADA, quien + ": " + c.getMotivo()
-                + (hayDevolucion ? ". Devolución de " + Dinero.formato(monto) + "." : "."));
-        publicar(Eventos.RESERVA_CANCELADA, new ReservaCanceladaEvento(UUID.randomUUID(), ahora, mapeador.datos(r), por.name(),
+        if (hayDevolucion) {
+            r.registrarDevolucion(monto);
+        }
+        registrarHito(r, ReservaHistorial.CANCELADA, ReglasReserva.textoCancelacion(por, c.getMotivo(), monto));
+        publicar(Eventos.RESERVA_CANCELADA, new ReservaCanceladaEvento(UUID.randomUUID(), ahora, datos, por.name(),
                 c.getMotivo(), hayDevolucion, monto));
         return c;
     }
@@ -223,9 +224,16 @@ public class OperacionesReserva {
         return codigo;
     }
 
-    private Cliente guardarCliente(ClienteSolicitud s, LocalDateTime ahora) {
+    /**
+     * Upsert del cliente por DNI. Celular y correo se actualizan siempre. Nombres y apellidos: un cliente nuevo los toma
+     * de lo escrito; uno existente los conserva, salvo en la reserva MANUAL (panel) cuando NO está verificado por
+     * RENIEC: ahí recepción puede corregirlos y se guardan. Si está verificado, mandan los datos de RENIEC.
+     * (En la web no se tocan los nombres de un cliente existente: cualquiera podría escribir un DNI ajeno.)
+     */
+    private Cliente guardarCliente(ClienteSolicitud s, LocalDateTime ahora, boolean manual) {
         String dni = s.dni().trim();
-        Cliente c = clientes.findByDni(dni).orElseGet(() -> {
+        Optional<Cliente> existente = clientes.findByDni(dni);
+        Cliente c = existente.orElseGet(() -> {
             Cliente nuevo = new Cliente();
             nuevo.setDni(dni);
             nuevo.setNombres(Texto.titulo(s.nombres()));
@@ -233,11 +241,16 @@ public class OperacionesReserva {
             nuevo.setFechaRegistro(ahora);
             return nuevo;
         });
+        if (manual && existente.isPresent() && !c.isVerificadoReniec()) {
+            c.setNombres(Texto.titulo(s.nombres()));
+            c.setApellidos(Texto.titulo(s.apellidos()));
+        }
         c.setTelefono(Texto.normalizarCelular(s.telefono()));
         c.setCorreo(Texto.correo(s.correo()));
         c.setActualizadoEn(ahora);
         if (!c.isVerificadoReniec()) {
-            c.setVerificadoReniec(consultas.existsById(new ConsultaDocumento.Clave(TipoDocumento.DNI, dni)));
+            c.setVerificadoReniec(consultas.existsByClaveAndFuenteNot(new ConsultaDocumento.Clave(TipoDocumento.DNI, dni),
+                    ConsultaDocumento.FUENTE_NO_ENCONTRADO));
         }
         return clientes.save(c);
     }

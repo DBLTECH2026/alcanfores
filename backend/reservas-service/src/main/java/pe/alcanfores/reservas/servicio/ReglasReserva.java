@@ -1,10 +1,14 @@
 package pe.alcanfores.reservas.servicio;
 
+import pe.alcanfores.comun.util.Dinero;
+import pe.alcanfores.comun.util.Tiempo;
 import pe.alcanfores.reservas.modelo.Asistencia;
+import pe.alcanfores.reservas.modelo.CanceladoPor;
 import pe.alcanfores.reservas.modelo.EstadoPago;
 import pe.alcanfores.reservas.modelo.EstadoReserva;
 import pe.alcanfores.reservas.modelo.Reserva;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.Map;
 
@@ -54,6 +58,41 @@ public final class ReglasReserva {
 
     public static boolean puedeCobrarSaldo(Reserva r) {
         return r.getEstado() == EstadoReserva.CONFIRMADA && r.saldo().signum() > 0;
+    }
+
+    /**
+     * Texto que termina en punto, sin duplicarlo: el motivo o la observación que escriben el cliente o el administrador
+     * ya suele traer su punto final («…lluvia.» + «.» daba «…lluvia..»).
+     */
+    public static String frase(String texto) {
+        String t = texto == null ? "" : texto.strip();
+        if (t.isEmpty()) {
+            return t;
+        }
+        char ultimo = t.charAt(t.length() - 1);
+        return ultimo == '.' || ultimo == '!' || ultimo == '?' ? t : t + ".";
+    }
+
+    /** «19/11/2026 a las 10:40 a. m.»: la línea de tiempo usa el mismo formato de 12 h que el portal. */
+    public static String fechaHora(LocalDateTime momento) {
+        return momento.toLocalDate().format(Tiempo.FECHA_CORTA) + " a las " + Tiempo.horaAmPm(momento.toLocalTime());
+    }
+
+    /** Detalle del hito OBSERVADO: «Comprobante observado: <observación>. Reenvíalo antes del <plazo>» (12 h). */
+    public static String textoObservado(String observacion, LocalDateTime plazo) {
+        String base = "Comprobante observado: " + frase(observacion);
+        return plazo == null ? base : base + " Reenvíalo antes del " + fechaHora(plazo);
+    }
+
+    /** Detalle del hito CANCELADA: quién, el motivo (sin doble punto) y la devolución si la hubo. */
+    public static String textoCancelacion(CanceladoPor por, String motivo, BigDecimal devolucion) {
+        String quien = switch (por) {
+            case CLIENTE -> "Cancelada por el cliente";
+            case ADMINISTRADOR -> "Cancelada por el complejo";
+            case SISTEMA -> "Cancelada por el sistema";
+        };
+        String texto = quien + ": " + frase(motivo);
+        return devolucion != null && devolucion.signum() > 0 ? texto + " Devolución de " + Dinero.formato(devolucion) + "." : texto;
     }
 
     /** «Fútbol 5», «Multiusos (vóley y básquet)»… */

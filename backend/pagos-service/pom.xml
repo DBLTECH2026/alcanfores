@@ -136,6 +136,13 @@
                 <artifactId>jacoco-maven-plugin</artifactId>
                 <executions>
                     <execution>
+                        <!-- Primero el reporte (HTML, XML y CSV, heredado del parent) y después la meta: si la meta
+                             no se cumple, el reporte igual queda en target/site/jacoco/. -->
+                        <id>reporte</id>
+                        <phase>verify</phase>
+                        <goals><goal>report</goal></goals>
+                    </execution>
+                    <execution>
                         <!-- Meta del curso: ≥ 70 % de líneas en la capa de servicio -->
                         <id>meta-servicios</id>
                         <phase>verify</phase>

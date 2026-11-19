@@ -24,7 +24,7 @@ public class ConfiguracionComercio {
             Map.entry("yape_titular", "Complejo Deportivo Los Alcanfores"),
             Map.entry("plin_numero", "914995187"),
             Map.entry("adelanto_pct", "50"),
-            Map.entry("ruc_emisor", "20612345679"),
+            Map.entry("ruc_emisor", "20000000001"),
             Map.entry("razon_social_emisor", "Los Alcanfores Sport E.I.R.L. (ficticia)"),
             Map.entry("direccion", "Carretera Central km 11.5, Santa Clara, Ate, Lima"),
             Map.entry("nombre_complejo", "Complejo Deportivo Los Alcanfores"));

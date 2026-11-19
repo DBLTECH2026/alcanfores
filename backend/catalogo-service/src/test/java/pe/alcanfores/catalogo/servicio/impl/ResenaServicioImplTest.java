@@ -122,13 +122,31 @@ class ResenaServicioImplTest {
     }
 
     @Test
-    void duplicadaNoConsultaAReservas() {
+    void duplicadaSeRespondeSoloDespuesDeComprobarCodigoYDni() {
         when(canchas.findById(1L)).thenReturn(Optional.of(cancha));
+        when(reservas.elegibleResena("ALC-QW3RT7", "45678912", 1L)).thenReturn(new ElegibilidadResena(true, null, "Carla M."));
         when(resenas.existsByCodigoReserva("ALC-QW3RT7")).thenReturn(true);
         assertThatThrownBy(() -> servicio.crear(1L, new ResenaSolicitud("ALC-QW3RT7", "45678912", 4, "Todo bien en la cancha.")))
                 .isInstanceOf(NegocioExcepcion.class)
                 .satisfies(e -> assertThat(((NegocioExcepcion) e).getCodigo()).isEqualTo("RESENA_DUPLICADA"));
-        verify(reservas, never()).elegibleResena(anyString(), anyString(), any());
+    }
+
+    @Test
+    void conDniAjenoNoSeRevisaSiYaHayResena() {
+        when(canchas.findById(1L)).thenReturn(Optional.of(cancha));
+        when(reservas.elegibleResena("ALC-QW3RT7", "99019999", 1L))
+                .thenReturn(new ElegibilidadResena(false, "No encontramos una reserva con ese código y DNI.", null));
+        assertThatThrownBy(() -> servicio.crear(1L, new ResenaSolicitud("ALC-QW3RT7", "99019999", 4, "Todo bien en la cancha.")))
+                .isInstanceOf(NegocioExcepcion.class)
+                .satisfies(e -> assertThat(((NegocioExcepcion) e).getCodigo()).isEqualTo("RESENA_NO_ELEGIBLE"));
+        verify(resenas, never()).existsByCodigoReserva(anyString());
+    }
+
+    @Test
+    void existeParaReservaNormalizaElCodigo() {
+        when(resenas.existsByCodigoReserva("ALC-QW3RT7")).thenReturn(true);
+        assertThat(servicio.existeParaReserva(" alc-qw3rt7 ")).isTrue();
+        assertThat(servicio.existeParaReserva(null)).isFalse();
     }
 
     @Test

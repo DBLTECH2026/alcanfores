@@ -90,6 +90,6 @@ public class InternoServicioImpl implements InternoServicio {
     @Override
     @Transactional(readOnly = true)
     public List<ReservaSemilla> paraSemilla() {
-        return reservas.sembradas().stream().map(mapeador::semilla).toList();
+        return reservas.sembradas().stream().map(r -> mapeador.semilla(r, operaciones.cancelacionDe(r))).toList();
     }
 }

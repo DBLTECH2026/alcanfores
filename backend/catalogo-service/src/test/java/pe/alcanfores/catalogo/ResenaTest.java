@@ -61,12 +61,40 @@ class ResenaTest extends PruebaIntegracion {
     }
 
     @Test
-    void reservaYaResenadaDa409SinConsultarAReservas() throws Exception {
+    void reservaYaResenadaDa409SoloAlDuenoDeLaReserva() throws Exception {
+        when(reservas.elegibleResena("ALC-K5T8VZ", "45678912", 2L))
+                .thenReturn(new ElegibilidadResena(true, null, "Carla M."));
         mvc.perform(post("/api/catalogo/canchas/2/resenas").contentType(MediaType.APPLICATION_JSON)
                         .content(resena("ALC-K5T8VZ", "45678912", 4, "Quiero dejar otra reseña de la misma reserva.")))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.codigo").value("RESENA_DUPLICADA"));
-        verify(reservas, never()).elegibleResena(anyString(), anyString(), any());
+    }
+
+    @Test
+    void conUnDniAjenoNoSeRevelaQueLaReservaYaTieneResena() throws Exception {
+        // ALC-K5T8VZ ya tiene reseña en la semilla; con otro DNI se responde lo mismo que a un código inexistente.
+        String noCalza = "No encontramos una reserva con ese código y DNI. Revisa ambos datos.";
+        when(reservas.elegibleResena("ALC-K5T8VZ", "99019999", 2L)).thenReturn(new ElegibilidadResena(false, noCalza, null));
+        when(reservas.elegibleResena("ALC-NQEXZ5", "99019999", 2L)).thenReturn(new ElegibilidadResena(false, noCalza, null));
+        for (String codigo : new String[]{"ALC-K5T8VZ", "ALC-NQEXZ5"}) {
+            mvc.perform(post("/api/catalogo/canchas/2/resenas").contentType(MediaType.APPLICATION_JSON)
+                            .content(resena(codigo, "99019999", 4, "Intento calificar una reserva que no es mía.")))
+                    .andExpect(status().isUnprocessableEntity())
+                    .andExpect(jsonPath("$.codigo").value("RESENA_NO_ELEGIBLE"))
+                    .andExpect(jsonPath("$.mensaje").value(noCalza));
+        }
+    }
+
+    @Test
+    void internoDiceSiLaReservaYaTieneResena() throws Exception {
+        String token = "token-interno-solo-para-desarrollo-local";
+        mvc.perform(get("/interno/resenas/alc-k5t8vz").header("X-Interno-Token", token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.codigoReserva").value("ALC-K5T8VZ"))
+                .andExpect(jsonPath("$.existe").value(true));
+        mvc.perform(get("/interno/resenas/ALC-NQEXZ5").header("X-Interno-Token", token))
+                .andExpect(jsonPath("$.existe").value(false));
+        mvc.perform(get("/interno/resenas/ALC-K5T8VZ")).andExpect(status().isForbidden());
     }
 
     @Test

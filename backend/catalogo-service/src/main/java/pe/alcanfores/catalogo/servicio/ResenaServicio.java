@@ -15,8 +15,14 @@ public interface ResenaServicio {
     /** Reseñas PUBLICADAS de una cancha activa; {@code orden} = recientes | mejor | peor. */
     PaginaRespuesta<ResenaPublicaRespuesta> listarPublicadas(Long idCancha, String orden, int pagina, int tamanio);
 
-    /** Reseña verificada con reservas-service: 422 si no es elegible, 409 si la reserva ya tiene reseña. */
+    /**
+     * Reseña verificada con reservas-service: 422 si no es elegible (incluye código + DNI que no calzan), 409 si la
+     * reserva ya tiene reseña (solo después de comprobar código y DNI).
+     */
     ResenaPublicaRespuesta crear(Long idCancha, ResenaSolicitud solicitud);
+
+    /** ¿La reserva ya tiene reseña (publicada u oculta)? Lo usa reservas para la bandera {@code puedeResenar}. */
+    boolean existeParaReserva(String codigoReserva);
 
     /** Promedio (1 decimal), total y distribución 5…1 de las reseñas publicadas. */
     ResumenResenasRespuesta resumen(Long idCancha);

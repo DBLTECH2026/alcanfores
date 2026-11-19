@@ -6,10 +6,33 @@ import pe.alcanfores.pagos.modelo.DatosFacturacion;
 import pe.alcanfores.pagos.modelo.InstantaneaReserva;
 import pe.alcanfores.pagos.modelo.TipoComprobante;
 
-/** Convierte lo que pidió el cliente (boleta o factura) en los datos del adquirente del comprobante. */
+import java.util.Optional;
+
+/**
+ * Convierte lo que pidió el cliente (boleta o factura) en los datos del adquirente del comprobante. Si el envío NO trae
+ * {@code comprobante} (reenvío tras un rechazo, pago en línea desde «Mi reserva», cobro del saldo en caja) se repite la
+ * última facturación pedida para la misma reserva: así la factura pedida al reservar no se pierde. Un
+ * {@code {"tipo":"BOLETA"}} explícito sí cambia a boleta.
+ */
 final class FacturacionSolicitada {
 
     private FacturacionSolicitada() {
+    }
+
+    static DatosFacturacion de(DatosComprobanteSolicitud solicitud, String codigoReserva, InstantaneaReserva reserva,
+                               Optional<DatosFacturacion> anterior) {
+        if (solicitud == null && anterior.isPresent()) {
+            DatosFacturacion previa = anterior.get();
+            DatosFacturacion df = new DatosFacturacion();
+            df.setCodigoReserva(codigoReserva);
+            df.setTipo(previa.getTipo());
+            df.setTipoDoc(previa.getTipoDoc());
+            df.setNumDoc(previa.getNumDoc());
+            df.setNombre(previa.getNombre());
+            df.setDireccion(previa.getDireccion());
+            return df;
+        }
+        return de(solicitud, codigoReserva, reserva);
     }
 
     static DatosFacturacion de(DatosComprobanteSolicitud solicitud, String codigoReserva, InstantaneaReserva reserva) {

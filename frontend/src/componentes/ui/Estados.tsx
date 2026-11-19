@@ -59,6 +59,7 @@ export const ESTADOS: Record<string, Record<string, Def>> = {
     OBSERVADO: ['rojo', TriangleAlert, 'Observado'],
     ADELANTO_PAGADO: ['menta', BadgeCheck, 'Adelanto pagado'],
     PAGADO_TOTAL: ['profundo', BadgeCheck, 'Pagado'],
+    REEMBOLSADO: ['neutro', History, 'Devuelto'],
   },
   pago: {
     PENDIENTE: ['amarillo', Hourglass, 'En revisión'],

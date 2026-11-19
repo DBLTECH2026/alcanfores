@@ -3,6 +3,7 @@ package pe.alcanfores.reservas.cliente;
 import org.springframework.cloud.client.circuitbreaker.CircuitBreaker;
 import org.springframework.cloud.client.circuitbreaker.CircuitBreakerFactory;
 import org.springframework.cloud.client.loadbalancer.LoadBalanced;
+import com.fasterxml.jackson.databind.JsonNode;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -35,6 +36,14 @@ public class CatalogoClienteHttp implements CatalogoCliente {
     public List<CanchaCatalogo> canchas() {
         return circuito.run(() -> http.get().uri("/interno/canchas").retrieve()
                 .body(new ParameterizedTypeReference<List<CanchaCatalogo>>() { }), this::caido);
+    }
+
+    @Override
+    public boolean tieneResena(String codigoReserva) {
+        return circuito.run(() -> {
+            JsonNode r = http.get().uri("/interno/resenas/{codigo}", codigoReserva).retrieve().body(JsonNode.class);
+            return r != null && r.path("existe").asBoolean(false);
+        }, causa -> false);
     }
 
     private <T> T caido(Throwable causa) {

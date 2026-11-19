@@ -65,9 +65,14 @@ export const reservasApi = {
   urlConstancia: (codigo: string, dni: string) => urlApi(`/reservas/${codigo}/constancia.pdf?dni=${encodeURIComponent(dni)}`),
 };
 
+/** RENIEC/SUNAT pueden tardar ~11 s en decir «no existe» (el gateway espera 20 s): el front espera un poco más. */
+const ESPERA_DOCUMENTOS_MS = 25000;
+
 export const documentosApi = {
-  dni: (dni: string) => http.get<DocumentoDni>(`/documentos/dni/${dni}`, { silenciarToast: true }).then((r) => r.data),
-  ruc: (ruc: string) => http.get<DocumentoRuc>(`/documentos/ruc/${ruc}`, { silenciarToast: true }).then((r) => r.data),
+  dni: (dni: string) =>
+    http.get<DocumentoDni>(`/documentos/dni/${dni}`, { silenciarToast: true, timeout: ESPERA_DOCUMENTOS_MS }).then((r) => r.data),
+  ruc: (ruc: string) =>
+    http.get<DocumentoRuc>(`/documentos/ruc/${ruc}`, { silenciarToast: true, timeout: ESPERA_DOCUMENTOS_MS }).then((r) => r.data),
 };
 
 // ------------------------------ pagos-service ------------------------------
@@ -100,7 +105,8 @@ export const pagosApi = {
   },
   pagosDeReserva: (codigo: string, dni: string) =>
     http.get<PagoCliente[]>(`/pagos/reserva/${codigo}`, { params: { dni }, silenciarToast: true }).then((r) => r.data),
-  crearIntento: (datos: { codigoReserva: string; dni: string; tipoPago: TipoPago; comprobante: DatosComprobante }) =>
+  /** Sin `comprobante`, pagos repite la boleta o factura que se pidió antes para la reserva. */
+  crearIntento: (datos: { codigoReserva: string; dni: string; tipoPago: TipoPago; comprobante?: DatosComprobante }) =>
     http.post<IntentoCreado>('/pagos/pasarela/intentos', datos, { silenciarToast: true }).then((r) => r.data),
   estadoIntento: (ref: string) =>
     http.get<EstadoIntentoRespuesta>(`/pagos/intentos/${ref}/estado`, { silenciarToast: true }).then((r) => r.data),

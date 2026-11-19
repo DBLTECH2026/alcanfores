@@ -14,7 +14,8 @@ import java.time.Duration;
 /**
  * Circuit breaker de cada ruta (Resilience4j). Se abre si en las últimas 20 llamadas (mínimo 10) falla la mitad o
  * más; abierto 15 s, luego deja pasar 3 de prueba. Mientras está abierto, o si el servicio no responde a tiempo, la
- * ruta responde el fallback 503 al instante. Las rutas «-archivos» tienen más tiempo (subidas, PDF, Excel).
+ * ruta responde el fallback 503 al instante. Las rutas «-archivos» tienen más tiempo (subidas, PDF, Excel) y
+ * «-documentos» también (consulta RENIEC/SUNAT).
  */
 @Configuration
 public class CircuitoConfig {
@@ -40,7 +41,14 @@ public class CircuitoConfig {
     }
 
     static Duration limite(String idCircuito, GatewayPropiedades p) {
-        Duration base = idCircuito.endsWith("-archivos") ? Duration.ofMillis(p.timeoutArchivosMs()) : p.timeout();
+        Duration base;
+        if (idCircuito.endsWith("-archivos")) {
+            base = Duration.ofMillis(p.timeoutArchivosMs());
+        } else if (idCircuito.endsWith("-documentos")) {
+            base = Duration.ofMillis(p.timeoutDocumentosMs());
+        } else {
+            base = p.timeout();
+        }
         return base.plus(MARGEN);
     }
 }

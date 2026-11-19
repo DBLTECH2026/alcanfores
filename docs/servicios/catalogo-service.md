@@ -43,6 +43,7 @@ respuestas del admin); la configuración por defecto (Yape/Plin, RUC y razón so
 | PATCH | `/api/admin/resenas/{id}` · POST `/api/admin/resenas/{id}/respuesta` | ADMIN |
 | GET / PUT | `/api/admin/configuracion` | GET con token (ADMIN o RECEPCION) · PUT ADMIN |
 | GET | `/interno/canchas` · `/interno/canchas/{id}` · `/interno/configuracion` | `X-Interno-Token` |
+| GET | `/interno/resenas/{codigoReserva}` → `{codigoReserva, existe}` (reservas lo usa para `puedeResenar`) | `X-Interno-Token` |
 
 Swagger: `http://localhost:8092/swagger-ui.html`.
 
@@ -62,8 +63,10 @@ Swagger: `http://localhost:8092/swagger-ui.html`.
   turno, e inicio de la tarifa de noche dentro del horario.
 
 ## Reseña verificada
-`POST /api/catalogo/canchas/{id}/resenas` → 404 si la cancha no existe o está inactiva → 409 `RESENA_DUPLICADA` si el
-código ya tiene reseña (sin llamar a reservas) → `GET http://reservas-service/interno/reservas/{codigo}/elegible-resena?dni&idCancha`
+`POST /api/catalogo/canchas/{id}/resenas` → 404 si la cancha no existe o está inactiva →
+`GET http://reservas-service/interno/reservas/{codigo}/elegible-resena?dni&idCancha` (primero código + DNI: así un tercero
+no puede saber si un código existe y ya tiene reseña) → 409 `RESENA_DUPLICADA` solo si la reserva es elegible y ya tiene
+reseña
 (`RestClient` `@LoadBalanced` + `InterceptorInterno`, timeout 3 s, circuit breaker Resilience4j: 50 % de fallos en 10
 llamadas abre 20 s) → si no es elegible, 422 `RESENA_NO_ELEGIBLE` con el `motivo` de reservas (un 404 de reservas se
 traduce a «No encontramos una reserva con ese código y DNI.») → si reservas falla o no responde, 503
@@ -103,7 +106,7 @@ las ilustraciones del prototipo (IL-05, ARQ-03, ARQ-05 para fútbol; ARQ-04, IL-
 - Coordenadas del complejo aproximadas (-12.0196, -76.8865); Yape/Plin ficticios 900 111 222 (del prototipo).
 
 ## Pruebas (`mvn -B -f backend/catalogo-service/pom.xml verify`)
-94 pruebas, 0 fallos. Integración con `@SpringBootTest` + MockMvc contra `alcanfores_catalogo_test` (Flyway hace clean +
+98 pruebas, 0 fallos (18/11/2026). Integración con `@SpringBootTest` + MockMvc contra `alcanfores_catalogo_test` (Flyway hace clean +
 migrate V1/V2 al iniciar; RabbitMQ y reservas simulados con `@MockitoBean`; tokens JWT reales):
 `CatalogoPublicoTest` (complejo, listado, detalle por slug/id, orden de reseñas, foto con caché, rutas manipuladas),
 `CanchaAdminTest` (CRUD, 400 por campo, noche < día, deporte desconocido, duplicado 409, 401/403 con RECEPCION, evento
@@ -113,4 +116,4 @@ extensión cambiada, JPG disfrazado, imagen pequeña, WebP, leyenda larga, princ
 `ConfiguracionTest` (lectura con RECEPCION, PUT 403, 11 claves inválidas a la vez, reglas de horario, normalización y
 auditoría). Unitarias: `ResenaServicioImplTest` (resumen, redondeo, carrera → 409), `ReservasClienteHttpTest`
 (`MockRestServiceServer`: 200, 404, 422 con mensaje, 400 sin JSON, 500 → 503), `ValidadorConfiguracionTest` (30 casos),
-`UtilidadesTest`. Cobertura JaCoCo: 92 % de líneas en total, 94 % en `servicio.impl`.
+`UtilidadesTest`. Cobertura JaCoCo: 92,3 % de líneas en total, 93,9 % en la capa de servicio.

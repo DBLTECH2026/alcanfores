@@ -8,10 +8,13 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import pe.alcanfores.catalogo.dto.CanchaInternaRespuesta;
+import pe.alcanfores.catalogo.dto.ResenaExisteRespuesta;
 import pe.alcanfores.catalogo.servicio.CanchaServicio;
 import pe.alcanfores.catalogo.servicio.ConfiguracionServicio;
+import pe.alcanfores.catalogo.servicio.ResenaServicio;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /** Consultas entre microservicios (cabecera X-Interno-Token). El gateway nunca enruta /interno/**. */
@@ -23,6 +26,7 @@ public class InternoControlador {
 
     private final CanchaServicio canchas;
     private final ConfiguracionServicio configuracion;
+    private final ResenaServicio resenas;
 
     @GetMapping("/canchas")
     @Operation(summary = "Todas las canchas (activas e inactivas) con precios y estado")
@@ -34,6 +38,14 @@ public class InternoControlador {
     @Operation(summary = "Una cancha por id")
     public CanchaInternaRespuesta cancha(@PathVariable Long id) {
         return canchas.interna(id);
+    }
+
+    @GetMapping("/resenas/{codigoReserva}")
+    @Operation(summary = "¿La reserva ya tiene reseña?", description = "Lo usa reservas-service para no ofrecer "
+            + "«Calificar la cancha» a una reserva que ya fue calificada.")
+    public ResenaExisteRespuesta resenaDeReserva(@PathVariable String codigoReserva) {
+        String codigo = codigoReserva.trim().toUpperCase(Locale.ROOT);
+        return new ResenaExisteRespuesta(codigo, resenas.existeParaReserva(codigo));
     }
 
     @GetMapping("/configuracion")

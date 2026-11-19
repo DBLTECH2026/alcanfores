@@ -38,6 +38,7 @@ import pe.alcanfores.pagos.mapeador.ComprobanteMapeador;
 import pe.alcanfores.pagos.mapeador.PagoMapeador;
 import pe.alcanfores.pagos.modelo.CanalPago;
 import pe.alcanfores.pagos.modelo.Comprobante;
+import pe.alcanfores.pagos.modelo.DatosFacturacion;
 import pe.alcanfores.pagos.modelo.EstadoValidacion;
 import pe.alcanfores.pagos.modelo.InstantaneaReserva;
 import pe.alcanfores.pagos.modelo.MetodoPago;
@@ -123,8 +124,7 @@ public class PagoServicioImpl implements PagoServicio {
             return tx.execute(estado -> {
                 if (pagos.existsByMetodoAndCodigoOperacionAndEstadoIn(metodo, formulario.codigoOperacion(),
                         EnumSet.of(EstadoValidacion.PENDIENTE, EstadoValidacion.VALIDADO))) {
-                    throw NegocioExcepcion.conflicto("OPERACION_REPETIDA",
-                            "Ese número de operación ya fue registrado en otro pago. Revisa tu constancia de " + metodo.texto() + ".");
+                    throw operacionRepetida(metodo);
                 }
                 InstantaneaReserva foto = VerificadorReservas.instantanea(reserva);
                 Pago p = Pago.nuevo(reserva.codigoReserva(), foto, metodo, CanalPago.COMPROBANTE, TipoPago.ADELANTO,
@@ -132,7 +132,8 @@ public class PagoServicioImpl implements PagoServicio {
                 p.setCodigoOperacion(formulario.codigoOperacion());
                 p.setArchivoComprobante(archivo);
                 pagos.save(p);
-                var df = FacturacionSolicitada.de(formulario.comprobante(), p.getCodigoReserva(), foto);
+                var df = FacturacionSolicitada.de(formulario.comprobante(), p.getCodigoReserva(), foto,
+                        facturacion.findFirstByCodigoReservaOrderByIdDesc(p.getCodigoReserva()));
                 df.setIdPago(p.getId());
                 facturacion.save(df);
                 bus.publicar(Eventos.PAGO_REGISTRADO, new PagoRegistradoEvento(UUID.randomUUID(), Tiempo.ahora(),
@@ -154,8 +155,12 @@ public class PagoServicioImpl implements PagoServicio {
             throw NegocioExcepcion.noEncontrado(VerificadorReservas.NO_ENCONTRADA);
         }
         Map<Long, List<Comprobante>> porPago = comprobantesPorPago(lista);
+        Map<Long, DatosFacturacion> pedida = lista.isEmpty() ? Map.of()
+                : facturacion.findByIdPagoIn(lista.stream().map(Pago::getId).toList()).stream()
+                .collect(Collectors.toMap(DatosFacturacion::getIdPago, df -> df, (a, b) -> b));
         return lista.stream()
-                .map(p -> PagoMapeador.paraCliente(p, porPago.getOrDefault(p.getId(), List.of()), dni.trim()))
+                .map(p -> PagoMapeador.paraCliente(p, porPago.getOrDefault(p.getId(), List.of()), dni.trim(),
+                        pedida.get(p.getId())))
                 .toList();
     }
 
@@ -306,7 +311,7 @@ public class PagoServicioImpl implements PagoServicio {
             p.setCodigoOperacion(s.codigoOperacion());
             p.validar(ahora, idAdministrador, actor);
             pagos.save(p);
-            var df = FacturacionSolicitada.de(s.comprobante(), codigo, foto);
+            var df = FacturacionSolicitada.de(s.comprobante(), codigo, foto, facturacion.findFirstByCodigoReservaOrderByIdDesc(codigo));
             df.setIdPago(p.getId());
             facturacion.save(df);
             Comprobante c = comprobanteServicio.emitirParaPago(p, ahora, true);
@@ -360,6 +365,12 @@ public class PagoServicioImpl implements PagoServicio {
         bus.publicar(Eventos.PAGO_VALIDADO, new PagoValidadoEvento(UUID.randomUUID(), Tiempo.ahora(), p.getId(),
                 p.getCodigoReserva(), p.getMetodo().name(), p.getCanal().name(), p.getMonto(), p.getTipoPago().name(),
                 p.getValidadoPor()));
+    }
+
+    /** 409 con el campo marcado: el front lo pinta en «Número de operación» sin conocer el código. */
+    static NegocioExcepcion operacionRepetida(MetodoPago metodo) {
+        String mensaje = "Ese número de operación ya fue registrado en otro pago. Revisa tu constancia de " + metodo.texto() + ".";
+        return new NegocioExcepcion(409, "OPERACION_REPETIDA", mensaje, List.of(new ErrorCampo("codigoOperacion", mensaje)));
     }
 
     private static void exigirPendiente(Pago p) {

@@ -17,7 +17,7 @@ class LimitadorSolicitudesTest {
 
     private final AtomicLong reloj = new AtomicLong(0);
     private final LimitadorSolicitudes limitador = new LimitadorSolicitudes(new GatewayPropiedades(DataSize.ofMegabytes(6),
-            Duration.ofSeconds(10), 20_000, List.of(), List.of(
+            Duration.ofSeconds(10), 20_000, 20_000, List.of(), List.of(
             new Limite("login", "POST", List.of("/api/auth/login"), 10),
             new Limite("documentos", null, List.of("/api/documentos/**"), 20),
             new Limite("reservas", "POST", List.of("/api/reservas"), 10),

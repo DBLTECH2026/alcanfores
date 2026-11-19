@@ -11,6 +11,7 @@ import pe.alcanfores.comun.validacion.Documentos;
 import pe.alcanfores.pagos.cliente.ReservaSemilla;
 import pe.alcanfores.pagos.cliente.ReservasCliente;
 import pe.alcanfores.pagos.modelo.CanalPago;
+import pe.alcanfores.pagos.modelo.Comprobante;
 import pe.alcanfores.pagos.modelo.DatosFacturacion;
 import pe.alcanfores.pagos.modelo.EstadoValidacion;
 import pe.alcanfores.pagos.modelo.InstantaneaReserva;
@@ -29,8 +30,10 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * Pagos de ejemplo coherentes con las reservas de la semilla de reservas-service (para que el panel, los comprobantes y
@@ -38,7 +41,8 @@ import java.util.Random;
  * <ul>
  *   <li>ADELANTO_PAGADO / PAGADO_TOTAL → pagos VALIDADOS con su boleta o factura (fechas del pasado).</li>
  *   <li>EN_REVISION → pago PENDIENTE con una imagen de constancia de ejemplo.</li>
- *   <li>OBSERVADO → pago RECHAZADO con observación.</li>
+ *   <li>OBSERVADO → pago RECHAZADO con observación (la misma que muestra la línea de tiempo de reservas).</li>
+ *   <li>REEMBOLSADO (cancelada con devolución) → pago cobrado y luego REEMBOLSADO con su nota de crédito.</li>
  * </ul>
  */
 @Service
@@ -47,10 +51,8 @@ public class SemillaPagos {
     private static final Logger log = LoggerFactory.getLogger(SemillaPagos.class);
     private static final int IMAGENES = 4;
     private static final String[] VALIDADORES = {"rhuaman", "mtorres"};
-    private static final String[] OBSERVACIONES = {
-            "La captura no muestra el número de operación. Vuelve a subirla completa, por favor.",
-            "El monto de la constancia no coincide con el adelanto de la reserva.",
-            "La imagen está borrosa y no se puede leer la fecha del pago."};
+    /** Igual a {@code SemillaDatos.OBSERVACION_SEMILLA} de reservas-service: la reserva y el pago dicen lo mismo. */
+    static final String OBSERVACION = "La imagen no permite leer el número de operación. Vuelve a subirla completa, por favor.";
     private static final String[][] EMPRESAS = {
             {"Inversiones Deportivas Santa Clara S.A.C. (ficticia)", "Av. Nicolás Ayllón 1234, Ate, Lima"},
             {"Academia de Fútbol Los Andes E.I.R.L. (ficticia)", "Jr. Los Cedros 456, Santa Clara, Ate, Lima"},
@@ -92,6 +94,7 @@ public class SemillaPagos {
         Random azar = new Random(2026);
         LocalDateTime ahora = Tiempo.ahora();
         List<Pago> cobrados = new ArrayList<>();
+        Set<Pago> devueltos = new HashSet<>();
         int n = 0;
         List<ReservaSemilla> ordenadas = lista.stream()
                 .filter(r -> r.codigoReserva() != null && r.cliente() != null && r.montoTotal() != null)
@@ -117,6 +120,13 @@ public class SemillaPagos {
                         cobrados.add(saldoEnCaja(r, foto, r.montoTotal().subtract(adelanto), validado, ahora, n));
                     }
                 }
+                case "REEMBOLSADO" -> {
+                    BigDecimal monto = r.montoDevolucion() != null && r.montoDevolucion().signum() > 0 ? r.montoDevolucion() : adelanto;
+                    TipoPago tipo = monto.compareTo(r.montoTotal()) >= 0 ? TipoPago.TOTAL : TipoPago.ADELANTO;
+                    Pago p = cobro(r, foto, tipo, monto, registro, validacion(r, registro, azar, ahora), n, azar);
+                    cobrados.add(p);
+                    devueltos.add(p);
+                }
                 case "EN_REVISION" -> pendienteOrechazado(r, foto, adelanto, registro, azar, n, false);
                 case "OBSERVADO" -> pendienteOrechazado(r, foto, adelanto, registro, azar, n, true);
                 default -> {
@@ -127,7 +137,16 @@ public class SemillaPagos {
         }
         // Correlativos en orden cronológico: la numeración de la semilla queda creciente con las fechas.
         cobrados.sort(Comparator.comparing(Pago::getFechaValidacion));
-        cobrados.forEach(p -> comprobantes.emitirParaPago(p, p.getFechaValidacion(), false));
+        for (Pago p : cobrados) {
+            Comprobante c = comprobantes.emitirParaPago(p, p.getFechaValidacion(), false);
+            if (devueltos.contains(p)) {
+                LocalDateTime devuelto = antes(p.getFechaValidacion().plusHours(2), ahora);
+                p.setEstado(EstadoValidacion.REEMBOLSADO);
+                p.setObservacion("Reembolso simulado por cancelación de la reserva.");
+                comprobantes.emitirNotaCredito(c, ComprobanteServicio.MOTIVO_DEVOLUCION,
+                        "Devolución por cancelación de la reserva " + p.getCodigoReserva() + ".", devuelto, false);
+            }
+        }
         int creados = (int) pagos.count();
         log.info("Semilla de pagos: {} pago(s) y {} comprobante(s) de ejemplo a partir de {} reserva(s)", creados,
                 cobrados.size(), ordenadas.size());
@@ -198,7 +217,7 @@ public class SemillaPagos {
         p.setArchivoComprobante(imagenDeEjemplo(n));
         if (rechazado) {
             p.setEstado(EstadoValidacion.RECHAZADO);
-            p.setObservacion(OBSERVACIONES[n % OBSERVACIONES.length]);
+            p.setObservacion(OBSERVACION);
             p.setFechaValidacion(antes(envio.plusMinutes(12), Tiempo.ahora()));
             p.setValidadoPor(VALIDADORES[n % 2]);
         }

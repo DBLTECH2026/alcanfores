@@ -70,6 +70,8 @@ public class SemillaDatos implements CommandLineRunner {
     private static final int RESERVAS_FUTURAS = 20;
     private static final long ID_ADMIN = 1L;
     private static final long ID_RECEPCION = 2L;
+    /** Observación de los comprobantes OBSERVADOS de la semilla: la misma que guarda la semilla de pagos-service. */
+    static final String OBSERVACION_SEMILLA = "La imagen no permite leer el número de operación. Vuelve a subirla completa, por favor.";
 
     private static final String[][] CLIENTES = {
             {"Diego", "Ramos Quispe"}, {"Lucía", "Fernández Torres"}, {"Carlos", "Mendoza Huamán"},
@@ -214,8 +216,7 @@ public class SemillaDatos implements CommandLineRunner {
                 t.setEstado(EstadoTurno.RESERVADO);
                 reservas.save(r);
                 comprobanteRecibido(r, "YAPE", registro.plusMinutes(6));
-                hito(r, ReservaHistorial.OBSERVADO, "Comprobante observado: la imagen no permite leer el número de operación. "
-                        + "Reenvíalo antes del " + r.getVenceEn().format(Tiempo.FECHA_HORA) + ".", rechazo);
+                hito(r, ReservaHistorial.OBSERVADO, ReglasReserva.textoObservado(OBSERVACION_SEMILLA, r.getVenceEn()), rechazo);
             }
             case PENDIENTE_WEB -> {
                 LocalDateTime registro = ahora.minusMinutes(3);
@@ -320,13 +321,11 @@ public class SemillaDatos implements CommandLineRunner {
         c.setMontoDevolucion(devolucion ? r.getMontoPagado() : BigDecimal.ZERO.setScale(2));
         c.setFechaCancelacion(fecha);
         cancelaciones.save(c);
-        String quien = switch (por) {
-            case CLIENTE -> "Cancelada por el cliente";
-            case ADMINISTRADOR -> "Cancelada por el complejo";
-            case SISTEMA -> "Cancelada por el sistema";
-        };
-        hito(r, ReservaHistorial.CANCELADA, quien + ": " + motivo
-                + (devolucion ? ". Devolución de " + Dinero.formato(c.getMontoDevolucion()) + "." : "."), fecha);
+        if (devolucion && c.getMontoDevolucion().signum() > 0) {
+            r.registrarDevolucion(c.getMontoDevolucion());
+            reservas.save(r);
+        }
+        hito(r, ReservaHistorial.CANCELADA, ReglasReserva.textoCancelacion(por, motivo, c.getMontoDevolucion()), fecha);
     }
 
     private void comprobanteRecibido(Reserva r, String metodo, LocalDateTime fecha) {

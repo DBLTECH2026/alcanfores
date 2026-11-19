@@ -1,5 +1,6 @@
 package pe.alcanfores.reservas.cliente;
 
+import com.sun.net.httpserver.HttpServer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -8,9 +9,13 @@ import org.springframework.http.MediaType;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 import pe.alcanfores.comun.error.NegocioExcepcion;
+import pe.alcanfores.reservas.config.ClientesHttpConfig;
 import pe.alcanfores.reservas.config.ReservasPropiedades;
 import pe.alcanfores.reservas.dto.DocumentoDtos.DniRespuesta;
 import pe.alcanfores.reservas.dto.DocumentoDtos.RucRespuesta;
+
+import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -79,23 +84,62 @@ class FactilizaProveedorTest {
 
     @Test
     void tokenInvalidoTambienEs503() {
-        servidor.expect(requestTo(URL + "/ruc/info/20612345679")).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
-        assertThatThrownBy(() -> proveedor.consultarRuc("20612345679")).isInstanceOf(NegocioExcepcion.class);
+        servidor.expect(requestTo(URL + "/ruc/info/20000000001")).andRespond(withStatus(HttpStatus.UNAUTHORIZED));
+        assertThatThrownBy(() -> proveedor.consultarRuc("20000000001")).isInstanceOf(NegocioExcepcion.class);
     }
 
     @Test
     void consultaElRuc() {
-        servidor.expect(requestTo(URL + "/ruc/info/20612345679"))
+        servidor.expect(requestTo(URL + "/ruc/info/20000000001"))
                 .andRespond(withSuccess("""
-                        {"success":true,"data":{"numero":"20612345679","nombre_o_razon_social":"LOS ALCANFORES SPORT E.I.R.L.",
+                        {"success":true,"data":{"numero":"20000000001","nombre_o_razon_social":"LOS ALCANFORES SPORT E.I.R.L.",
                          "estado":"ACTIVO","condicion":"HABIDO","direccion_completa":"CAR. CENTRAL KM. 11.5 ATE - LIMA"}}
                         """, MediaType.APPLICATION_JSON));
-        RucRespuesta r = proveedor.consultarRuc("20612345679").orElseThrow();
+        RucRespuesta r = proveedor.consultarRuc("20000000001").orElseThrow();
         assertThat(r.razonSocial()).isEqualTo("LOS ALCANFORES SPORT E.I.R.L.");
         assertThat(r.direccion()).contains("CENTRAL");
         assertThat(r.estado()).isEqualTo("ACTIVO");
         assertThat(r.condicion()).isEqualTo("HABIDO");
         assertThat(r.fuente()).isEqualTo("SUNAT (Factiliza)");
+    }
+
+    @Test
+    void elDniInexistenteQueTardaMasDe5SegundosSigueSiendoNoEncontrado() throws Exception {
+        // Factiliza real tarda ~11 s en responder 404 a un DNI inexistente; antes el cliente cortaba a los 5 s (503).
+        HttpServer lento = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        lento.createContext("/v1/dni/info/", intercambio -> {
+            try {
+                Thread.sleep(6_000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            byte[] cuerpo = "{\"status\":404,\"success\":false,\"message\":\"No se encontraron resultados\"}"
+                    .getBytes(StandardCharsets.UTF_8);
+            intercambio.getResponseHeaders().add("Content-Type", "application/json");
+            intercambio.sendResponseHeaders(404, cuerpo.length);
+            intercambio.getResponseBody().write(cuerpo);
+            intercambio.close();
+        });
+        lento.start();
+        try {
+            FactilizaProveedor real = new FactilizaProveedor(
+                    RestClient.builder().requestFactory(ClientesHttpConfig.fabricaDocumentos()),
+                    new ReservasPropiedades.Factiliza("token-prueba", "http://127.0.0.1:" + lento.getAddress().getPort() + "/v1"));
+            long inicio = System.nanoTime();
+            assertThat(real.consultarDni("99010005")).isEmpty();
+            assertThat((System.nanoTime() - inicio) / 1_000_000).isGreaterThanOrEqualTo(5_500);
+        } finally {
+            lento.stop(0);
+        }
+    }
+
+    @Test
+    void errores400y422SonNoEncontrado() {
+        servidor.expect(requestTo(URL + "/ruc/info/20000000001")).andRespond(withStatus(HttpStatus.UNPROCESSABLE_ENTITY));
+        servidor.expect(requestTo(URL + "/dni/info/99010005")).andRespond(withStatus(HttpStatus.BAD_REQUEST));
+        assertThat(proveedor.consultarRuc("20000000001")).isEmpty();
+        assertThat(proveedor.consultarDni("99010005")).isEmpty();
+        servidor.verify();
     }
 
     @Test

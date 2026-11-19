@@ -6,6 +6,7 @@ import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.reactive.UrlBasedCorsConfigurationSource;
 import pe.alcanfores.comun.config.AlcanforesPropiedades;
 import pe.alcanfores.gateway.filtro.FiltroCors;
+import pe.alcanfores.gateway.filtro.RespuestaError;
 
 import java.time.Duration;
 import java.util.Arrays;
@@ -23,7 +24,7 @@ public class CorsConfig {
     static final List<String> EXPUESTAS = List.of("X-Request-Id", "Content-Disposition");
 
     @Bean
-    FiltroCors filtroCors(AlcanforesPropiedades propiedades) {
+    FiltroCors filtroCors(AlcanforesPropiedades propiedades, RespuestaError error) {
         CorsConfiguration c = new CorsConfiguration();
         c.setAllowedOrigins(origenes(propiedades.getFrontUrl()));
         c.setAllowedMethods(METODOS);
@@ -33,7 +34,7 @@ public class CorsConfig {
         c.setMaxAge(Duration.ofHours(1));
         UrlBasedCorsConfigurationSource origen = new UrlBasedCorsConfigurationSource();
         origen.registerCorsConfiguration("/**", c);
-        return new FiltroCors(origen);
+        return new FiltroCors(origen, error);
     }
 
     /** «https://a.pe/, http://localhost:5186» → [https://a.pe, http://localhost:5186] */

@@ -34,12 +34,12 @@ Bean Validation y los mensajes del SPEC §3), `mapeador`, `config`, `evento`, `c
 | Tabla | Contenido |
 |---|---|
 | `pago` | Columnas del SPEC + **fotografía de la reserva** (`cliente_dni`, `cliente_nombres`, `cliente_apellidos`, `cliente_telefono`, `cliente_correo`, `concepto`, `porcentaje_adelanto`) para emitir comprobantes y eventos sin volver a llamar a reservas. |
-| `datos_facturacion` | Adquirente pedido (boleta a DNI «1» o factura a RUC «6»). Amplía el SPEC con `referencia_intento` (los pagos en línea guardan la facturación antes de que exista el pago). |
+| `datos_facturacion` | Adquirente pedido (boleta a DNI «1» o factura a RUC «6»). Amplía el SPEC con `referencia_intento` (los pagos en línea guardan la facturación antes de que exista el pago). Si un envío no trae `comprobante` (reenvío tras un rechazo, pago en línea desde «Mi reserva», saldo en caja) se copia la última facturación pedida de la reserva; un `{"tipo":"BOLETA"}` explícito sí cambia a boleta. |
 | `intento_pago` | Sesión de pago en línea `ALP-` + 10 caracteres, con estado, `expira_en` (15 min), `id_externo`, `url_checkout`, `id_pago` y la misma fotografía. |
 | `webhook_evento` | Avisos recibidos: `UNIQUE(proveedor, id_externo)` = idempotencia; `firma_valida`, `payload JSON`, `procesado`, `resultado`. |
 | `pasarela_transaccion` | Libro del **proveedor** simulado: marca, últimos 4, estado, código de autorización y su cola de avisos (outbox con reintentos). Nunca guarda el número completo ni el CVV. |
 | `serie` | B001, F001, BC01, FC01 con `ultimo_correlativo` (se bloquea con `SELECT … FOR UPDATE`). |
-| `comprobante` | Columnas del SPEC + `codigo_motivo` (catálogo 09) y **datos del emisor al emitir** (`emisor_ruc`, `emisor_razon_social`, `emisor_direccion`). `UNIQUE(serie, correlativo)`. |
+| `comprobante` | Columnas del SPEC + `codigo_motivo` (catálogo 09) y **datos del emisor al emitir** (`emisor_ruc`, `emisor_razon_social`, `emisor_direccion`). `UNIQUE(serie, correlativo)`. Emisor ficticio: RUC **20000000001** (el anterior, 20612345679, existía en SUNAT; `V2__ruc_emisor_ficticio` corrige `emisor_ruc` y `cadena_qr` de los ya emitidos). |
 | `evento_procesado` | Eventos de RabbitMQ ya consumidos. |
 
 ## Endpoints
@@ -53,7 +53,7 @@ Públicos (el gateway los enruta; el de la pasarela tiene límite 30/min):
 | POST | `/api/pagos/pasarela/intentos` | `{codigoReserva, dni, tipoPago: ADELANTO\|TOTAL, comprobante}` → 201 `{referencia, urlCheckout, expiraEn}`. Cierra intentos abiertos anteriores de la reserva. |
 | GET | `/api/pasarela/intentos/{ref}` | Datos del checkout. |
 | POST | `/api/pasarela/intentos/{ref}/tarjeta` · `/3ds` · `/yape` | Resultado `{estado, codigoAutorizacion?, motivo?, marca, ultimos4}`. |
-| GET | `/api/pagos/intentos/{ref}/estado` | Sondeo de la página de resultado; en Mercado Pago, si sigue pendiente, consulta `GET /v1/payments/search?external_reference=…` («Ya pagué, verificar»). |
+| GET | `/api/pagos/intentos/{ref}/estado` | Sondeo de la página de resultado (enlaces del comprobante completos, con `&dni=`); en Mercado Pago, si sigue pendiente, consulta `GET /v1/payments/search?external_reference=…` («Ya pagué, verificar»). |
 | POST | `/api/pagos/mercadopago/preferencias` | 201 `{referencia, initPoint, sandbox, expiraEn}`; 409 `MP_NO_CONFIGURADO` sin token. |
 | POST | `/api/webhooks/pasarela-beta` | `X-Firma` (HMAC-SHA256 hex del cuerpo) + `X-Evento-Id`. 401 `FIRMA_INVALIDA`. |
 | POST | `/api/webhooks/mercadopago` | `x-signature`/`x-request-id` (si hay `MP_WEBHOOK_SECRETO`) y `data.id`; consulta `GET /v1/payments/{id}`. |
@@ -125,7 +125,8 @@ y `GET /interno/comprobantes/{id}/pdf` (lo usa notificaciones).
 Si `alcanfores.semilla.habilitada=true` y no hay pagos, `SemillaTarea` pide a reservas `/interno/reservas/para-semilla` cada 30 s
 (máx. 20 veces) y crea: ADELANTO_PAGADO/PAGADO_TOTAL → pagos VALIDADOS con comprobante en fechas pasadas (correlativos en
 orden cronológico; uno de cada cuatro con factura a RUC de prueba `2000000XXXD` válido por módulo 11; PAGADO_TOTAL alterna
-pago total o adelanto + saldo en caja), EN_REVISION → pago PENDIENTE con imagen de ejemplo, OBSERVADO → RECHAZADO con observación.
+pago total o adelanto + saldo en caja), EN_REVISION → pago PENDIENTE con imagen de ejemplo, OBSERVADO → RECHAZADO con la misma
+observación que la línea de tiempo de reservas, REEMBOLSADO (cancelada con devolución) → cobro + REEMBOLSADO con nota de crédito.
 Las 4 imágenes de ejemplo (`src/main/resources/semilla/comprobantes/`) son constancias ficticias genéricas con sello «EJEMPLO»
 (sin logos reales). La semilla no publica eventos.
 
@@ -143,14 +144,16 @@ Comunes: `DB_HOST/DB_PORT/DB_USUARIO/DB_CLAVE`, `EUREKA_URL`, `RABBIT_*`, `JWT_S
 - Las llamadas HTTP a otros servicios se hacen fuera de la transacción de base de datos (`TransactionTemplate`).
 - Un pago en línea aprobado se registra aunque el intento ya haya expirado (no se pierde un cobro hecho); los intentos rechazados
   pueden reintentarse con otra tarjeta mientras no expiren; un intento nuevo cierra los anteriores de la misma reserva.
-- Un mismo número de operación Yape/Plin no puede sustentar dos pagos (409 `OPERACION_REPETIDA`).
+- Un mismo número de operación Yape/Plin no puede sustentar dos pagos (409 `OPERACION_REPETIDA`, con
+  `errores:[{campo:"codigoOperacion", mensaje}]` para que el front lo marque en el campo).
+- `GET /api/pagos/reserva/{codigo}` incluye por pago `facturacion: {tipo, ruc, razonSocial, direccionFiscal}` (lo que se pidió).
 - Idempotencia de Mercado Pago por `payment:{id}:{status}` (un pago puede avisar «pending» y luego «approved»).
 - El time limiter de Resilience4j está desactivado: el timeout lo da el cliente HTTP (3 s) y la llamada corre en el mismo hilo
   (se conserva el `X-Request-Id`).
 - `ManejadorErroresPagos` convierte `?sort=` inválido en 400 (el manejador común lo dejaría en 500).
 
 ## Pruebas (`mvn -B -f backend/pagos-service/pom.xml verify`)
-105 pruebas, 0 fallos. JaCoCo: líneas 92,9 % en total, 92,1 % en la capa de servicio (regla `check` ≥ 70 % en el pom).
+111 pruebas, 0 fallos (18/11/2026). JaCoCo: líneas 93,0 % en total, 92,4 % en la capa de servicio (regla `check` ≥ 70 % en el pom).
 Las de integración usan MariaDB `alcanfores_pagos_test` + Flyway, servidor en puerto aleatorio (la pasarela llama de verdad a su
 webhook) y simulan reservas, catálogo, Mercado Pago y RabbitMQ.
 

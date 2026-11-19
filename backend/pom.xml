@@ -110,9 +110,17 @@
                             <goals><goal>prepare-agent</goal></goals>
                         </execution>
                         <execution>
+                            <!-- target/site/jacoco/: index.html, jacoco.xml y jacoco.csv (el resumen del CI lee el CSV) -->
                             <id>reporte</id>
                             <phase>verify</phase>
                             <goals><goal>report</goal></goals>
+                            <configuration>
+                                <formats>
+                                    <format>HTML</format>
+                                    <format>XML</format>
+                                    <format>CSV</format>
+                                </formats>
+                            </configuration>
                         </execution>
                     </executions>
                 </plugin>

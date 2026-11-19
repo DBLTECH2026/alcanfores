@@ -17,5 +17,5 @@ public record ReservaSemilla(String codigoReserva, String estado, String estadoP
                              BigDecimal montoTotal, BigDecimal montoAdelanto, BigDecimal montoPagado,
                              LocalDateTime fechaRegistro, LocalDateTime confirmadaEn, ClienteContacto cliente,
                              String nombreCancha, String deporte, LocalDate fecha, LocalTime horaInicio,
-                             LocalTime horaFin) {
+                             LocalTime horaFin, BigDecimal montoDevolucion) {
 }

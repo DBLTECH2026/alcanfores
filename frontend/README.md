@@ -140,7 +140,7 @@ Se guardan en `localStorage` (`alc-mock-bd`) y se regeneran cada día. Consola: 
 | Partido jugado (calificar) | `ALC-H2P6WD` + DNI `45678912` → `/canchas/1?resena=ALC-H2P6WD` |
 | Cancelada | `ALC-W6R2NC` + DNI `41236587` |
 | RENIEC | cualquier DNI → nombres simulados · `00000000` → 404 (se escribe a mano) · `11111111` → 503 |
-| SUNAT | cualquier RUC válido (módulo 11), p. ej. `20612345679` |
+| SUNAT | cualquier RUC válido (módulo 11), p. ej. `20000000001` |
 | 409 TURNO_OCUPADO | Cancha 2 · mañana · 9:00 p. m. (se ve libre; al confirmar «otra persona» se adelanta) |
 | Pasarela beta | tarjetas del SPEC (4111…, 5555…, 3782…, 4000 0027 6000 3184 → 3-D Secure `123456`, …0002 / …9995 / …0069 rechazadas) · Yape `123456` aprueba, `000000` rechaza |
 | Mercado Pago | apagado (como sin `MP_ACCESS_TOKEN`); `localStorage.setItem('alc-mock-mp','1')` lo activa y se aprueba en la 2.ª consulta de `/pago/resultado` |

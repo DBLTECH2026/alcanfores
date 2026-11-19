@@ -25,7 +25,9 @@ class ConfiguracionTest extends PruebaIntegracion {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", aMapWithSize(23)))
                 .andExpect(jsonPath("$.adelanto_pct").value("50"))
-                .andExpect(jsonPath("$.ultimo_turno").value("23:00"));
+                .andExpect(jsonPath("$.ultimo_turno").value("23:00"))
+                // V3__ruc_emisor_ficticio: el RUC anterior (20612345679) existe en SUNAT; el emisor ficticio es 20000000001.
+                .andExpect(jsonPath("$.ruc_emisor").value("20000000001"));
         mvc.perform(put("/api/admin/configuracion").header("Authorization", tokenRecepcion())
                         .contentType(MediaType.APPLICATION_JSON).content("{\"lema\":\"Otro lema del complejo\"}"))
                 .andExpect(status().isForbidden());

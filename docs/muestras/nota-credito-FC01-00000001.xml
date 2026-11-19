@@ -27,7 +27,7 @@
   <cac:AccountingSupplierParty>
     <cac:Party>
       <cac:PartyIdentification>
-        <cbc:ID schemeID="6">20612345679</cbc:ID>
+        <cbc:ID schemeID="6">20000000001</cbc:ID>
       </cac:PartyIdentification>
       <cac:PartyName>
         <cbc:Name>Complejo Deportivo Los Alcanfores</cbc:Name>

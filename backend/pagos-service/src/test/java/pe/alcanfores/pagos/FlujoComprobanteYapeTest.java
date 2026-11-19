@@ -81,11 +81,11 @@ class FlujoComprobanteYapeTest extends IntegracionBase {
     @Test
     void facturaConRucInvalidoODeOtroTipoNoSeAcepta() throws Exception {
         reservaDisponible(reserva(CODIGO, "PENDIENTE", "SIN_PAGO", "0"));
-        subir(png(400, 700), "{\"tipo\":\"FACTURA\",\"ruc\":\"20612345670\",\"razonSocial\":\"Mi Empresa SAC\",\"direccionFiscal\":\"Av. Lima 123\"}")
+        subir(png(400, 700), "{\"tipo\":\"FACTURA\",\"ruc\":\"20000000002\",\"razonSocial\":\"Mi Empresa SAC\",\"direccionFiscal\":\"Av. Lima 123\"}")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errores[0].campo").value("comprobante.ruc"))
                 .andExpect(jsonPath("$.errores[0].mensaje").value("El RUC no es válido."));
-        subir(png(400, 700), "{\"tipo\":\"FACTURA\",\"ruc\":\"20612345679\"}")
+        subir(png(400, 700), "{\"tipo\":\"FACTURA\",\"ruc\":\"20000000001\"}")
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errores[*].campo").value(org.hamcrest.Matchers.containsInAnyOrder(
                         "comprobante.direccionFiscal", "comprobante.razonSocial")))
@@ -168,11 +168,11 @@ class FlujoComprobanteYapeTest extends IntegracionBase {
 
     @Test
     void facturaValidaSeEmiteEnLaSerieF001() throws Exception {
-        long idPago = subirValido("{\"tipo\":\"FACTURA\",\"ruc\":\"20612345679\",\"razonSocial\":\"Mi Empresa S.A.C.\",\"direccionFiscal\":\"Av. Lima 123, Ate\"}");
+        long idPago = subirValido("{\"tipo\":\"FACTURA\",\"ruc\":\"20000000001\",\"razonSocial\":\"Mi Empresa S.A.C.\",\"direccionFiscal\":\"Av. Lima 123, Ate\"}");
         mvc.perform(post("/api/admin/pagos/{id}/validar", idPago).header("Authorization", tokenAdmin()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.comprobante.serieNumero").value("F001-00000001"));
-        assertThat(jdbc.queryForObject("SELECT cliente_num_doc FROM comprobante", String.class)).isEqualTo("20612345679");
+        assertThat(jdbc.queryForObject("SELECT cliente_num_doc FROM comprobante", String.class)).isEqualTo("20000000001");
     }
 
     @Test

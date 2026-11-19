@@ -249,7 +249,16 @@ function ModalCancelar({ abierto, alCerrar, reserva, dni, devolucionHoras, alCan
   );
 }
 
-function ModalReenviar({ abierto, alCerrar, reserva, dni, alEnviar }: { abierto: boolean; alCerrar: () => void; reserva: ReservaDetalle; dni: string; alEnviar: () => void }) {
+/** Última boleta o factura pedida para la reserva según pagos (sirve aunque la reserva se haya hecho en otro navegador). */
+function facturacionPedida(pagos: PagoCliente[] | null | undefined): DatosComprobante | null {
+  const f = [...(pagos ?? [])].reverse().find((p) => p.facturacion)?.facturacion;
+  if (!f) return null;
+  return f.tipo === 'FACTURA'
+    ? { tipo: 'FACTURA', ruc: f.ruc ?? '', razonSocial: f.razonSocial ?? '', direccionFiscal: f.direccionFiscal ?? '' }
+    : { tipo: 'BOLETA' };
+}
+
+function ModalReenviar({ abierto, alCerrar, reserva, dni, alEnviar, pedida }: { abierto: boolean; alCerrar: () => void; reserva: ReservaDetalle; dni: string; alEnviar: () => void; pedida: DatosComprobante | null }) {
   const toast = useToast();
   const metodos = useMetodosPago();
   const { datos: complejo } = useComplejo();
@@ -268,7 +277,7 @@ function ModalReenviar({ abierto, alCerrar, reserva, dni, alEnviar }: { abierto:
     resolver: zodResolver(esquemaReenvio),
     mode: 'onTouched',
     defaultValues: (() => {
-      const f = leerFacturacion(reserva.codigoReserva);
+      const f = leerFacturacion(reserva.codigoReserva) ?? pedida;
       return {
         metodo: reserva.metodoPagoPrevisto === 'PLIN' ? 'PLIN' : 'YAPE',
         codigoOperacion: '',
@@ -284,10 +293,11 @@ function ModalReenviar({ abierto, alCerrar, reserva, dni, alEnviar }: { abierto:
   const tipoComprobante = watch('tipoComprobante');
   const [rucConsultado, setRucConsultado] = useState('');
   const ruc = watch('ruc') ?? '';
+  const rucPedido = pedida?.ruc;
   // Con 11 dígitos válidos trae razón social y dirección de SUNAT (si no responde, se escriben a mano).
   useEffect(() => {
     if (tipoComprobante !== 'FACTURA' || ruc === rucConsultado || !/^\d{11}$/.test(ruc) || !rucValido(ruc)) return;
-    if (leerFacturacion(reserva.codigoReserva)?.ruc === ruc && rucConsultado === '') {
+    if ((leerFacturacion(reserva.codigoReserva)?.ruc ?? rucPedido) === ruc && rucConsultado === '') {
       setRucConsultado(ruc);
       return;
     }
@@ -299,7 +309,7 @@ function ModalReenviar({ abierto, alCerrar, reserva, dni, alEnviar }: { abierto:
         setValue('direccionFiscal', d.direccion, { shouldValidate: true });
       })
       .catch(() => undefined);
-  }, [ruc, rucConsultado, tipoComprobante, reserva.codigoReserva, setValue]);
+  }, [ruc, rucConsultado, tipoComprobante, reserva.codigoReserva, rucPedido, setValue]);
   const numero = metodo === 'PLIN' ? metodos.datos?.plin.numero ?? complejo?.pagos.plinNumero : metodos.datos?.yape.numero ?? complejo?.pagos.yapeNumero;
   const monto = Math.max(0, reserva.montoAdelanto - reserva.montoPagado) || reserva.montoAdelanto;
 
@@ -436,6 +446,7 @@ function Detalle({ consulta, inicial, alSalir }: { consulta: Consulta; inicial: 
   const [pagando, setPagando] = useState(false);
   const [version, setVersion] = useState(0);
   const pagos = useCarga(() => pagosApi.pagosDeReserva(consulta.codigo, consulta.dni), `${consulta.codigo}-${version}`);
+  const pedida = facturacionPedida(pagos.datos);
   useTituloPagina(`Reserva ${reserva.codigoReserva}`);
 
   // Los cambios de pago llegan a la reserva por eventos (RabbitMQ): se vuelve a pedir unos segundos hasta verlos.
@@ -460,7 +471,7 @@ function Detalle({ consulta, inicial, alSalir }: { consulta: Consulta; inicial: 
   const pagarConTarjeta = async () => {
     setPagando(true);
     try {
-      const i = await pagosApi.crearIntento({ codigoReserva: reserva.codigoReserva, dni: consulta.dni, tipoPago: 'ADELANTO', comprobante: leerFacturacion(reserva.codigoReserva) ?? { tipo: 'BOLETA' } });
+      const i = await pagosApi.crearIntento({ codigoReserva: reserva.codigoReserva, dni: consulta.dni, tipoPago: 'ADELANTO', comprobante: leerFacturacion(reserva.codigoReserva) ?? pedida ?? undefined });
       guardarUltimaReserva({ reserva, dni: consulta.dni, metodo: 'TARJETA' });
       navigate(i.urlCheckout.startsWith('http') ? new URL(i.urlCheckout).pathname : i.urlCheckout);
     } catch (e) {
@@ -662,6 +673,8 @@ function Detalle({ consulta, inicial, alSalir }: { consulta: Consulta; inicial: 
         }}
       />
       <ModalReenviar
+        key={JSON.stringify(pedida)}
+        pedida={pedida}
         abierto={reenviar}
         alCerrar={() => setReenviar(false)}
         reserva={reserva}

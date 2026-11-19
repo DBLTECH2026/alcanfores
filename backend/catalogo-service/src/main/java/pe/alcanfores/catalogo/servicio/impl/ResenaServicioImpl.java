@@ -83,13 +83,14 @@ public class ResenaServicioImpl implements ResenaServicio {
     public ResenaPublicaRespuesta crear(Long idCancha, ResenaSolicitud s) {
         Cancha cancha = canchaActiva(idCancha);
         String codigo = s.codigoReserva().trim().toUpperCase(Locale.ROOT);
-        if (resenas.existsByCodigoReserva(codigo)) {
-            throw NegocioExcepcion.conflicto("RESENA_DUPLICADA", DUPLICADA);
-        }
+        // Primero código + DNI (reservas): así el 409 «ya tiene reseña» no revela a un tercero que el código existe.
         ElegibilidadResena e = reservas.elegibleResena(codigo, s.dni().trim(), idCancha);
         if (!e.elegible()) {
             throw NegocioExcepcion.regla("RESENA_NO_ELEGIBLE", e.motivo() == null || e.motivo().isBlank()
                     ? "Esta reserva todavía no permite dejar una reseña." : e.motivo());
+        }
+        if (resenas.existsByCodigoReserva(codigo)) {
+            throw NegocioExcepcion.conflicto("RESENA_DUPLICADA", DUPLICADA);
         }
         Resena r = new Resena();
         r.setCancha(cancha);
@@ -107,6 +108,12 @@ public class ResenaServicioImpl implements ResenaServicio {
         auditor.registrarComo(r.getAutor(), "CLIENTE", "CREAR_RESENA", "resena", r.getId(),
                 cancha.getNombre() + " · " + codigo + " · " + r.getPuntuacion() + " estrellas");
         return mapeador.publica(r);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean existeParaReserva(String codigoReserva) {
+        return codigoReserva != null && resenas.existsByCodigoReserva(codigoReserva.trim().toUpperCase(Locale.ROOT));
     }
 
     @Override

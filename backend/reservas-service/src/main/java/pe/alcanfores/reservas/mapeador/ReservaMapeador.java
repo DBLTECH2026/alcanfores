@@ -66,13 +66,15 @@ public class ReservaMapeador {
         return historial.stream().map(h -> new EventoLinea(h.getEvento(), h.getFecha(), h.getDetalle())).toList();
     }
 
-    public ReservaClienteDetalle detalleCliente(Reserva r, Cancelacion c, List<ReservaHistorial> historial, LocalDateTime ahora) {
+    /** {@code yaResenada}: catálogo ya tiene la reseña de esta reserva (entonces no se ofrece «Calificar»). */
+    public ReservaClienteDetalle detalleCliente(Reserva r, Cancelacion c, List<ReservaHistorial> historial, LocalDateTime ahora,
+                                                boolean yaResenada) {
         Turno t = r.getTurno();
         return new ReservaClienteDetalle(r.getCodigoReserva(), r.getEstado(), r.getEstadoPago(), r.getVenceEn(), cancha(t),
                 t.getFecha(), t.getHoraInicio(), t.getHoraFin(), r.getMontoTotal(), r.getMontoAdelanto(),
                 clientePublico(r.getCliente()), r.getAsistencia(), r.getMontoPagado(), r.saldo(), r.getMetodoPagoPrevisto(),
                 cancelacion(c), linea(historial), ReglasReserva.puedeCancelarCliente(r, ahora),
-                ReglasReserva.puedeReenviarComprobante(r, ahora), ReglasReserva.puedeResenar(r, ahora));
+                ReglasReserva.puedeReenviarComprobante(r, ahora), !yaResenada && ReglasReserva.puedeResenar(r, ahora));
     }
 
     public ReservaAdminDetalle detalleAdmin(Reserva r, Cancelacion c, List<ReservaHistorial> historial, LocalDateTime ahora) {
@@ -104,10 +106,11 @@ public class ReservaMapeador {
                 r.getMetodoPagoPrevisto(), r.saldo(), t.inicio(), r.getVenceEn());
     }
 
-    public ReservaSemilla semilla(Reserva r) {
+    public ReservaSemilla semilla(Reserva r, Cancelacion c) {
         Turno t = r.getTurno();
         return new ReservaSemilla(r.getCodigoReserva(), r.getEstado(), r.getEstadoPago(), r.getMetodoPagoPrevisto(),
                 r.getMontoTotal(), r.getMontoAdelanto(), r.getMontoPagado(), r.getFechaRegistro(), r.getConfirmadaEn(),
-                r.getOrigen(), t.getNombreCancha(), t.getFecha(), t.getHoraInicio(), contacto(r.getCliente()));
+                r.getOrigen(), t.getNombreCancha(), t.getFecha(), t.getHoraInicio(), contacto(r.getCliente()),
+                c != null && c.isDevolucion() ? c.getMontoDevolucion() : null);
     }
 }

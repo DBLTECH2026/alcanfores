@@ -72,7 +72,7 @@ class PanelTest extends PruebaIntegracion {
                 .when(pagos).registrarPagoCaja(any());
         Turno t = turno(2, HOY.plusDays(1), 19);
         String pago = "{\"tipoPago\":\"ADELANTO\",\"metodo\":\"YAPE\",\"monto\":45.00,\"codigoOperacion\":\"12345678\","
-                + "\"comprobante\":{\"tipo\":\"FACTURA\",\"ruc\":\"20612345679\",\"razonSocial\":\"Club Deportivo UTP S.A.C.\","
+                + "\"comprobante\":{\"tipo\":\"FACTURA\",\"ruc\":\"20000000001\",\"razonSocial\":\"Club Deportivo UTP S.A.C.\","
                 + "\"direccionFiscal\":\"Av. Nicolás Ayllón 123, Ate\"}}";
         mvc.perform(post("/api/admin/reservas").header("Authorization", token("ADMIN"))
                         .contentType(MediaType.APPLICATION_JSON).content(manual(t.getId(), pago)))

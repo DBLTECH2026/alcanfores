@@ -19,6 +19,7 @@ import pe.alcanfores.reservas.modelo.TipoDocumento;
 import pe.alcanfores.reservas.repositorio.ConsultaDocumentoRepositorio;
 import pe.alcanfores.reservas.servicio.DocumentoServicio;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.function.Supplier;
@@ -30,6 +31,8 @@ public class DocumentoServicioImpl implements DocumentoServicio {
 
     public static final String FUENTE_CACHE = "CACHE";
     private static final int DIAS_CACHE = 30;
+    /** El «no encontrado» se guarda 1 día (puede ser un DNI recién emitido o un error de tipeo corregido luego). */
+    private static final int DIAS_CACHE_NO_ENCONTRADO = 1;
     private static final Logger log = LoggerFactory.getLogger(DocumentoServicioImpl.class);
 
     private final ProveedorDocumentos proveedor;
@@ -37,7 +40,8 @@ public class DocumentoServicioImpl implements DocumentoServicio {
     private final ObjectMapper json;
 
     @Override
-    @Transactional
+    // El 404 no revierte la transacción: así se guarda la caché del «no encontrado».
+    @Transactional(noRollbackFor = NegocioExcepcion.class)
     public DniRespuesta consultarDni(String dni) {
         String numero = dni == null ? "" : dni.trim();
         if (!Documentos.dniValido(numero)) {
@@ -46,13 +50,14 @@ public class DocumentoServicioImpl implements DocumentoServicio {
         return consultar(TipoDocumento.DNI, numero, DniRespuesta.class,
                 () -> proveedor.consultarDni(numero),
                 () -> new NegocioExcepcion(404, "DNI_NO_ENCONTRADO",
-                        "No encontramos ese DNI en RENIEC. Revisa el número o escribe tus datos a mano."),
+                        "No encontramos ese DNI en RENIEC. Revisa el número; si está bien, escribe tus nombres y apellidos a mano."),
                 DniRespuesta::fuente,
                 r -> r.conFuente(FUENTE_CACHE));
     }
 
     @Override
-    @Transactional
+    // El 404 no revierte la transacción: así se guarda la caché del «no encontrado».
+    @Transactional(noRollbackFor = NegocioExcepcion.class)
     public RucRespuesta consultarRuc(String ruc) {
         String numero = ruc == null ? "" : ruc.trim();
         if (!Documentos.rucValido(numero)) {
@@ -61,7 +66,7 @@ public class DocumentoServicioImpl implements DocumentoServicio {
         return consultar(TipoDocumento.RUC, numero, RucRespuesta.class,
                 () -> proveedor.consultarRuc(numero),
                 () -> new NegocioExcepcion(404, "RUC_NO_ENCONTRADO",
-                        "No encontramos ese RUC en SUNAT. Revisa el número o escribe la razón social a mano."),
+                        "No encontramos ese RUC en SUNAT. Revisa el número; si está bien, escribe la razón social y la dirección a mano."),
                 RucRespuesta::fuente,
                 r -> r.conFuente(FUENTE_CACHE));
     }
@@ -70,13 +75,20 @@ public class DocumentoServicioImpl implements DocumentoServicio {
                             Supplier<NegocioExcepcion> noExiste, Function<T, String> fuente,
                             UnaryOperator<T> comoCache) {
         ConsultaDocumento.Clave clave = new ConsultaDocumento.Clave(tipo, numero);
-        Optional<ConsultaDocumento> guardada = cache.findById(clave)
-                .filter(c -> c.getConsultadoEn().isAfter(Tiempo.ahora().minusDays(DIAS_CACHE)));
+        LocalDateTime ahora = Tiempo.ahora();
+        Optional<ConsultaDocumento> guardada = cache.findById(clave);
         if (guardada.isPresent()) {
-            try {
-                return comoCache.apply(json.readValue(guardada.get().getRespuesta(), clase));
-            } catch (JsonProcessingException e) {
-                log.warn("Caché ilegible para {} {}; se vuelve a consultar", tipo, numero);
+            ConsultaDocumento c = guardada.get();
+            if (!c.encontrado() && c.getConsultadoEn().isAfter(ahora.minusDays(DIAS_CACHE_NO_ENCONTRADO))) {
+                // El proveedor ya dijo hace poco que no existe: no se gasta otra consulta (Factiliza cobra cada una).
+                throw noExiste.get();
+            }
+            if (c.encontrado() && c.getConsultadoEn().isAfter(ahora.minusDays(DIAS_CACHE))) {
+                try {
+                    return comoCache.apply(json.readValue(c.getRespuesta(), clase));
+                } catch (JsonProcessingException e) {
+                    log.warn("Caché ilegible para {} {}; se vuelve a consultar", tipo, numero);
+                }
             }
         }
         if (!proveedor.disponible()) {
@@ -84,17 +96,23 @@ public class DocumentoServicioImpl implements DocumentoServicio {
                     + (tipo == TipoDocumento.DNI ? "RENIEC" : "SUNAT") + " no está disponible en este momento. "
                     + "Escribe los datos a mano.");
         }
-        T respuesta = remoto.get().orElseThrow(noExiste);
-        ConsultaDocumento c = cache.findById(clave).orElseGet(ConsultaDocumento::new);
+        Optional<T> respuesta = remoto.get();
+        ConsultaDocumento c = guardada.orElseGet(ConsultaDocumento::new);
         c.setClave(clave);
-        c.setFuente(fuente.apply(respuesta));
         c.setConsultadoEn(Tiempo.ahora());
+        if (respuesta.isEmpty()) {
+            c.setFuente(ConsultaDocumento.FUENTE_NO_ENCONTRADO);
+            c.setRespuesta("{}");
+            cache.save(c);
+            throw noExiste.get();
+        }
+        c.setFuente(fuente.apply(respuesta.get()));
         try {
-            c.setRespuesta(json.writeValueAsString(respuesta));
+            c.setRespuesta(json.writeValueAsString(respuesta.get()));
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("No se pudo serializar la consulta de documento", e);
         }
         cache.save(c);
-        return respuesta;
+        return respuesta.get();
     }
 }

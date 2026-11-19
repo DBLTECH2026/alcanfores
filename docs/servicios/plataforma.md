@@ -43,6 +43,7 @@ Eureka y Resilience4j reactivo.
 | `catalogo-archivos` | `/api/admin/canchas/*/fotos/**`, `/api/catalogo/fotos/**` | `lb://catalogo-service` | 20 s |
 | `catalogo` | `/api/catalogo/**`, `/api/admin/canchas/**`, `/api/admin/resenas/**`, `/api/admin/configuracion/**` | `lb://catalogo-service` | 10 s |
 | `reservas-archivos` | `/api/reservas/*/constancia.pdf`, `/api/admin/reportes/reservas.xlsx` | `lb://reservas-service` | 20 s |
+| `reservas-documentos` | `/api/documentos/**` (Factiliza tarda ~11 s en decir «no existe»; reservas espera 15 s) | `lb://reservas-service` | 20 s |
 | `reservas` | `/api/disponibilidad/**`, `/api/reservas/**`, `/api/documentos/**`, `/api/admin/reservas/**`, `/api/admin/turnos/**`, `/api/admin/clientes/**`, `/api/admin/dashboard/**`, `/api/admin/reportes/reservas/**` | `lb://reservas-service` | 10 s |
 | `pagos-archivos` | `/api/pagos/comprobante`, `/api/comprobantes/**`, `/api/admin/pagos/*/archivo`, `/api/admin/comprobantes/*/pdf`, `/api/admin/comprobantes/*/xml`, `/api/admin/reportes/ingresos.xlsx` | `lb://pagos-service` | 20 s |
 | `pagos` | `/api/pagos/**`, `/api/pasarela/**`, `/api/webhooks/**`, `/api/admin/pagos/**`, `/api/admin/comprobantes/**`, `/api/admin/reportes/ingresos/**` | `lb://pagos-service` | 10 s |
@@ -50,7 +51,7 @@ Eureka y Resilience4j reactivo.
 | `notificaciones` | `/api/admin/notificaciones/**`, `/api/admin/recordatorios/**` | `lb://notificaciones-service` | 10 s |
 | — | `GET /api/estado` | el propio gateway | — |
 
-Las rutas «de archivos» tienen `order: -1` (se evalúan primero) y `metadata.response-timeout: 20000`. Conexión: 3 s.
+Las rutas «de archivos» y `reservas-documentos` tienen `order: -1` (se evalúan primero) y `metadata.response-timeout: 20000` (`timeout-archivos-ms` / `timeout-documentos-ms`; su circuit breaker espera ese tiempo + 2 s). Conexión: 3 s.
 Filtros por defecto: `RemoveRequestHeader=X-Interno-Token` (nadie de afuera puede hacerse pasar por un servicio) y
 `DedupeResponseHeader` para las cabeceras CORS y `X-Request-Id`.
 
@@ -62,7 +63,9 @@ Se hicieron como `WebFilter` y no como `GlobalFilter` para que también cubran r
    no, genera un UUID. Lo envía al servicio y lo devuelve en la respuesta. `comun` lo pone en el MDC de cada servicio.
 2. **`FiltroRegistroAcceso`**: log de acceso `GET /api/catalogo/canchas -> 200 (35 ms) ip=... id=...`. Se escribe al
    confirmar la respuesta, así el estado es el real aunque lo ponga el manejador de errores.
-3. **CORS (`FiltroCors`)**: orígenes de `FRONT_URL` (lista separada por comas, sin la barra final), métodos
+3. **CORS (`FiltroCors`)**: orígenes de `FRONT_URL` (lista separada por comas, sin la barra final; en local por
+   defecto `http://localhost:5186,http://localhost:5187`: portal y panel). Un `Origin` no permitido (preflight o
+   solicitud simple) recibe **403 `ORIGEN_NO_PERMITIDO`** con el cuerpo estándar `ErrorApi` (antes salía vacío). Métodos
    GET/POST/PUT/PATCH/DELETE/OPTIONS, cabeceras `Authorization`, `Content-Type`, `X-Request-Id`; expone `X-Request-Id`
    y `Content-Disposition`; sin credenciales (el front usa Bearer); `max-age` 1 h. Va antes que los rechazos para que
    el navegador pueda leer los 401/404/413/429.
