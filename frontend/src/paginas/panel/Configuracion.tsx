@@ -365,7 +365,7 @@ function Whatsapp() {
         {qr?.cargando ? (
           <div className="grid place-items-center gap-3 py-10">
             <Spinner grande />
-            <span className="text-[#A9B9B1]">Pidiendo el QR a Evolution API…</span>
+            <span className="text-[#6B7C74]">Pidiendo el QR a Evolution API…</span>
           </div>
         ) : qr?.error ? (
           <div className="grid gap-3">
@@ -373,7 +373,7 @@ function Whatsapp() {
               <span className="punto-wa grid place-items-center w-[64px] h-[64px] rounded-[16px] bg-amarillo/15 text-amarillo">
                 <TriangleAlert className="ico ico-32" aria-hidden />
               </span>
-              <b className="text-white text-[16px] text-center">{qr.error.codigo === 'WHATSAPP_NO_CONFIGURADO' ? 'WhatsApp sin configurar' : 'Evolution API no responde'}</b>
+              <b className="text-noche text-[16px] text-center">{qr.error.codigo === 'WHATSAPP_NO_CONFIGURADO' ? 'WhatsApp sin configurar' : 'Evolution API no responde'}</b>
               <span className="text-center text-[#C9D6CF] text-[13.5px]">{qr.error.mensaje}</span>
             </div>
             <div className="caja-aviso">

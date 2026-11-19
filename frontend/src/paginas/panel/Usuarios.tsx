@@ -228,7 +228,7 @@ function FormUsuario({ usuario, esYo, alCerrar, alHecho }: { usuario: UsuarioAdm
             { valor: 'ADMIN', texto: 'Administrador', icono: ShieldCheck },
           ]}
         />
-        {esYo && <span className="text-[12px] text-[#A9B9B1]">No puedes quitarte el rol de administrador.</span>}
+        {esYo && <span className="text-[12px] text-[#6B7C74]">No puedes quitarte el rol de administrador.</span>}
         {nuevo && (
           <div className="cajas2">
             <CampoTexto label="Contraseña" requerido type="password" icono={KeyRound} autoComplete="new-password" ayuda="8+ con mayúscula, minúscula y número" error={errors.contrasena?.message} {...register('contrasena')} />

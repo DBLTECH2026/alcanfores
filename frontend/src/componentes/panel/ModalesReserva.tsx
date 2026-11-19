@@ -178,7 +178,7 @@ export function ModalValidar({ idPago, alCerrar, alHecho }: { idPago: number | n
           </div>
           <div className="flecha-estados">
             <InsigniaEstado dominio="reserva" estado="PENDIENTE" />
-            <ArrowRight className="ico ico-16 text-[#A9B9B1]" aria-hidden />
+            <ArrowRight className="ico ico-16 text-[#6B7C74]" aria-hidden />
             <InsigniaEstado dominio="reserva" estado="CONFIRMADA" />
           </div>
           {!pago.puedeValidar && <Alerta tipo="advertencia">Este pago ya no está pendiente.</Alerta>}
@@ -536,7 +536,7 @@ export function ModalCancelar({
               <Interruptor activo={devolucion} alCambiar={(v) => setValue('devolucion', v)}>
                 Devolver {fmtSoles(reserva.montoPagado)} (nota de crédito)
               </Interruptor>
-              <span className="text-[12px] text-[#A9B9B1]">
+              <span className="text-[12px] text-[#6B7C74]">
                 {devolucionSugerida ? `Faltan más de ${devolucionHoras} h: corresponde devolución.` : `Faltan menos de ${devolucionHoras} h: por regla no hay devolución.`}
               </span>
             </div>

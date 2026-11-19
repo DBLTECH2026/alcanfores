@@ -86,18 +86,18 @@
 .compara { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 10px; padding: 14px 16px; border-radius: 12px; background: rgba(55,162,50,.14); }
 .compara.distinto { background: rgba(229,57,53,.16); }
 .compara > div { display: grid; justify-items: center; gap: 2px; }
-.compara span { font-size: 12px; color: #C9D6CF; display: inline-flex; align-items: center; gap: 6px; }
-.compara b { font-family: var(--f-titular, 'Barlow Semi Condensed'); font-size: 26px; color: #fff; }
-.compara i { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: rgba(255,255,255,.12); font-style: normal; color: #fff; font-weight: 700; }
+.compara span { font-size: 12px; color: #5E7068; display: inline-flex; align-items: center; gap: 6px; }
+.compara b { font-family: var(--f-titular, 'Barlow Semi Condensed'); font-size: 26px; color: var(--noche); }
+.compara i { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: #E8F3EC; font-style: normal; color: var(--verde); font-weight: 700; }
 .cajas2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.caja-osc { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.14); color: #fff; font-weight: 600; font-variant-numeric: tabular-nums; }
-.caja-osc .ico { width: 17px; height: 17px; color: #A9B9B1; }
+.caja-osc { display: flex; align-items: center; gap: 10px; min-height: 46px; padding: 0 14px; border-radius: 12px; border: 1px solid #E3EAE6; background: #F7FAF8; color: var(--noche); font-weight: 600; font-variant-numeric: tabular-nums; }
+.caja-osc .ico { width: 17px; height: 17px; color: #6B7C74; }
 .flecha-estados { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.caja-aviso { display: grid; gap: 8px; padding: 12px 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.12); font-size: 13.5px; color: #E6EEEA; }
+.caja-aviso { display: grid; gap: 8px; padding: 12px 14px; border-radius: 12px; border: 1px solid #E3EAE6; background: #F7FAF8; font-size: 13.5px; color: #33443C; }
 .caja-aviso > div { display: flex; align-items: center; gap: 10px; }
-.caja-aviso .ico { width: 16px; height: 16px; color: #6FD06A; flex: none; }
+.caja-aviso .ico { width: 16px; height: 16px; color: var(--verde); flex: none; }
 .chips-motivo { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip-motivo { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid rgba(255,255,255,.2); background: transparent; color: #E6EEEA; font: 600 13px/1.2 var(--f-texto, Inter); cursor: pointer; }
+.chip-motivo { display: inline-flex; align-items: center; gap: 8px; min-height: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid #CFDAD4; background: #fff; color: var(--noche); font: 600 13px/1.2 var(--f-texto, Inter); cursor: pointer; }
 .chip-motivo .ico { width: 15px; height: 15px; }
 .chip-motivo[aria-pressed="true"] { background: var(--verde); border-color: var(--verde); color: #fff; }
 .etiqueta-osc { font-size: 13px; font-weight: 600; color: #F2F6F4; }
@@ -303,17 +303,17 @@
   .ma.plegado .ma-plegar-btn { width: 36px; }
 }
 
-/* v2 · campana de avisos: lista de comprobantes por validar (dentro del modal oscuro) */
+/* v2 · campana de avisos: lista de comprobantes por validar (dentro del modal) */
 .avisos-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; max-height: min(60vh, 520px); overflow-y: auto; }
-.aviso { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); }
+.aviso { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 12px; padding: 10px 12px; border-radius: 12px; background: #F7FAF8; border: 1px solid #E3EAE6; }
 .aviso-txt { display: grid; gap: 3px; min-width: 0; }
-.aviso-txt b { color: #fff; font-size: 14px; }
-.aviso-datos { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: #A9B9B1; }
+.aviso-txt b { color: var(--noche); font-size: 14px; }
+.aviso-datos { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: #5E7068; }
 .aviso-datos span { display: inline-flex; align-items: center; gap: 5px; }
 .aviso-datos .ico { width: 13px; height: 13px; }
 .aviso-monto { display: grid; justify-items: end; gap: 2px; }
-.aviso-monto b { font-family: var(--f-titular, 'Barlow Semi Condensed'); font-size: 19px; color: #6FD06A; }
-.aviso-monto small { font-size: 11.5px; color: #A9B9B1; white-space: nowrap; }
+.aviso-monto b { font-family: var(--f-titular, 'Barlow Semi Condensed'); font-size: 19px; color: var(--verde); }
+.aviso-monto small { font-size: 11.5px; color: #6B7C74; white-space: nowrap; }
 @media (max-width: 640px) {
   .aviso { grid-template-columns: auto minmax(0, 1fr) auto; }
   .aviso > .btn { grid-column: 1 / -1; }
@@ -375,10 +375,10 @@
 
 /* v2 · Agenda: bloqueo por rango en varias canchas, feriados y reservas de varios turnos */
 .chips-rango { display: flex; flex-wrap: wrap; gap: 8px; }
-.chip-rango { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid rgba(255,255,255,.16); background: rgba(255,255,255,.04); color: #DCE5E0; font: 600 13px/1 var(--f-cuerpo, Inter); cursor: pointer; }
+.chip-rango { display: inline-flex; align-items: center; gap: 7px; height: 38px; padding: 0 12px; border-radius: 10px; border: 1px solid #CFDAD4; background: #fff; color: var(--noche); font: 600 13px/1 var(--f-cuerpo, Inter); cursor: pointer; }
 .chip-rango .ico { width: 16px; height: 16px; }
 .chip-rango[aria-pressed="true"] { background: var(--verde); border-color: var(--verde); color: #fff; }
-.enlace-osc { border: 0; background: transparent; color: #6FD06A; font: 600 12.5px/1 var(--f-cuerpo, Inter); cursor: pointer; padding: 4px 0; }
+.enlace-osc { border: 0; background: transparent; color: var(--verde); font: 600 12.5px/1 var(--f-cuerpo, Inter); cursor: pointer; padding: 4px 0; }
 .enlace-osc:hover { text-decoration: underline; }
 .agenda-celda .varios-turnos { position: absolute; top: -9px; right: 8px; display: inline-flex; align-items: center; gap: 4px; height: 18px; padding: 0 7px; border-radius: 9px; background: var(--noche); color: #fff; font: 700 10.5px/1 var(--f-cuerpo, Inter); font-variant-numeric: tabular-nums; }
 .agenda-celda .varios-turnos .ico { width: 11px; height: 11px; }
@@ -460,8 +460,11 @@
 .dias-chips button { height: 34px; border-radius: 9px; border: 1px solid var(--borde-p); background: #fff; font: 600 12.5px/1 var(--f-cuerpo, Inter); color: var(--noche); cursor: pointer; }
 .dias-chips button.cerrado { color: #A8B5AF; text-decoration: line-through; }
 .dias-chips button[aria-selected="true"] { background: var(--noche); color: #fff; border-color: var(--noche); }
-.previa-turnos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
-.previa-turnos li { display: grid; gap: 2px; justify-items: center; padding: 8px 4px; border-radius: 10px; border: 1.5px solid var(--grass); font-size: 12px; color: var(--texto-3); white-space: nowrap; }
-.previa-turnos li b { font-size: 12.5px; color: var(--noche); }
-.previa-turnos li.noche { border-color: var(--noche); background: #F3F6F8; }
+.previa-grupo { display: grid; gap: 6px; }
+.previa-titulo { font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #6B7C74; }
+.previa-turnos { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }
+.previa-turnos li { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 0; height: 52px; padding: 0 6px; border-radius: 10px; font-size: 12px; color: #5E7068; white-space: nowrap; }
+.previa-turnos li b { font-size: 13px; color: var(--noche); }
+.previa-turnos li.previa-dia { border: 1.5px solid #9ED39B; background: #F4FAF5; }
+.previa-turnos li.previa-noche { border: 1.5px solid #B9C6D1; background: #F3F6F9; }
 .tira-dias { scrollbar-width: thin; -webkit-mask-image: linear-gradient(90deg, #000 92%, transparent); mask-image: linear-gradient(90deg, #000 92%, transparent); padding-right: 24px; }

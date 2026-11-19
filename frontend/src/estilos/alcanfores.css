@@ -814,8 +814,8 @@ body .check.is-foco { outline: 0; }
 
 /* ============================== 12 · ADMIN ============================== */
 .ma { display: flex; min-height: 100dvh; background: var(--fondo-admin); }
-.ma-sidebar { width: var(--ancho-sidebar); flex: none; background: var(--noche); color: #fff; display: none; flex-direction: column; position: relative; overflow: hidden; }
-.ma-sidebar-in { position: sticky; top: 0; display: flex; flex-direction: column; height: 100dvh; overflow-y: auto; scrollbar-width: thin; padding: 20px 14px 16px; gap: 6px; }
+.ma-sidebar { width: var(--ancho-sidebar); flex: none; background: var(--noche); color: #fff; display: none; flex-direction: column; position: sticky; top: 0; height: 100dvh; align-self: flex-start; overflow: hidden; }
+.ma-sidebar-in { position: relative; display: flex; flex-direction: column; height: 100%; overflow-y: auto; scrollbar-width: thin; padding: 20px 14px 16px; gap: 6px; }
 .ma-logo { padding: 2px 8px 18px; display: block; }
 .ma-logo img { height: 34px; width: auto; display: block; }
 .ma-nav { display: grid; gap: 2px; }

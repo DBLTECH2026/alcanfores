@@ -275,14 +275,23 @@ export function HorarioCancha({
               <span className="t-sec">Cerrado este día.</span>
             ) : (
               <>
-                <ul className="previa-turnos">
-                  {turnos.map((t) => (
-                    <li key={t.horaInicio} className={t.franja === 'NOCHE' ? 'noche' : 'dia'}>
-                      <b className="tnum">{hora12(t.horaInicio)}</b>
-                      <span className="tnum">{fmtSoles(t.precio, { decimales: 0 })}</span>
-                    </li>
-                  ))}
-                </ul>
+                {(['DIA', 'NOCHE'] as const).map((franja) => {
+                  const grupo = turnos.filter((t) => (t.franja === 'NOCHE' ? 'NOCHE' : 'DIA') === franja);
+                  if (grupo.length === 0) return null;
+                  return (
+                    <div key={franja} className="previa-grupo">
+                      <span className="previa-titulo">{franja === 'DIA' ? 'Día' : 'Noche'}</span>
+                      <ul className="previa-turnos">
+                        {grupo.map((t) => (
+                          <li key={t.horaInicio} className={franja === 'NOCHE' ? 'previa-noche' : 'previa-dia'}>
+                            <b className="tnum">{hora12(t.horaInicio)}</b>
+                            <span className="tnum">{fmtSoles(t.precio, { decimales: 0 })}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  );
+                })}
                 <span className="dato-ico tnum">{`${plural(turnos.length, 'turno', 'turnos')} · hasta ${fmtSoles(suma, { decimales: 0 })} al día`}</span>
               </>
             )}
