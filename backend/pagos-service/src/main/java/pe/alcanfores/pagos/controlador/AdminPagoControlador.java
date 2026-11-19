@@ -85,4 +85,13 @@ public class AdminPagoControlador {
     public CobroRespuesta caja(@Valid @RequestBody SolicitudCaja solicitud) {
         return pagos.cobrarEnCaja(solicitud);
     }
+
+    @Operation(summary = "Adjuntar la foto del comprobante a un cobro en caja",
+            description = "Multipart `archivo` (JPG o PNG ≤ 5 MB, ≥ 200 px). Solo para cobros en caja con Yape, Plin o POS.")
+    @PostMapping(value = "/{id}/archivo", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public PagoDetalleRespuesta adjuntarFoto(@PathVariable Long id,
+                                             @org.springframework.web.bind.annotation.RequestParam(required = false)
+                                             org.springframework.web.multipart.MultipartFile archivo) throws java.io.IOException {
+        return pagos.adjuntarFotoCaja(id, archivo == null || archivo.isEmpty() ? null : archivo.getBytes());
+    }
 }

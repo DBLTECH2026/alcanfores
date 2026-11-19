@@ -468,3 +468,12 @@
 .previa-turnos li.previa-dia { border: 1.5px solid #9ED39B; background: #F4FAF5; }
 .previa-turnos li.previa-noche { border: 1.5px solid #B9C6D1; background: #F3F6F9; }
 .tira-dias { scrollbar-width: thin; -webkit-mask-image: linear-gradient(90deg, #000 92%, transparent); mask-image: linear-gradient(90deg, #000 92%, transparent); padding-right: 24px; }
+
+/* Validar comprobante con la foto al lado (19-nov): foto a la izquierda, datos a la derecha; en celular, la foto arriba */
+.validar-con-foto { display: grid; gap: 16px; }
+.validar-foto .visor-panel-lienzo { max-height: 56vh; }
+@media (min-width: 900px) {
+  .validar-con-foto { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); align-items: start; }
+  .validar-foto { position: sticky; top: 0; }
+  .validar-foto .visor-panel-lienzo { min-height: 420px; max-height: 62vh; }
+}

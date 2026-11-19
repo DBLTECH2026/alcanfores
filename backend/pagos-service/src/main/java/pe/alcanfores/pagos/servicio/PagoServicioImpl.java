@@ -220,6 +220,26 @@ public class PagoServicioImpl implements PagoServicio {
     }
 
     @Override
+    public PagoDetalleRespuesta adjuntarFotoCaja(Long id, byte[] imagen) {
+        Pago p = pagos.findById(id).orElseThrow(PagoServicioImpl::noExiste);
+        if (p.getCanal() != CanalPago.CAJA || p.getMetodo() == MetodoPago.EFECTIVO) {
+            throw NegocioExcepcion.regla("FOTO_NO_APLICA",
+                    "La foto solo se adjunta a cobros en caja hechos con Yape, Plin o POS.");
+        }
+        almacen.problema(imagen).ifPresent(m -> {
+            throw NegocioExcepcion.validacion("archivo", m);
+        });
+        String archivo = almacen.guardar(imagen);
+        tx.executeWithoutResult(estado -> {
+            Pago actual = pagos.findById(id).orElseThrow(PagoServicioImpl::noExiste);
+            actual.setArchivoComprobante(archivo);
+            pagos.save(actual);
+        });
+        bus.auditar("ADJUNTAR_FOTO_CAJA", "pago", id, p.getCodigoReserva() + " · " + p.getMetodo());
+        return detalle(id);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public PagoDetalleRespuesta detalle(Long id) {
         Pago p = pagos.findById(id).orElseThrow(PagoServicioImpl::noExiste);

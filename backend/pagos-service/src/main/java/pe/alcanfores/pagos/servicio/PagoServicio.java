@@ -41,6 +41,9 @@ public interface PagoServicio {
     /** Cobro presencial desde el panel. */
     CobroRespuesta cobrarEnCaja(SolicitudCaja solicitud);
 
+    /** Adjunta (o reemplaza) la foto del comprobante de un cobro en caja hecho con Yape, Plin o POS. */
+    PagoDetalleRespuesta adjuntarFotoCaja(Long id, byte[] imagen);
+
     /** Cobro presencial pedido por reservas-service (reserva manual con pago inicial). */
     CobroRespuesta cobrarEnCajaInterno(SolicitudCajaInterna solicitud);
 }

@@ -42,6 +42,8 @@ import { ahoraLima, deLima, fmtFecha, fmtFechaHora, fmtRango24 } from '@/utilida
 import { fmtSoles } from '@/utilidades/formato';
 import { abrirArchivo } from './archivos';
 import { BloqueComprobante } from './BloqueComprobante';
+import { SubidaImagen } from '@/componentes/ui/SubidaImagen';
+import { VisorComprobante } from './VisorComprobante';
 
 export const TEXTO_METODO: Record<string, string> = {
   YAPE: 'Yape',
@@ -129,6 +131,7 @@ export function ModalValidar({ idPago, alCerrar, alHecho }: { idPago: number | n
       abierto={idPago !== null}
       alCerrar={() => !enviando && alCerrar()}
       titulo="Validar comprobante"
+      tamano={pago?.canal === 'COMPROBANTE' ? 'xl' : 'md'}
       subtitulo={pago ? `${pago.codigoReserva} · ${nombre(pago.cliente)}` : 'Cargando…'}
       busto="BU-rosa-panel"
       franja={franjaReserva(r, pago)}
@@ -148,7 +151,13 @@ export function ModalValidar({ idPago, alCerrar, alHecho }: { idPago: number | n
       ) : !pago ? (
         <Cargando texto="Cargando pago…" className="!py-8" />
       ) : (
-        <div className="grid gap-3">
+        <div className={pago.canal === 'COMPROBANTE' ? 'validar-con-foto' : undefined}>
+        {pago.canal === 'COMPROBANTE' && (
+          <div className="validar-foto">
+            <VisorComprobante idPago={pago.id} leyenda={`Comprobante de ${pago.codigoReserva}`} />
+          </div>
+        )}
+        <div className="grid gap-3 content-start">
           <div className={coincide ? 'compara' : 'compara distinto'}>
             <div>
               <span>
@@ -186,6 +195,8 @@ export function ModalValidar({ idPago, alCerrar, alHecho }: { idPago: number | n
           <Casilla checked={verificado} onChange={(e) => setVerificado(e.target.checked)}>
             Verifiqué en {TEXTO_METODO[pago.metodo] ?? pago.metodo} la operación <b>{pago.codigoOperacion}</b> por <b>{fmtSoles(pago.monto)}</b>
           </Casilla>
+          <span className="t-mini text-[#6B7C74]">Al validar, el cliente recibe por WhatsApp y correo la confirmación y su boleta o factura.</span>
+        </div>
         </div>
       )}
     </Modal>
@@ -303,6 +314,13 @@ export function ModalCobrar({ reserva, alCerrar, alHecho }: { reserva: ReservaAd
   }, [reserva?.codigoReserva, saldo, tipoInicial, reset]);
   const metodo = watch('metodo');
   const tipoComp = watch('tipoComprobante');
+  const [foto, setFoto] = useState<File | null>(null);
+  const [errorFoto, setErrorFoto] = useState<string | null>(null);
+  const conFoto = metodo === 'YAPE' || metodo === 'PLIN' || metodo === 'TARJETA_POS';
+  useEffect(() => {
+    setFoto(null);
+    setErrorFoto(null);
+  }, [reserva]);
 
   const enviar = handleSubmit(async (entrada) => {
     if (!reserva) return;
@@ -317,6 +335,13 @@ export function ModalCobrar({ reserva, alCerrar, alHecho }: { reserva: ReservaAd
         codigoOperacion: d.codigoOperacion || undefined,
         comprobante: comprobanteDe(d),
       });
+      if (conFoto && foto && r.idPago) {
+        try {
+          await pagosAdminApi.adjuntarFoto(r.idPago, foto);
+        } catch {
+          toast.error('El cobro se registró, pero no se pudo guardar la foto. Súbela desde el detalle de la reserva.');
+        }
+      }
       setResultado(r);
       toast.exito(r.comprobante ? `Cobro registrado · ${r.comprobante.serieNumero}` : 'Cobro registrado');
       alHecho(r);
@@ -414,6 +439,17 @@ export function ModalCobrar({ reserva, alCerrar, alHecho }: { reserva: ReservaAd
               <CampoTexto label="N.° de operación" requerido inputMode="numeric" maxLength={12} icono={Hash} error={errors.codigoOperacion?.message} {...register('codigoOperacion')} />
             )}
           </div>
+          {conFoto && (
+            <SubidaImagen
+              valor={foto}
+              alCambiar={setFoto}
+              error={errorFoto ?? undefined}
+              alError={setErrorFoto}
+              titulo="Foto del comprobante (opcional)"
+              ayuda={metodo === 'TARJETA_POS' ? 'Voucher del POS · JPG o PNG, máx. 5 MB' : 'Captura del Yape o Plin · JPG o PNG, máx. 5 MB'}
+              nombreCampo="foto-caja"
+            />
+          )}
           <BloqueComprobante
             tipo={tipoComp}
             alTipo={(t) => setValue('tipoComprobante', t)}

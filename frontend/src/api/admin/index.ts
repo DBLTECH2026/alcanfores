@@ -98,6 +98,12 @@ export const pagosAdminApi = {
   validar: (id: number) => d(http.post<ResultadoCobro>(`/admin/pagos/${id}/validar`, {})),
   rechazar: (id: number, observacion: string) => d(http.post<DetallePago>(`/admin/pagos/${id}/rechazar`, { observacion }, S)),
   caja: (datos: CobroCaja) => d(http.post<ResultadoCobro>('/admin/pagos/caja', datos, S)),
+  /** Foto del comprobante de un cobro en caja con Yape, Plin o POS. */
+  adjuntarFoto: (id: number, archivo: File) => {
+    const fd = new FormData();
+    fd.append('archivo', archivo, archivo.name);
+    return d(http.post<DetallePago>(`/admin/pagos/${id}/archivo`, fd, { ...S, timeout: 60000 }));
+  },
 };
 
 export const comprobantesApi = {
