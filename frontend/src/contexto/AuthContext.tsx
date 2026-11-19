@@ -24,6 +24,8 @@ interface ApiAuth {
   ingresar: (usuario: string, contrasena: string) => Promise<UsuarioSesion>;
   salir: (motivo?: 'manual' | 'expirada') => void;
   tieneRol: (...roles: Rol[]) => boolean;
+  /** Reemplaza los datos del usuario de la sesión (tras editar «Mi cuenta»). */
+  actualizarUsuario: (u: UsuarioSesion) => void;
 }
 
 const CLAVE = 'alc-sesion';
@@ -72,6 +74,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return r.usuario;
   }, []);
 
+  const actualizarUsuario = useCallback<ApiAuth['actualizarUsuario']>((u) => {
+    setSesion((s) => {
+      if (!s) return s;
+      const nueva = { ...s, usuario: { ...s.usuario, ...u } };
+      localStorage.setItem(CLAVE, JSON.stringify(nueva));
+      return nueva;
+    });
+  }, []);
+
   // El interceptor lee el token y avisa los 401.
   useEffect(() => {
     registrarSesion({ token: () => leerSesion()?.token ?? null, alExpirar: () => salir('expirada') });
@@ -108,8 +119,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ingresar,
       salir,
       tieneRol: (...roles) => Boolean(sesion && roles.includes(sesion.usuario.rol)),
+      actualizarUsuario,
     }),
-    [sesion, expirada, ingresar, salir],
+    [sesion, expirada, ingresar, salir, actualizarUsuario],
   );
 
   return <Contexto.Provider value={api}>{children}</Contexto.Provider>;

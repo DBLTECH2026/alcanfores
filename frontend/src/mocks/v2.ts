@@ -4,7 +4,7 @@
  */
 import { bypass, delay, http, HttpResponse } from 'msw';
 import { setupWorker } from 'msw/browser';
-import type { DiaEspecialAdmin, HorarioAdmin, ResenaAdmin } from '@/api/admin/tipos';
+import type { ConfigCorreo, DiaEspecialAdmin, HorarioAdmin, ResenaAdmin, SolicitudCorreo } from '@/api/admin/tipos';
 import type { CuentaCliente } from '@/api/tipos';
 import { hoyLima, isoLima, ahoraLima } from '@/utilidades/fecha';
 import { semanaPorDefecto, textoSemana } from '@/utilidades/horario';
@@ -16,6 +16,9 @@ interface Bd {
   resenas: ResenaAdmin[];
   cuentas: Array<CuentaCliente & { contrasena: string }>;
   sec: number;
+  /** Recuperar contraseña y correo (SMTP). */
+  correo?: ConfigCorreo & { clave?: string };
+  telefonos?: Record<string, string | null>;
 }
 const FERIADOS: Array<[string, string]> = [
   ['01-01', 'Año Nuevo'], ['05-01', 'Día del Trabajo'], ['06-07', 'Batalla de Arica y Día de la Bandera'], ['06-29', 'San Pedro y San Pablo'],
@@ -44,7 +47,140 @@ const dniDe = (req: Request) => /cliente-(\d{8})/.exec(req.headers.get('Authoriz
 const sesion = (c: CuentaCliente) => ({ token: `x.cliente-${c.dni}.y`, tipo: 'Bearer', expiraEn: isoLima(ahoraLima().add(8, 'hour')), cliente: c });
 const sinClave = ({ contrasena: _c, ...c }: Bd['cuentas'][number]) => c;
 
+// ---------- recuperar contraseña (en memoria) ----------
+interface Recuperacion { codigo: string; expira: number; intentos: number; envios: number }
+const recuperaciones = new Map<string, Recuperacion>();
+const tokens = new Map<string, string>();
+const enmascararCorreo = (c: string) => c.replace(/^(.{2})[^@]*(@.*)$/, '$1***$2');
+const enmascararCel = (t: string) => `*** *** ${t.slice(-3)}`;
+const idPanel = () => (JSON.parse(localStorage.getItem('alc-sesion') ?? 'null') as { usuario?: { id: number } } | null)?.usuario?.id ?? 0;
+const correoInicial = (): ConfigCorreo => ({ configurado: false, origen: 'NINGUNO', host: null, puerto: null, usuario: null, remitente: null, nombreRemitente: null, seguridad: null, tieneClave: false });
+const sinClaveCorreo = (c: ConfigCorreo & { clave?: string }): ConfigCorreo => {
+  const { clave: _c, ...resto } = c;
+  return resto;
+};
+const MSJ_INTENTOS = 'Muchos intentos. Pide un código nuevo.';
+
 const manejadores = [
+  // ---------- recuperar contraseña ----------
+  http.post('/api/auth/recuperar/opciones', async ({ request }) => {
+    await delay(350);
+    const b = (await request.json()) as { tipoCuenta: string; usuario: string };
+    if (b.usuario === '00000000' || b.usuario === 'noexiste') return err(404, 'CUENTA_NO_ENCONTRADA', 'No encontramos una cuenta con esos datos.', [{ campo: 'usuario', mensaje: 'No encontramos una cuenta con esos datos.' }]);
+    const cuenta = bd.cuentas.find((c) => c.dni === b.usuario || c.correo === b.usuario);
+    const correo = cuenta?.correo ?? (b.usuario.includes('@') ? b.usuario : b.tipoCuenta === 'ADMIN' ? `${b.usuario}@alcanfores.pe` : 'cliente@gmail.com');
+    const tel = b.tipoCuenta === 'ADMIN' ? (bd.telefonos?.yo ?? null) : (cuenta?.telefono ?? '987654659');
+    const canales = [{ canal: 'CORREO', destino: enmascararCorreo(correo) }, ...(tel ? [{ canal: 'WHATSAPP', destino: enmascararCel(tel) }] : [])];
+    return ok({ canales });
+  }),
+  http.post('/api/auth/recuperar/enviar', async ({ request }) => {
+    await delay(600);
+    const b = (await request.json()) as { tipoCuenta: string; usuario: string; canal: 'CORREO' | 'WHATSAPP' };
+    const k = `${b.tipoCuenta}:${b.usuario}`;
+    const previo = recuperaciones.get(k);
+    if (previo && previo.envios >= 5) return err(429, 'DEMASIADOS_ENVIOS', 'Pediste muchos códigos. Espera 15 minutos e intenta de nuevo.');
+    const r: Recuperacion = { codigo: String(Math.floor(100000 + Math.random() * 900000)), expira: Date.now() + 10 * 60000, intentos: 0, envios: (previo?.envios ?? 0) + 1 };
+    recuperaciones.set(k, r);
+    const destino = b.canal === 'CORREO' ? (b.usuario.includes('@') ? enmascararCorreo(b.usuario) : 'cl***@gmail.com') : '*** *** 659';
+    return ok({ destino, expiraEn: isoLima(ahoraLima().add(10, 'minute')), reenviarEn: isoLima(ahoraLima().add(45, 'second')), simulado: b.canal === 'WHATSAPP' || !bd.correo?.configurado, codigoPrueba: r.codigo });
+  }),
+  http.post('/api/auth/recuperar/verificar', async ({ request }) => {
+    await delay(400);
+    const b = (await request.json()) as { tipoCuenta: string; usuario: string; codigo: string };
+    const r = recuperaciones.get(`${b.tipoCuenta}:${b.usuario}`);
+    if (!r || Date.now() > r.expira) return err(422, 'CODIGO_VENCIDO', 'El código venció. Pide otro.', [{ campo: 'codigo', mensaje: 'El código venció. Pide otro.' }]);
+    if (r.intentos >= 5) return err(422, 'DEMASIADOS_INTENTOS', MSJ_INTENTOS, [{ campo: 'codigo', mensaje: MSJ_INTENTOS }]);
+    if (r.codigo !== b.codigo) {
+      r.intentos += 1;
+      if (r.intentos >= 5) return err(422, 'DEMASIADOS_INTENTOS', MSJ_INTENTOS, [{ campo: 'codigo', mensaje: MSJ_INTENTOS }]);
+      const m = `El código no es correcto. Te quedan ${5 - r.intentos} intentos.`;
+      return err(422, 'CODIGO_INCORRECTO', m, [{ campo: 'codigo', mensaje: m }]);
+    }
+    const t = `rec-${Math.random().toString(36).slice(2)}`;
+    tokens.set(t, `${b.tipoCuenta}:${b.usuario}`);
+    recuperaciones.delete(`${b.tipoCuenta}:${b.usuario}`);
+    return ok({ tokenRestablecer: t, expiraEn: isoLima(ahoraLima().add(15, 'minute')) });
+  }),
+  http.post('/api/auth/recuperar/restablecer', async ({ request }) => {
+    await delay(400);
+    const b = (await request.json()) as { tokenRestablecer: string; nueva: string; confirmacion: string };
+    if (!tokens.has(b.tokenRestablecer)) return err(422, 'TOKEN_VENCIDO', 'El permiso para cambiar la contraseña venció. Empieza de nuevo.');
+    if (b.nueva !== b.confirmacion) return err(400, 'VALIDACION', 'Revisa los datos marcados.', [{ campo: 'confirmacion', mensaje: 'Las contraseñas no coinciden.' }]);
+    const [tipo, usuario] = (tokens.get(b.tokenRestablecer) ?? '').split(':');
+    if (tipo === 'CLIENTE') bd.cuentas = bd.cuentas.map((c) => (c.dni === usuario || c.correo === usuario ? { ...c, contrasena: b.nueva } : c));
+    tokens.delete(b.tokenRestablecer);
+    guardar();
+    return new HttpResponse(null, { status: 204 });
+  }),
+  // ---------- WhatsApp con tarjeta ilustrada (adjunto IMAGEN) si el back aún no la manda ----------
+  http.get('/api/admin/notificaciones/:id', async ({ request }) => {
+    const r = await fetch(bypass(request));
+    if (!r.ok) return r;
+    const n = (await r.json()) as { canal: string; evento: string; adjuntos: Array<{ tipo: string }> };
+    if (n.canal !== 'WHATSAPP' || n.adjuntos.some((a) => a.tipo === 'IMAGEN')) return ok(n);
+    const archivo = n.evento.toLowerCase().replace(/[_.]/g, '-').replace(/^recordatorio.*/, 'recordatorio-futbol');
+    return ok({ ...n, adjuntos: [{ tipo: 'IMAGEN', referencia: archivo, nombreArchivo: `${archivo}.jpg`, estado: 'ADJUNTADO', detalle: null }, ...n.adjuntos] });
+  }),
+  // ---------- correo (SMTP) ----------
+  http.get('/api/admin/correo', () => ok(sinClaveCorreo(bd.correo ?? correoInicial()))),
+  http.put('/api/admin/correo', async ({ request }) => {
+    await delay(400);
+    const b = (await request.json()) as SolicitudCorreo;
+    const clave = b.clave || bd.correo?.clave || '';
+    bd.correo = { configurado: true, origen: 'PANEL', host: b.host, puerto: b.puerto, usuario: b.usuario, remitente: b.remitente, nombreRemitente: b.nombreRemitente, seguridad: b.seguridad, tieneClave: Boolean(clave), clave };
+    guardar();
+    return ok(sinClaveCorreo(bd.correo));
+  }),
+  http.post('/api/admin/correo/prueba', async ({ request }) => {
+    await delay(1200);
+    const b = (await request.json()) as { destino: string };
+    const c = bd.correo;
+    if (!c?.configurado) return ok({ destino: b.destino, enviado: false, simulado: true, estado: 'SIMULADO', mensaje: 'Sin servidor de correo.' });
+    if (!c.host?.endsWith('hostinger.com')) return err(502, 'CORREO_NO_ENVIADO', `No se pudo conectar con ${c.host ?? ''}:${c.puerto ?? ''}. Revisa el servidor y el puerto.`);
+    return ok({ destino: b.destino, enviado: true, simulado: false, estado: 'ENVIADO' });
+  }),
+  // ---------- administradores: celular ----------
+  http.get('/api/auth/yo', async ({ request }) => {
+    const r = await fetch(bypass(request));
+    if (!r.ok) return r;
+    const u = (await r.json()) as { id: number; correo: string; telefono?: string | null };
+    const extra = bd.telefonos ?? {};
+    return ok({ ...u, telefono: u.telefono ?? extra[`u${u.id}`] ?? null, correo: extra[`c${u.id}`] ?? u.correo });
+  }),
+  http.put('/api/auth/yo', async ({ request }) => {
+    const b = (await request.json()) as { telefono: string | null; correo: string };
+    const id = idPanel();
+    bd.telefonos = { ...(bd.telefonos ?? {}), [`u${id}`]: b.telefono, yo: b.telefono, [`c${id}`]: b.correo };
+    guardar();
+    const r = await fetch(bypass(new Request(new URL('/api/auth/yo', request.url), { headers: request.headers })));
+    const u = r.ok ? ((await r.json()) as Record<string, unknown>) : {};
+    return ok({ ...u, telefono: b.telefono, correo: b.correo });
+  }),
+  http.get('/api/admin/usuarios', async ({ request }) => {
+    const r = await fetch(bypass(request));
+    if (!r.ok) return r;
+    const p = (await r.json()) as { contenido: Array<{ id: number; telefono?: string | null }> };
+    return ok({ ...p, contenido: p.contenido.map((u) => ({ ...u, telefono: u.telefono ?? bd.telefonos?.[`u${u.id}`] ?? null })) });
+  }),
+  http.post('/api/admin/usuarios', async ({ request }) => {
+    const b = (await request.clone().json()) as { telefono?: string | null };
+    const r = await fetch(bypass(request));
+    if (!r.ok) return r;
+    const u = (await r.json()) as { id: number };
+    bd.telefonos = { ...(bd.telefonos ?? {}), [`u${u.id}`]: b.telefono ?? null };
+    guardar();
+    return ok({ ...u, telefono: b.telefono ?? null }, 201);
+  }),
+  http.put('/api/admin/usuarios/:id', async ({ request, params }) => {
+    const b = (await request.clone().json()) as { telefono?: string | null };
+    const r = await fetch(bypass(request));
+    if (!r.ok) return r;
+    const u = (await r.json()) as { id: number };
+    bd.telefonos = { ...(bd.telefonos ?? {}), [`u${String(params.id)}`]: b.telefono ?? null };
+    guardar();
+    return ok({ ...u, telefono: b.telefono ?? null });
+  }),
+
   // ---------- calendario ----------
   http.get('/api/admin/calendario', ({ request }) => {
     const anio = new URL(request.url).searchParams.get('anio') ?? hoyLima().slice(0, 4);

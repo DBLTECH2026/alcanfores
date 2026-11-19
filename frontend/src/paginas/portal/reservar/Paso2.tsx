@@ -180,6 +180,11 @@ export default function Paso2() {
 
   const verificado = dniEstado === 'verificado';
   const rucOk = rucEstado === 'verificado';
+  const razonSocial = (watch('razonSocial') ?? '').trim();
+  const direccionFiscal = (watch('direccionFiscal') ?? '').trim();
+  // Mismos mínimos que el esquema: si SUNAT trae algo más corto, se pide escribirlo.
+  const razonOk = rucOk && razonSocial.length >= 3;
+  const direccionOk = rucOk && direccionFiscal.length >= 5;
   const errorAcepta = errors.aceptaTerminos?.message ?? errors.aceptaPrivacidad?.message;
 
   return (
@@ -325,8 +330,29 @@ export default function Paso2() {
                 accion={<BotonLupa etiqueta="Buscar RUC en SUNAT" buscando={rucEstado === 'buscando'} alPulsar={() => void consultarRuc(getValues('ruc') ?? '')} />}
                 {...register('ruc', { setValueAs: (v: string) => String(v ?? '').replace(/\D/g, '').slice(0, 11) })}
               />
-              <CampoTexto label="Razón social" requerido icono={Building2} maxLength={150} lectura={rucOk} valido={rucOk} error={errors.razonSocial?.message} {...register('razonSocial')} />
-              <CampoTexto label="Dirección fiscal" requerido icono={MapPin} maxLength={200} lectura={rucOk} valido={rucOk} className="md:col-span-2" error={errors.direccionFiscal?.message} {...register('direccionFiscal')} />
+              {/* Lo que trae SUNAT se muestra como texto que se ajusta (no un input de solo lectura que lo corta).
+                  Si SUNAT no trae alguno de los dos (o viene incompleto), ese queda como campo para escribirlo. */}
+              {(razonOk || direccionOk) && (
+                <div className="dato-verificado md:col-span-2">
+                  <BadgeCheck className="ico" aria-hidden />
+                  <dl>
+                    {razonOk && (
+                      <div>
+                        <dt>Razón social</dt>
+                        <dd>{razonSocial}</dd>
+                      </div>
+                    )}
+                    {direccionOk && (
+                      <div>
+                        <dt>Dirección fiscal</dt>
+                        <dd>{direccionFiscal}</dd>
+                      </div>
+                    )}
+                  </dl>
+                </div>
+              )}
+              {!razonOk && <CampoTexto label="Razón social" requerido icono={Building2} maxLength={150} className="md:col-span-2" error={errors.razonSocial?.message} {...register('razonSocial')} />}
+              {!direccionOk && <CampoTexto label="Dirección fiscal" requerido icono={MapPin} maxLength={200} className="md:col-span-2" error={errors.direccionFiscal?.message} {...register('direccionFiscal')} />}
               {rucOk && rucMensaje && (
                 <Alerta tipo="advertencia" className="md:col-span-2">
                   {`${rucMensaje}. Revisa el RUC: SUNAT no lo tiene activo.`}

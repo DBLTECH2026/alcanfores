@@ -127,9 +127,9 @@ export function EditorVisual({
 
   return (
     <div className="editor-visual">
-      <div className="grid gap-3 min-w-0">
+      <div className="grid grid-cols-[minmax(0,1fr)] gap-3 min-w-0">
         <div className="editor-barra">
-          <div className="editor-partes" role="toolbar" aria-label="Partes de la ficha">
+          <div className="editor-partes xl:flex-wrap xl:[&>.editor-parte]:px-2" role="toolbar" aria-label="Partes de la ficha">
             {PARTES.map((p) => (
               <button key={p.id} type="button" aria-pressed={activa === p.id} className="editor-parte" onClick={() => setActiva(p.id)}>
                 <p.icono className="ico" aria-hidden />

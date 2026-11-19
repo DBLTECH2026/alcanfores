@@ -7,6 +7,11 @@ import { Modal } from '@/componentes/ui/Modal';
 import { fmtSoles } from '@/utilidades/formato';
 import { cx } from '@/utilidades/cx';
 
+/** «Cancha 1 · Fútbol 5» → «Cancha 1» (el deporte ya va en su propia línea). */
+function nombreCorto(nombre: string): string {
+  return nombre.split(' · ')[0] || nombre;
+}
+
 function Portada({ cancha, className }: { cancha: CanchaResumen; className?: string }) {
   return (
     <span className={cx('sc-portada', className)}>
@@ -43,9 +48,9 @@ export function ModalCanchas({ abierto, canchas, activa, alElegir, alCerrar }: {
               <span className="sc-cuerpo">
                 <span className="sc-dep">
                   <IconoDeporte deporte={c.deporte} />
-                  {c.deporteTexto}
+                  <span className="sc-dep-txt">{c.deporteTexto}</span>
                 </span>
-                <b className="sc-nombre">{c.nombre}</b>
+                <b className="sc-nombre">{nombreCorto(c.nombre)}</b>
                 <span className="sc-datos">
                   <span>
                     <Users className="ico" aria-hidden />
@@ -82,8 +87,8 @@ export function ModalCanchas({ abierto, canchas, activa, alElegir, alCerrar }: {
 }
 
 /**
- * Cancha elegida en una tarjeta compacta (portada pequeña, nombre y deporte) + «Cambiar», que abre el modal de tarjetas.
- * Lo usan el paso 1 del portal y la «Nueva reserva» del panel.
+ * Cancha elegida en una tarjeta compacta (portada pequeña, nombre corto y deporte) + «Cambiar», que abre el modal de tarjetas.
+ * Debajo de 400 px «Cambiar» queda solo con el ícono (40x40). Lo usan el paso 1 del portal y la «Nueva reserva» del panel.
  */
 export function SelectorCancha({ canchas, activa, alElegir, className }: { canchas: CanchaResumen[]; activa: number | null; alElegir: (id: number) => void; className?: string }) {
   const [abierto, setAbierto] = useState(false);
@@ -94,11 +99,13 @@ export function SelectorCancha({ canchas, activa, alElegir, className }: { canch
         {c ? (
           <>
             <Portada cancha={c} className="pequena" />
-            <span className="grid gap-0.5 min-w-0">
-              <b className="truncar">{c.nombre}</b>
+            <span className="sc-elegida-txt">
+              <b className="sc-elegida-nom" title={c.nombre}>
+                {nombreCorto(c.nombre)}
+              </b>
               <span className="sc-dep">
                 <IconoDeporte deporte={c.deporte} />
-                {c.deporteTexto}
+                <span className="sc-dep-txt">{c.deporteTexto}</span>
               </span>
             </span>
           </>
@@ -106,8 +113,8 @@ export function SelectorCancha({ canchas, activa, alElegir, className }: { canch
           <span className="t-sec">Elige una cancha</span>
         )}
         {canchas.length > 1 && (
-          <Boton variante="secundario" tamano="sm" icono={Repeat2} className="ml-auto shrink-0" onClick={() => setAbierto(true)}>
-            Cambiar
+          <Boton variante="secundario" tamano="sm" icono={Repeat2} etiqueta="Cambiar cancha" className="sc-cambiar ml-auto shrink-0" onClick={() => setAbierto(true)}>
+            <span className="sc-cambiar-txt">Cambiar</span>
           </Boton>
         )}
       </div>

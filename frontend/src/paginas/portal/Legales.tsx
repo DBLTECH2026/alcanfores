@@ -49,14 +49,13 @@ function Pagina({ kicker, titulo, ilustracion, actualizado, children }: { kicker
 
 function Punto({ icono: I, titulo, children, alerta }: { icono: LucideIcon; titulo: string; children: ReactNode; alerta?: boolean }) {
   return (
-    <section className="card p-4 md:p-5 flex gap-4 items-start">
-      <span className={`grid place-items-center w-11 h-11 rounded-12 shrink-0 ${alerta ? 'bg-amarillo-tinte text-noche' : 'bg-menta text-profundo'}`}>
+    // Debajo de 480 px el ícono va en la fila del título y el párrafo usa todo el ancho de la tarjeta.
+    <section className="card p-4 md:p-5 grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-2 items-center min-[480px]:gap-x-4 min-[480px]:gap-y-1 min-[480px]:items-start">
+      <span className={`grid place-items-center w-10 h-10 min-[480px]:w-11 min-[480px]:h-11 min-[480px]:row-span-2 rounded-12 shrink-0 ${alerta ? 'bg-amarillo-tinte text-noche' : 'bg-menta text-profundo'}`}>
         <I className="ico ico-20" aria-hidden />
       </span>
-      <div className="grid gap-1">
-        <h2 className="t-h4">{titulo}</h2>
-        <div className="t-sec !text-[14.5px] leading-relaxed">{children}</div>
-      </div>
+      <h2 className="t-h4">{titulo}</h2>
+      <div className="col-span-2 min-[480px]:col-span-1 min-[480px]:col-start-2 t-sec !text-[14.5px] leading-relaxed">{children}</div>
     </section>
   );
 }

@@ -77,7 +77,7 @@ export function TarjetaCancha({ cancha, cta = 'Ver cancha', destino, className }
           <span className="desde-et">Desde</span>
           <span className="desde-val">
             {fmtSoles(cancha.precioDia, { decimales: 0 })}
-            <small>/ hora</small>
+            <small>/ turno</small>
           </span>
         </div>
         <Link to={a} className={clasesBoton({ variante: 'secundario', tamano: 'sm' })}>

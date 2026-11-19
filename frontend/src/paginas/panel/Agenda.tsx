@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
 import {
+  CalendarClock,
   CalendarDays,
   CalendarPlus,
   ChevronDown,
@@ -25,7 +26,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import { calendarioApi, reservasAdminApi, turnosApi } from '@/api/admin';
-import type { AgendaDia, TurnoAgenda } from '@/api/admin/tipos';
+import type { AgendaDia, ReservaAdmin, TurnoAgenda } from '@/api/admin/tipos';
 import { esErrorApi } from '@/api/cliente';
 import { useToast } from '@/contexto/ToastContext';
 import { useCarga } from '@/hooks/useCarga';
@@ -36,9 +37,12 @@ import { ErrorCarga, MenuFila, ModalConfirmar } from '@/componentes/panel/Herram
 import { Boton } from '@/componentes/ui/Boton';
 import { AreaTexto, CampoTexto, Interruptor, Selector } from '@/componentes/ui/Campo';
 import { Esqueleto, Segmentado, Vacio } from '@/componentes/ui/Datos';
+import { horario24 } from '@/componentes/panel/ModalesReserva';
+import { ModalReprogramar } from '@/componentes/reserva/ModalReprogramar';
 import { Alerta, InsigniaEstado } from '@/componentes/ui/Estados';
 import { IconoDeporte } from '@/componentes/ui/Marca';
-import { ahoraLima, fmtFecha, fmtRango24, hoyLima, sumarDias } from '@/utilidades/fecha';
+import { ASISTENCIA_DESDE_MIN, ahoraLima, fmtFecha, fmtHora24, fmtRango24, hoyLima, inicioAsistencia, puedeMarcarAsistencia, sumarDias } from '@/utilidades/fecha';
+import { useComplejo } from '@/hooks/useDatosPublicos';
 import { fmtSoles, plural } from '@/utilidades/formato';
 import { cx } from '@/utilidades/cx';
 import { esquemaBloqueo, esquemaRango } from './esquemasPanel';
@@ -46,16 +50,30 @@ import { esquemaBloqueo, esquemaRango } from './esquemasPanel';
 type Cancha = AgendaDia['canchas'][number];
 type Celda = { cancha: Cancha; turno: TurnoAgenda };
 
-function useEsMovil() {
-  const [m, setM] = useState(() => window.matchMedia('(max-width: 767px)').matches);
-  useEffect(() => {
-    const mq = window.matchMedia('(max-width: 767px)');
-    const f = () => setM(mq.matches);
-    mq.addEventListener('change', f);
-    return () => mq.removeEventListener('change', f);
-  }, []);
-  return m;
+/** Ancho mínimo de la grilla: columna de horas + 158 px por cancha (columna de 150 + separación). */
+const anchoGrilla = (canchas: number) => 64 + canchas * 158;
+
+/**
+ * Una cancha a la vez (con chips) cuando la grilla de todas no cabe sin deslizar: celular, tablet y
+ * laptop chica o iPad acostado. Se mide el espacio real de la grilla, así sirve igual con 3 o con 6
+ * canchas; antes de la primera medida se usa el corte de 1200 px. Devuelve [unaCancha, ref de la caja].
+ */
+function useUnaCancha(canchas: number) {
+  const [caja, setCaja] = useState<HTMLDivElement | null>(null);
+  const [ancho, setAncho] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    if (!caja) return;
+    setAncho(caja.clientWidth);
+    const ro = new ResizeObserver(() => setAncho(caja.clientWidth));
+    ro.observe(caja);
+    return () => ro.disconnect();
+  }, [caja]);
+  const unaCancha = ancho === null || canchas === 0 ? window.innerWidth < 1200 : ancho < anchoGrilla(canchas);
+  return [unaCancha, setCaja] as const;
 }
+
+/** Nombre corto completo de la cancha («Cancha 1», «Losa multiusos»), nunca abreviado. */
+const corto = (c: { nombre: string }) => c.nombre.split(' · ')[0] ?? c.nombre;
 
 /** Texto de una celda bloqueada según el origen del bloqueo (v2). */
 const TEXTO_BLOQUEO: Record<string, string> = { FERIADO: 'Feriado', NO_LABORABLE: 'No laborable', CANCHA_INACTIVA: 'Cancha inactiva', MANUAL: 'Bloqueado' };
@@ -69,7 +87,6 @@ export default function Agenda() {
   useTituloPagina('Agenda');
   const navigate = useNavigate();
   const toast = useToast();
-  const movil = useEsMovil();
   const [sp, setSp] = useSearchParams();
   const fecha = sp.get('fecha') || hoyLima();
   const ponerFecha = (f: string) => setSp(f === hoyLima() ? {} : { fecha: f }, { replace: true });
@@ -85,6 +102,7 @@ export default function Agenda() {
     | { tipo: 'bloquear' | 'desbloquear'; celda: Celda }
     | { tipo: 'ASISTIO' | 'NO_ASISTIO'; celda: Celda }
     | { tipo: 'rango' }
+    | { tipo: 'reprogramar'; reserva: ReservaAdmin }
     | null
   >(null);
   const recargar = () => {
@@ -93,12 +111,15 @@ export default function Agenda() {
   };
 
   const canchas = useMemo(() => ag.datos?.canchas ?? [], [ag.datos]);
+  const [movil, refGrilla] = useUnaCancha(canchas.length);
   useEffect(() => {
     if (canchaMovil === null && canchas[0]) setCanchaMovil(canchas[0].idCancha);
   }, [canchas, canchaMovil]);
   const visibles = movil ? canchas.filter((c) => c.idCancha === canchaMovil) : canchas;
   const horas = useMemo(() => [...new Set(canchas.flatMap((c) => c.turnos.map((t) => t.horaInicio)))].sort(), [canchas]);
   const esHoy = fecha === hoyLima();
+  const complejo = useComplejo();
+  const desdeMin = complejo.datos?.reglas.asistenciaDesdeMin ?? ASISTENCIA_DESDE_MIN;
   const ahora = ahoraLima().format('HH:mm');
   const finDe = (h: string) => canchas.flatMap((c) => c.turnos).find((t) => t.horaInicio === h)?.horaFin ?? h;
   const pasadas = esHoy ? horas.filter((h) => finDe(h) <= ahora) : fecha < hoyLima() ? horas : [];
@@ -113,6 +134,16 @@ export default function Agenda() {
       await turnosApi.desbloquear(c.turno.idTurno);
       toast.exito('Turno liberado');
       recargar();
+    } catch {
+      /* toast del interceptor */
+    }
+  };
+  /** Reprogramar pide el detalle (turnos, montos) y abre el modal; si ya no se puede, solo avisa. */
+  const reprogramar = async (codigo: string) => {
+    try {
+      const det = await reservasAdminApi.detalle(codigo);
+      if (det.puedeReprogramar === false) toast.info('Esta reserva ya no se puede reprogramar');
+      else setModal({ tipo: 'reprogramar', reserva: det });
     } catch {
       /* toast del interceptor */
     }
@@ -140,16 +171,21 @@ export default function Agenda() {
       const mismos = c.turnos.filter((x) => x.reserva?.codigoReserva === r.codigoReserva);
       const n = Math.max(mismos.length, r.cantidadTurnos ?? 1);
       const pos = mismos.findIndex((x) => x.idTurno === t.idTurno) + 1;
+      const primera = mismos[0]?.horaInicio ?? t.horaInicio;
+      const puedeAsis = r.puedeMarcarAsistencia ?? puedeMarcarAsistencia(fecha, primera, desdeMin);
+      const desdeAsis = puedeAsis ? undefined : `Desde las ${inicioAsistencia(fecha, primera, desdeMin).format('HH:mm')}`;
+      // Se reprograma mientras el partido (su primer turno) no empiece.
+      const empezo = fecha < hoyLima() || (esHoy && primera <= ahora);
       return (
         <div key={c.idCancha} className={cx('agenda-celda', conf ? 'confirmada' : 'pendiente', pasado && 'pasado', n > 1 && 'varios', n > 1 && pos > 1 && 'continua')}>
           {n > 1 && (
-            <span className="varios-turnos" title={r.horarioTexto ?? undefined}>
+            <span className="varios-turnos" title={horario24({ ...r, horaInicio: t.horaInicio, horaFin: t.horaFin, cantidadTurnos: n })}>
               <Link2 className="ico" aria-hidden />
               {`${pos} de ${n}`}
             </span>
           )}
-          <div className="fila">
-            <button type="button" className="cod bg-transparent border-0 p-0 cursor-pointer text-left tnum" onClick={() => navigate(`/admin/reservas/${r.codigoReserva}`)}>
+          <div className="fila flex-wrap">
+            <button type="button" className="cod bg-transparent border-0 p-0 cursor-pointer text-left tnum whitespace-nowrap" onClick={() => navigate(`/admin/reservas/${r.codigoReserva}`)}>
               {r.codigoReserva}
             </button>
             <InsigniaEstado dominio={r.estadoPago === 'EN_REVISION' ? 'estadoPago' : 'reserva'} estado={r.estadoPago === 'EN_REVISION' ? 'EN_REVISION' : r.estado} tamano="sm" />
@@ -159,12 +195,23 @@ export default function Agenda() {
             <span className="truncar">{r.cliente}</span>
           </span>
           {conf && r.asistencia !== 'PENDIENTE' && <InsigniaEstado dominio="asistencia" estado={r.asistencia} tamano="sm" />}
-          <div className="flex justify-end -mb-1">
+          <div className="celda-menu flex justify-end -mb-1">
             <MenuFila
+              contexto={{
+                titulo: r.codigoReserva,
+                subtitulo: `${r.cliente} · ${corto(c)} · ${horario24({ ...r, horaInicio: t.horaInicio, horaFin: t.horaFin, cantidadTurnos: n })}`,
+                detalle: (
+                  <>
+                    <InsigniaEstado dominio="reserva" estado={r.estado} tamano="sm" />
+                    {r.estadoPago && <InsigniaEstado dominio="estadoPago" estado={r.estadoPago} tamano="sm" />}
+                  </>
+                ),
+              }}
               acciones={[
                 { texto: 'Ver reserva', icono: Eye, alPulsar: () => navigate(`/admin/reservas/${r.codigoReserva}`) },
-                { texto: 'Asistió', icono: UserCheck, alPulsar: () => setModal({ tipo: 'ASISTIO', celda: info }), oculta: !conf || r.asistencia !== 'PENDIENTE' },
-                { texto: 'No asistió', icono: UserX, alPulsar: () => setModal({ tipo: 'NO_ASISTIO', celda: info }), oculta: !conf || r.asistencia !== 'PENDIENTE' },
+                { texto: 'Reprogramar', icono: CalendarClock, alPulsar: () => void reprogramar(r.codigoReserva), oculta: r.estado === 'CANCELADA' || r.asistencia !== 'PENDIENTE' || empezo },
+                { texto: 'Asistió', icono: UserCheck, alPulsar: () => setModal({ tipo: 'ASISTIO', celda: info }), oculta: !conf || r.asistencia !== 'PENDIENTE', deshabilitada: !puedeAsis, motivo: desdeAsis },
+                { texto: 'No asistió', icono: UserX, alPulsar: () => setModal({ tipo: 'NO_ASISTIO', celda: info }), oculta: !conf || r.asistencia !== 'PENDIENTE', deshabilitada: !puedeAsis, motivo: desdeAsis },
               ]}
             />
           </div>
@@ -182,15 +229,38 @@ export default function Agenda() {
           </span>
           <span className="sub">{t.motivoBloqueo}</span>
           {!pasado && manual && (
-            <div className="flex justify-end -mb-1">
-              <MenuFila acciones={[{ texto: 'Desbloquear', icono: LockOpen, alPulsar: () => setModal({ tipo: 'desbloquear', celda: info }) }]} />
+            <div className="celda-menu flex justify-end -mb-1">
+              <MenuFila
+                contexto={{ titulo: `${corto(c)} · ${fmtRango24(t.horaInicio, t.horaFin)}`, subtitulo: `${TEXTO_BLOQUEO[t.tipoBloqueo ?? 'MANUAL'] ?? 'Bloqueado'}${t.motivoBloqueo ? ` · ${t.motivoBloqueo}` : ''}` }}
+                acciones={[{ texto: 'Desbloquear', icono: LockOpen, alPulsar: () => setModal({ tipo: 'desbloquear', celda: info }) }]}
+              />
             </div>
           )}
         </div>
       );
     }
+    const tocable = !pasado && c.activa;
+    const reservar = () => navigate(`/admin/nueva-reserva?idCancha=${c.idCancha}&fecha=${fecha}&hora=${fmtHora24(t.horaInicio)}`);
     return (
-      <div key={c.idCancha} className={cx('agenda-celda', !pasado && c.activa && 'libre', pasado && 'pasado')}>
+      <div
+        key={c.idCancha}
+        className={cx('agenda-celda', tocable && 'libre', pasado && 'pasado')}
+        {...(tocable ? {
+          role: 'button',
+          tabIndex: 0,
+          'aria-label': `Reservar ${corto(c)} a las ${fmtHora24(t.horaInicio)}`,
+          // Solo cuentan los toques dentro de la celda (no los del menú ⋯, que se dibuja fuera con un portal).
+          onClick: (e: MouseEvent<HTMLDivElement>) => {
+            if (e.currentTarget.contains(e.target as Node)) reservar();
+          },
+          onKeyDown: (e: KeyboardEvent<HTMLDivElement>) => {
+            if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+              e.preventDefault();
+              reservar();
+            }
+          },
+        } : {})}
+      >
         <div className="fila">
           <span className="sub">{pasado ? (h === enCurso ? 'En curso' : 'Pasado') : 'Libre'}</span>
           <span className="precio">{fmtSoles(t.precio, { decimales: 0 })}</span>
@@ -202,10 +272,11 @@ export default function Agenda() {
           </span>
         )}
         {!pasado && (
-          <div className="flex justify-end -mb-1 mt-auto">
+          <div className="celda-menu flex justify-end -mb-1 mt-auto">
             <MenuFila
+              contexto={{ titulo: `${corto(c)} · ${fmtRango24(t.horaInicio, t.horaFin)}`, subtitulo: `Libre · ${fmtSoles(t.precio, { decimales: 0 })} · ${fmtFecha(fecha, 'corta')}` }}
               acciones={[
-                { texto: 'Reservar aquí', icono: CalendarPlus, alPulsar: () => navigate(`/admin/nueva-reserva?idCancha=${c.idCancha}&fecha=${fecha}&idTurno=${t.idTurno}`) },
+                { texto: 'Reservar aquí', icono: CalendarPlus, alPulsar: reservar },
                 { texto: 'Bloquear', icono: Lock, alPulsar: () => setModal({ tipo: 'bloquear', celda: info }) },
               ]}
             />
@@ -230,6 +301,7 @@ export default function Agenda() {
               <input type="date" className="sr-only" value={fecha} onChange={(e) => e.target.value && ponerFecha(e.target.value)} aria-label="Elegir fecha" />
             </label>
             <Boton variante="secundario" className="!flex-none" icono={ChevronRight} etiqueta="Día siguiente" onClick={() => ponerFecha(sumarDias(fecha, 1))} />
+            <Boton variante="secundario" className="!flex-none" icono={RefreshCw} etiqueta="Actualizar" onClick={() => setVersion((v) => v + 1)} />
           </>
         }
       />
@@ -261,14 +333,9 @@ export default function Agenda() {
             Validado
           </span>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Boton variante="secundario" tamano="sm" icono={RefreshCw} onClick={() => setVersion((v) => v + 1)}>
-            Actualizar
-          </Boton>
-          <Boton variante="oscuro" tamano="sm" icono={Lock} onClick={() => setModal({ tipo: 'rango' })}>
-            Bloquear horas
-          </Boton>
-        </div>
+        <Boton variante="oscuro" tamano="sm" icono={Lock} onClick={() => setModal({ tipo: 'rango' })}>
+          Bloquear horas
+        </Boton>
       </div>
 
       {diaEspecial && (
@@ -296,19 +363,17 @@ export default function Agenda() {
       ) : (
         <section className="card card-pad grid gap-3 min-w-0">
           {movil && (
-            <div className="overflow-x-auto min-w-0">
-            <Segmentado
-              etiqueta="Cancha"
-              bloque
-              pequeno
-              valor={canchaMovil !== null ? String(canchaMovil) : null}
-              alCambiar={(v) => setCanchaMovil(Number(v))}
-              opciones={canchas.map((c) => ({ valor: String(c.idCancha), texto: c.nombre.split(' · ')[0]?.replace('Cancha ', 'C') ?? '' }))}
-            />
+            <div className="flex flex-wrap gap-2" role="group" aria-label="Cancha">
+              {canchas.map((c) => (
+                <button key={c.idCancha} type="button" className={cx('pf-op', canchaMovil === c.idCancha && 'sel')} aria-pressed={canchaMovil === c.idCancha} onClick={() => setCanchaMovil(c.idCancha)}>
+                  <IconoDeporte deporte={c.deporte} className="ico" />
+                  {corto(c)}
+                </button>
+              ))}
             </div>
           )}
-          <div className="agenda-scroll">
-            <div className="agenda" style={{ ['--cols' as string]: cols, minWidth: movil ? undefined : 64 + cols * 158 }}>
+          <div className="agenda-scroll" ref={refGrilla}>
+            <div className={cx('agenda', movil && 'agenda-una')} style={{ ['--cols' as string]: cols, minWidth: movil ? undefined : anchoGrilla(cols) }}>
               <div className="agenda-cab">
                 <span />
                 {visibles.map((c) => (
@@ -317,10 +382,9 @@ export default function Agenda() {
                       <IconoDeporte deporte={c.deporte} className="ico" />
                     </span>
                     <div className="min-w-0">
-                      <b className="truncar">{c.nombre.split(' · ')[0]}</b>
-                      <small>{c.activa ? c.nombre.split(' · ')[1] ?? 'Multiusos' : 'Inactiva'}</small>
+                      <b>{corto(c)}</b>
+                      <small>{c.activa ? `${c.nombre.split(' · ')[1] ?? 'Multiusos'} · ${plural(libres(c), 'libre', 'libres')}` : 'Inactiva'}</small>
                     </div>
-                    <span className="libres">{libres(c)} libres</span>
                   </div>
                 ))}
               </div>
@@ -388,6 +452,7 @@ export default function Agenda() {
         peligro={modal?.tipo === 'NO_ASISTIO'}
         alConfirmar={() => (modal && (modal.tipo === 'ASISTIO' || modal.tipo === 'NO_ASISTIO') ? asistencia(modal.celda, modal.tipo) : undefined)}
       />
+      <ModalReprogramar modo="panel" reserva={modal?.tipo === 'reprogramar' ? modal.reserva : null} alCerrar={() => setModal(null)} alReprogramar={recargar} />
       <ModalRango abierto={modal?.tipo === 'rango'} canchas={canchas} fecha={fecha < hoyLima() ? hoyLima() : fecha} alCerrar={() => setModal(null)} alHecho={recargar} alRefrescar={() => setVersion((v) => v + 1)} />
     </>
   );

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { MSJ, esquemaCelular, esquemaCorreo, esquemaDni, esquemaMotivo, esquemaNombre, esquemaUsuario } from '@/esquemas/comunes';
-import { RE_CELULAR, RE_OPERACION, normalizarCelular, rucValido } from '@/utilidades/documentos';
+import { RE_CELULAR, RE_OPERACION, RE_USUARIO, normalizarCelular, rucValido } from '@/utilidades/documentos';
 
 /**
  * Esquemas Zod del PANEL con los MISMOS mensajes que devuelve el back (Bean Validation de cada servicio,
@@ -15,6 +15,7 @@ export const MSJ_PANEL = {
   respuesta: 'La respuesta debe tener entre 10 y 500 caracteres.',
   mensajeWa: 'Escribe el mensaje de prueba (1 a 1000 caracteres).',
   correoUsuario: 'Ingresa un correo válido de hasta 100 caracteres.',
+  nombres: 'Ingresa los nombres.',
   apellidos: 'Ingresa los apellidos.',
   nota: 'La nota tiene como máximo 255 caracteres.',
   turno: 'Elige un turno.',
@@ -103,8 +104,8 @@ export function crearEsquemaManual(total: number) {
     .object({
       idsTurno: z.array(z.number().int().positive()).min(1, MSJ_PANEL.turno).max(8, 'Elige como máximo 8 turnos.'),
       dni: esquemaDni,
-      nombres: esquemaNombre,
-      apellidos: esquemaNombre,
+      nombres: z.string().trim().min(1, MSJ_PANEL.nombres).pipe(esquemaNombre),
+      apellidos: z.string().trim().min(1, MSJ_PANEL.apellidos).pipe(esquemaNombre),
       telefono: esquemaCelular,
       correo: esquemaCorreo,
       origen: z.enum(['PRESENCIAL', 'TELEFONICA'], { errorMap: () => ({ message: MSJ_PANEL.origen }) }),
@@ -196,12 +197,32 @@ export const esquemaCaracteristica = z.string().trim().min(2, MSJ_PANEL.canchaCa
 export const esquemaLeyenda = z.string().trim().max(120, MSJ_PANEL.leyenda);
 export const esquemaRespuesta = z.object({ respuesta: z.string().trim().min(10, MSJ_PANEL.respuesta).max(500, MSJ_PANEL.respuesta) });
 
+// ------------------------------ ingreso al panel ------------------------------
+/** Login del panel: con el usuario vacío pide «Ingresa tu usuario.»; el mensaje de formato solo sale si escribió algo. */
+export const esquemaLoginPanel = z.object({
+  usuario: z.string().trim().min(1, 'Ingresa tu usuario.').pipe(z.string().regex(RE_USUARIO, MSJ.usuario)),
+  contrasena: z.string().min(1, MSJ.contrasena).max(64, MSJ.contrasena),
+});
+export type DatosLoginPanel = z.infer<typeof esquemaLoginPanel>;
+
 // ------------------------------ usuarios ------------------------------
+/** v2: celular opcional (para recuperar la contraseña por WhatsApp); vacío = sin celular. */
+export const esquemaCelularOpcional = z
+  .string()
+  .optional()
+  .transform((v) => normalizarCelular(v ?? ''))
+  .refine((v) => v === '' || RE_CELULAR.test(v), MSJ.celular);
+/** Mi cuenta (panel): correo + celular. */
+export const esquemaMisDatos = z.object({
+  correo: z.string().trim().min(1, 'Ingresa un correo válido de hasta 100 caracteres.').max(100, 'Ingresa un correo válido de hasta 100 caracteres.').email('Ingresa un correo válido de hasta 100 caracteres.'),
+  telefono: esquemaCelularOpcional,
+});
 const campoUsuario = {
-  nombres: esquemaNombre,
+  nombres: z.string().trim().min(1, MSJ_PANEL.nombres).pipe(esquemaNombre),
   apellidos: z.string().trim().min(1, MSJ_PANEL.apellidos).pipe(esquemaNombre),
   usuario: esquemaUsuario,
   correo: z.string().trim().min(1, MSJ_PANEL.correoUsuario).max(100, MSJ_PANEL.correoUsuario).email(MSJ_PANEL.correoUsuario),
+  telefono: esquemaCelularOpcional,
   rol: z.enum(['ADMIN', 'RECEPCION']),
 };
 export const esquemaUsuarioNuevo = z
@@ -225,7 +246,7 @@ export const esquemaConectarWa = z.object({
 });
 
 // ------------------------------ configuración (catalogo-service · ClaveConfiguracion) ------------------------------
-export type TipoClave = 'PORCENTAJE' | 'ENTERO' | 'HORA' | 'CELULAR' | 'TEXTO' | 'CORREO' | 'URL' | 'LATITUD' | 'LONGITUD' | 'RUC';
+export type TipoClave = 'MINUTOS_LISTA' | 'PORCENTAJE' | 'ENTERO' | 'HORA' | 'CELULAR' | 'TEXTO' | 'CORREO' | 'URL' | 'LATITUD' | 'LONGITUD' | 'RUC';
 export interface DefClave {
   clave: string;
   etiqueta: string;
@@ -234,6 +255,8 @@ export interface DefClave {
   max?: number;
   sufijo?: string;
   ayuda?: string;
+  /** Ocupa toda la fila del formulario (≥ 640 px). */
+  completo?: boolean;
 }
 /**
  * v2: cada grupo es una tarjeta de Configuración con su propia pantalla. El horario ya no es global (vive en cada
@@ -248,7 +271,7 @@ export const GRUPOS_CONFIG: Array<{ id: string; titulo: string; claves: DefClave
       { clave: 'lema', etiqueta: 'Frase del portal', tipo: 'TEXTO', min: 3, max: 120, ayuda: 'Se ve debajo del logo en el inicio' },
       { clave: 'direccion', etiqueta: 'Dirección', tipo: 'TEXTO', min: 5, max: 200 },
       { clave: 'referencia', etiqueta: 'Referencia', tipo: 'TEXTO', min: 5, max: 200, ayuda: 'Cómo llegar en una línea' },
-      { clave: 'mapa_url', etiqueta: 'Enlace de Google Maps', tipo: 'URL', max: 500 },
+      { clave: 'mapa_url', etiqueta: 'Enlace de Google Maps', tipo: 'URL', max: 500, completo: true },
       { clave: 'latitud', etiqueta: 'Latitud', tipo: 'LATITUD', min: -90, max: 90 },
       { clave: 'longitud', etiqueta: 'Longitud', tipo: 'LONGITUD', min: -180, max: 180 },
     ],
@@ -271,7 +294,8 @@ export const GRUPOS_CONFIG: Array<{ id: string; titulo: string; claves: DefClave
       { clave: 'adelanto_pct', etiqueta: 'Adelanto', tipo: 'PORCENTAJE', min: 0, max: 100, sufijo: '%', ayuda: 'Parte del total que se paga al reservar' },
       { clave: 'minutos_para_pagar', etiqueta: 'Tiempo para pagar', tipo: 'ENTERO', min: 5, max: 1440, sufijo: 'min', ayuda: 'El horario se guarda ese tiempo; luego se libera' },
       { clave: 'devolucion_horas', etiqueta: 'Devolución si cancela con', tipo: 'ENTERO', min: 1, max: 168, sufijo: 'h', ayuda: 'Horas de anticipación para devolver lo pagado' },
-      { clave: 'recordatorio_horas', etiqueta: 'Recordatorio', tipo: 'ENTERO', min: 1, max: 48, sufijo: 'h', ayuda: 'Horas antes del partido' },
+      { clave: 'recordatorio_minutos', etiqueta: 'Recordatorios', tipo: 'MINUTOS_LISTA', min: 5, max: 1440, ayuda: 'Avisos por WhatsApp antes del partido (máximo 3)' },
+      { clave: 'asistencia_desde_min', etiqueta: 'Marcar asistencia desde', tipo: 'ENTERO', min: 0, max: 180, sufijo: 'min', ayuda: 'Minutos antes del partido' },
       { clave: 'dias_visibles', etiqueta: 'Días para reservar', tipo: 'ENTERO', min: 1, max: 60, sufijo: 'días', ayuda: 'Cuántos días adelante ve el portal' },
     ],
   },
@@ -290,9 +314,24 @@ const RE_HORA = /^([01]\d|2[0-3]):[0-5]\d$/;
 const RE_CORREO_CONF = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/;
 const RE_DECIMAL = /^-?\d{1,3}(\.\d{1,8})?$/;
 
+/** Recordatorios: «120,15» → de 1 a 3 avisos distintos, cada uno entre `min` y `max` minutos. */
+export const MAX_RECORDATORIOS = 3;
+export function leerListaMinutos(v: string): number[] {
+  return v.split(',').map((x) => x.trim()).filter(Boolean).map(Number);
+}
+function validarListaMinutos(v: string, def: DefClave): string | null {
+  const lista = leerListaMinutos(v);
+  if (!lista.length) return 'Agrega al menos un recordatorio.';
+  if (lista.length > MAX_RECORDATORIOS) return `Máximo ${MAX_RECORDATORIOS} recordatorios.`;
+  if (lista.some((n) => !Number.isInteger(n) || n < (def.min ?? 5) || n > (def.max ?? 2880))) return `Cada recordatorio va de ${def.min ?? 5} a ${def.max ?? 2880} minutos.`;
+  if (new Set(lista).size !== lista.length) return 'No repitas recordatorios.';
+  return null;
+}
+
 /** Valida un valor como lo hace `ValidadorConfiguracion` del back. Devuelve el mensaje o null. */
 export function validarClave(def: DefClave, valor: string): string | null {
   const v = valor.trim();
+  if (def.tipo === 'MINUTOS_LISTA') return validarListaMinutos(v, def);
   if (!v) return 'Este dato es obligatorio.';
   switch (def.tipo) {
     case 'PORCENTAJE':
@@ -344,3 +383,22 @@ export function esquemaGrupoConfig(defs: DefClave[]) {
   });
 }
 
+
+// ------------------------------ v2: correo (SMTP) ------------------------------
+const RE_HOST = /^(?=.{3,255}$)[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/i;
+/** `tieneClave`: si ya hay una contraseña guardada, el campo vacío la conserva. */
+export const esquemaCorreoSmtp = (tieneClave: boolean) =>
+  z
+    .object({
+      host: z.string().trim().min(1, 'Escribe el servidor (p. ej. smtp.hostinger.com).').regex(RE_HOST, 'Escribe un servidor válido, como smtp.hostinger.com.'),
+      puerto: z.coerce.number({ invalid_type_error: 'El puerto va de 1 a 65535.' }).int('El puerto va de 1 a 65535.').min(1, 'El puerto va de 1 a 65535.').max(65535, 'El puerto va de 1 a 65535.'),
+      seguridad: z.enum(['SSL', 'STARTTLS']),
+      usuario: z.string().trim().min(1, 'Escribe el correo completo del buzón.').max(150, 'Máximo 150 caracteres.').email('El usuario es el correo completo del buzón.'),
+      clave: z.string().max(200, 'Máximo 200 caracteres.'),
+      remitente: z.string().trim().min(1, 'Escribe el correo que verán los clientes.').max(150, 'Máximo 150 caracteres.').email('Escribe un correo válido.'),
+      nombreRemitente: z.string().trim().max(80, 'Máximo 80 caracteres.'),
+    })
+    .refine((d) => tieneClave || d.clave.length > 0, { path: ['clave'], message: 'Escribe la contraseña del correo.' });
+export const esquemaPruebaCorreo = z.object({
+  destino: z.string().trim().min(1, 'Escribe a qué correo enviar la prueba.').max(150, 'Máximo 150 caracteres.').email('Escribe un correo válido.'),
+});

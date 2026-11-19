@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   AlarmClock,
   Ban,
+  CalendarClock,
   CalendarDays,
   CircleCheck,
   CircleX,
@@ -35,12 +36,13 @@ import {
   useFiltrosUrl,
   useRetraso,
 } from '@/componentes/panel/Herramientas';
-import { ICONO_ORIGEN, ModalCancelar, ModalCobrar, ModalValidar, TEXTO_ORIGEN } from '@/componentes/panel/ModalesReserva';
+import { HorarioTramos, ICONO_ORIGEN, ModalCancelar, ModalCobrar, ModalValidar, TEXTO_ORIGEN, horario24 } from '@/componentes/panel/ModalesReserva';
 import { abrirArchivo } from '@/componentes/panel/archivos';
+import { ModalReprogramar } from '@/componentes/reserva/ModalReprogramar';
 import { Boton, BotonEnlace } from '@/componentes/ui/Boton';
 import { Etiqueta, InsigniaEstado } from '@/componentes/ui/Estados';
 import { Paginacion, Tabla, TarjetaKpi, Vacio } from '@/componentes/ui/Datos';
-import { ahoraLima, deLima, fmtFecha, fmtRango24 } from '@/utilidades/fecha';
+import { ahoraLima, deLima, fmtFecha } from '@/utilidades/fecha';
 import { fmtCelular, fmtSoles } from '@/utilidades/formato';
 import ReservaDetalle from './ReservaDetalle';
 
@@ -50,6 +52,8 @@ const TEXTOS: Record<string, Record<string, string>> = {
   origen: TEXTO_ORIGEN,
 };
 const TAMANIO = 15;
+/** Con texto en el buscador los indicadores cuentan solo lo encontrado. */
+const CON_FILTRO = 'con este filtro';
 
 /** /admin/reservas y /admin/reservas/ALC-XXXXXX (la subruta muestra el detalle). */
 export default function Reservas() {
@@ -70,7 +74,7 @@ function ListaReservas() {
   const q = useRetraso(busqueda);
   const [filtrosAbiertos, setFiltrosAbiertos] = useState(false);
   const [version, setVersion] = useState(0);
-  const [accion, setAccion] = useState<{ tipo: 'validar'; idPago: number } | { tipo: 'cancelar' | 'cobrar'; reserva: ReservaAdmin } | null>(null);
+  const [accion, setAccion] = useState<{ tipo: 'validar'; idPago: number } | { tipo: 'cancelar' | 'cobrar' | 'reprogramar'; reserva: ReservaAdmin } | null>(null);
 
   // la búsqueda de la barra superior llega por ?q=
   const qUrl = f.leer('q');
@@ -95,6 +99,7 @@ function ListaReservas() {
   const lista = useCarga(() => reservasAdminApi.listar({ ...filtros, page: f.pagina, size: TAMANIO }), clave);
   const conteos = lista.datos?.conteos ?? {};
   const total = (conteos.PENDIENTE ?? 0) + (conteos.CONFIRMADA ?? 0) + (conteos.CANCELADA ?? 0);
+  const conBusqueda = Boolean(filtros.q);
 
   const activos = (
     [
@@ -122,7 +127,7 @@ function ListaReservas() {
   const kpi = (estado: string, estadoPago: string) => filtros.estado === estado && filtros.estadoPago === estadoPago;
   const ponerKpi = (estado: string, estadoPago: string) => f.poner({ estado: estado || null, estadoPago: estadoPago || null });
 
-  const abrirAccion = async (tipo: 'validar' | 'cancelar' | 'cobrar', r: FilaReserva) => {
+  const abrirAccion = async (tipo: 'validar' | 'cancelar' | 'cobrar' | 'reprogramar', r: FilaReserva) => {
     try {
       if (tipo === 'validar') {
         const pagos = await pagosAdminApi.listar({ q: r.codigoReserva, estado: 'PENDIENTE', size: 5 });
@@ -131,6 +136,10 @@ function ListaReservas() {
         else toast.info('No hay comprobante pendiente');
       } else {
         const det = await reservasAdminApi.detalle(r.codigoReserva);
+        if (tipo === 'reprogramar' && det.puedeReprogramar === false) {
+          toast.info('Esta reserva ya no se puede reprogramar');
+          return;
+        }
         setAccion({ tipo, reserva: det });
       }
     } catch {
@@ -142,6 +151,9 @@ function ListaReservas() {
     setVersion((v) => v + 1);
     refrescarContador();
   };
+
+  /** El partido ya empezó (o pasó): no se reprograma. */
+  const empezo = (r: FilaReserva) => deLima(`${r.fecha}T${r.horaInicio}:00`).diff(ahoraLima(), 'minute') <= 0;
 
   const urgente = (r: FilaReserva) => {
     if (r.estado !== 'PENDIENTE') return null;
@@ -157,32 +169,28 @@ function ListaReservas() {
         titulo="Reservas"
         subtitulo="Reservas, comprobantes por validar y asistencia"
         acciones={
-          <>
-            <Boton variante="secundario" icono={RefreshCw} onClick={() => setVersion((v) => v + 1)}>
-              Actualizar
-            </Boton>
-            <BotonEnlace to="/admin/nueva-reserva" icono={Plus}>
-              Nueva reserva
-            </BotonEnlace>
-          </>
+          <BotonEnlace to="/admin/nueva-reserva" icono={Plus}>
+            Nueva reserva
+          </BotonEnlace>
         }
       />
 
       <div className="kpis">
-        <TarjetaKpi etiqueta="Todas" valor={total} icono={List} tono="noche" detalle="registradas" activa={kpi('', '')} alPulsar={() => ponerKpi('', '')} />
-        <TarjetaKpi etiqueta="Por validar" valor={conteos.EN_REVISION ?? 0} icono={Hourglass} tono="gol" detalle="comprobantes en revisión" activa={kpi('', 'EN_REVISION')} alPulsar={() => ponerKpi('', 'EN_REVISION')} />
-        <TarjetaKpi etiqueta="Pendientes" valor={conteos.PENDIENTE ?? 0} icono={Clock} tono="gris" detalle="sin adelanto validado" activa={kpi('PENDIENTE', '')} alPulsar={() => ponerKpi('PENDIENTE', '')} />
-        <TarjetaKpi etiqueta="Confirmadas" valor={conteos.CONFIRMADA ?? 0} icono={CircleCheck} tono="verde" detalle="con adelanto validado" activa={kpi('CONFIRMADA', '')} alPulsar={() => ponerKpi('CONFIRMADA', '')} />
-        <TarjetaKpi etiqueta="Canceladas" valor={conteos.CANCELADA ?? 0} icono={CircleX} tono="rojo" detalle="por el cliente, el panel o el sistema" activa={kpi('CANCELADA', '')} alPulsar={() => ponerKpi('CANCELADA', '')} />
+        <TarjetaKpi etiqueta="Todas" valor={total} icono={List} tono="noche" detalle={conBusqueda ? CON_FILTRO : 'registradas'} activa={kpi('', '')} alPulsar={() => ponerKpi('', '')} />
+        <TarjetaKpi etiqueta="Por validar" valor={conteos.EN_REVISION ?? 0} icono={Hourglass} tono="gol" detalle={conBusqueda ? CON_FILTRO : 'comprobantes en revisión'} activa={kpi('', 'EN_REVISION')} alPulsar={() => ponerKpi('', 'EN_REVISION')} />
+        <TarjetaKpi etiqueta="Pendientes" valor={conteos.PENDIENTE ?? 0} icono={Clock} tono="gris" detalle={conBusqueda ? CON_FILTRO : 'sin adelanto validado'} activa={kpi('PENDIENTE', '')} alPulsar={() => ponerKpi('PENDIENTE', '')} />
+        <TarjetaKpi etiqueta="Confirmadas" valor={conteos.CONFIRMADA ?? 0} icono={CircleCheck} tono="verde" detalle={conBusqueda ? CON_FILTRO : 'con adelanto validado'} activa={kpi('CONFIRMADA', '')} alPulsar={() => ponerKpi('CONFIRMADA', '')} />
+        <TarjetaKpi etiqueta="Canceladas" valor={conteos.CANCELADA ?? 0} icono={CircleX} tono="rojo" detalle={conBusqueda ? CON_FILTRO : 'por el cliente, el panel o el sistema'} activa={kpi('CANCELADA', '')} alPulsar={() => ponerKpi('CANCELADA', '')} />
       </div>
 
       <BarraBusqueda
         valor={busqueda}
         alCambiar={setBusqueda}
-        placeholder="Código, DNI, nombre o celular"
+        placeholder="Código, nombre o DNI"
         filtrosActivos={activos.length}
         alAbrirFiltros={() => setFiltrosAbiertos(true)}
         conteo={lista.datos ? `${lista.datos.totalElementos} reservas` : ''}
+        extra={<Boton variante="secundario" icono={RefreshCw} etiqueta="Actualizar" onClick={() => setVersion((v) => v + 1)} />}
       />
       <FiltrosActivos items={activos} alLimpiar={() => f.limpiar(['q'])} />
 
@@ -212,7 +220,7 @@ function ListaReservas() {
             {
               clave: 'codigo',
               titulo: 'Código',
-              celda: (r) => <CeldaDoc icono={ICONO_ORIGEN[r.origen] ?? Globe} titulo={<span className="tnum tracking-[.03em]">{r.codigoReserva}</span>} sub={TEXTO_ORIGEN[r.origen]} extra={urgente(r)} />,
+              celda: (r) => <CeldaDoc icono={ICONO_ORIGEN[r.origen] ?? Globe} titulo={<span className="tnum tracking-[.03em] whitespace-nowrap">{r.codigoReserva}</span>} sub={TEXTO_ORIGEN[r.origen]} extra={urgente(r)} />,
             },
             {
               clave: 'cliente',
@@ -229,8 +237,10 @@ function ListaReservas() {
               titulo: 'Turno',
               celda: (r) => (
                 <div>
-                  <span className="block">{`${r.cancha.split(' · ')[0]} · ${fmtFecha(r.fecha, 'relativa')}`}</span>
-                  <span className="sub t-sec tnum">{r.cantidadTurnos && r.cantidadTurnos > 1 && r.horarioTexto ? `${r.horarioTexto} · ${r.cantidadTurnos} turnos` : fmtRango24(r.horaInicio, r.horaFin)}</span>
+                  <span className="block">
+                    <span className="whitespace-nowrap">{`${r.cancha.split(' · ')[0]} ·`}</span> <span className="whitespace-nowrap">{fmtFecha(r.fecha, 'relativa')}</span>
+                  </span>
+                  <HorarioTramos reserva={r} className="sub t-sec block" />
                 </div>
               ),
             },
@@ -251,10 +261,21 @@ function ListaReservas() {
           ]}
           acciones={(r) => (
             <MenuFila
+              contexto={{
+                titulo: r.codigoReserva,
+                subtitulo: `${r.cliente.nombres.split(' ')[0]} ${r.cliente.apellidos.split(' ')[0]} · ${r.cancha.split(' · ')[0]} · ${fmtFecha(r.fecha, 'relativa')} ${horario24(r)}`,
+                detalle: (
+                  <>
+                    <InsigniaEstado dominio="reserva" estado={r.estado} tamano="sm" />
+                    <InsigniaEstado dominio="estadoPago" estado={r.estadoPago} tamano="sm" />
+                  </>
+                ),
+              }}
               acciones={[
                 { texto: 'Ver detalle', icono: Eye, alPulsar: () => navigate(`/admin/reservas/${r.codigoReserva}`) },
                 { texto: 'Validar comprobante', icono: CircleCheck, alPulsar: () => void abrirAccion('validar', r), oculta: r.estadoPago !== 'EN_REVISION' },
                 { texto: 'Cobrar en caja', icono: HandCoins, alPulsar: () => void abrirAccion('cobrar', r), oculta: r.estado === 'CANCELADA' || r.montoPagado >= r.montoTotal || r.estadoPago === 'EN_REVISION' },
+                { texto: 'Reprogramar', icono: CalendarClock, alPulsar: () => void abrirAccion('reprogramar', r), oculta: r.estado === 'CANCELADA' || r.asistencia !== 'PENDIENTE' || empezo(r) },
                 { texto: 'Constancia PDF', icono: FileText, alPulsar: () => void abrirArchivo(reservasAdminApi.rutaConstancia(r.codigoReserva)) },
                 { texto: 'Cancelar reserva', icono: Ban, peligro: true, alPulsar: () => void abrirAccion('cancelar', r), oculta: r.estado === 'CANCELADA' || r.asistencia !== 'PENDIENTE' },
               ]}
@@ -334,6 +355,7 @@ function ListaReservas() {
       <ModalValidar idPago={accion?.tipo === 'validar' ? accion.idPago : null} alCerrar={() => setAccion(null)} alHecho={tras} />
       <ModalCobrar reserva={accion?.tipo === 'cobrar' ? accion.reserva : null} alCerrar={() => setAccion(null)} alHecho={() => { setVersion((v) => v + 1); refrescarContador(); }} />
       <ModalCancelar reserva={accion?.tipo === 'cancelar' ? accion.reserva : null} devolucionHoras={complejo.datos?.reglas.devolucionHoras} alCerrar={() => setAccion(null)} alHecho={tras} />
+      <ModalReprogramar modo="panel" reserva={accion?.tipo === 'reprogramar' ? accion.reserva : null} alCerrar={() => setAccion(null)} alReprogramar={tras} />
     </>
   );
 }

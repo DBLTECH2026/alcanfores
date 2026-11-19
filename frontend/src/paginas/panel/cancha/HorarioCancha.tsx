@@ -9,7 +9,7 @@ import { Boton } from '@/componentes/ui/Boton';
 import { CampoTexto, Interruptor, Selector } from '@/componentes/ui/Campo';
 import { Cargando, Segmentado } from '@/componentes/ui/Datos';
 import { Alerta } from '@/componentes/ui/Estados';
-import { fmtHora12 } from '@/utilidades/fecha';
+import { fmtHora24 } from '@/utilidades/fecha';
 import { fmtSoles, plural } from '@/utilidades/formato';
 import { DIAS_CORTOS, DIAS_SEMANA, HORAS_MEDIA, errorDia, textoSemana, turnosDelDia, type TurnoCalculado } from '@/utilidades/horario';
 import { cx } from '@/utilidades/cx';
@@ -17,10 +17,11 @@ import type { Entrada } from '../CanchaFormulario';
 import { HORARIO_DEFECTO, erroresDe } from './utilCancha';
 
 const DURACIONES = [30, 60, 90, 120] as const;
-const hora12 = (h: string) => fmtHora12(h);
-const OPC_APERTURA = HORAS_MEDIA.filter((h) => h !== '24:00').map((h) => ({ valor: h, texto: hora12(h) }));
-const OPC_CIERRE = HORAS_MEDIA.filter((h) => h !== '00:00').map((h) => ({ valor: h, texto: h === '24:00' ? '12:00 a. m. (medianoche)' : hora12(h) }));
-const OPC_NOCHE = HORAS_MEDIA.filter((h) => h >= '12:00' && h <= '22:00').map((h) => ({ valor: h, texto: hora12(h) }));
+// El panel muestra las horas en 24 h (regla de coherencia); el portal, en 12 h.
+const hora24 = (h: string) => fmtHora24(h);
+const OPC_APERTURA = HORAS_MEDIA.filter((h) => h !== '24:00').map((h) => ({ valor: h, texto: hora24(h) }));
+const OPC_CIERRE = HORAS_MEDIA.filter((h) => h !== '00:00').map((h) => ({ valor: h, texto: h === '24:00' ? '24:00 (medianoche)' : hora24(h) }));
+const OPC_NOCHE = HORAS_MEDIA.filter((h) => h >= '12:00' && h <= '22:00').map((h) => ({ valor: h, texto: hora24(h) }));
 
 /**
  * Apartado 2 · «Horario y precios» (SPEC_V2 §A): lunes a domingo (abierto/cerrado, apertura y cierre), duración del turno,
@@ -166,7 +167,7 @@ export function HorarioCancha({
               <CalendarCheck className="ico" aria-hidden />
               Días y horas
             </h2>
-            <span className="pc-der dato-ico">{textoSemana(dias)}</span>
+            <span className="pc-der dato-ico">{textoSemana(dias, true)}</span>
           </div>
           <ul className="semana">
             {dias.map((d, i) => {
@@ -284,7 +285,7 @@ export function HorarioCancha({
                       <ul className="previa-turnos">
                         {grupo.map((t) => (
                           <li key={t.horaInicio} className={franja === 'NOCHE' ? 'previa-noche' : 'previa-dia'}>
-                            <b className="tnum">{hora12(t.horaInicio)}</b>
+                            <b className="tnum">{hora24(t.horaInicio)}</b>
                             <span className="tnum">{fmtSoles(t.precio, { decimales: 0 })}</span>
                           </li>
                         ))}

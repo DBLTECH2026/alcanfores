@@ -1,8 +1,8 @@
 import { Fragment, useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AlarmClock, CircleAlert, FileText, Inbox, Mail, MessageCircle, Paperclip, Play, RefreshCw, RotateCw, Send, X } from 'lucide-react';
+import { AlarmClock, CircleAlert, FileText, Image as ImageIcon, Inbox, Mail, MessageCircle, Paperclip, Play, RefreshCw, RotateCw, Send, X } from 'lucide-react';
 import { notificacionesApi } from '@/api/admin';
-import type { FilaNotificacion, Recordatorio, ResultadoRecordatorios } from '@/api/admin/tipos';
+import type { Adjunto, FilaNotificacion, Recordatorio, ResultadoRecordatorios } from '@/api/admin/tipos';
 import { useAuth } from '@/contexto/AuthContext';
 import { useToast } from '@/contexto/ToastContext';
 import { useCarga } from '@/hooks/useCarga';
@@ -14,6 +14,7 @@ import { Cargando, Paginacion, Pestanas, Tabla, Vacio } from '@/componentes/ui/D
 import { Alerta } from '@/componentes/ui/Estados';
 import { fmtFechaHora, fmtHace } from '@/utilidades/fecha';
 import { cx } from '@/utilidades/cx';
+import { fmtMinutosAntes } from '@/utilidades/formato';
 
 const EVENTOS: Record<string, string> = {
   'reserva.registrada': 'Reserva registrada',
@@ -25,6 +26,10 @@ const EVENTOS: Record<string, string> = {
   'reserva.asistencia': 'Invitación a calificar',
   recordatorio: 'Recordatorio',
   'whatsapp.prueba': 'Prueba de WhatsApp',
+  'pago.validado': 'Saldo pagado',
+  'cuenta.codigo': 'Código para cambiar la contraseña',
+  'cuenta.contrasena': 'Contraseña cambiada',
+  'correo.prueba': 'Prueba de correo',
 };
 
 /** Texto de WhatsApp con *negritas* (sin HTML del back: se arma con nodos React). */
@@ -145,7 +150,7 @@ function Bandeja() {
           <div className="flex flex-wrap gap-2">
             {n.adjuntos.map((a) => (
               <span key={a.referencia + a.nombreArchivo} className={cx('badge badge-sm', a.estado === 'ADJUNTADO' ? 'b-menta' : a.estado === 'NO_DISPONIBLE' ? 'b-rojo' : 'b-neutro')} title={a.detalle ?? undefined}>
-                <Paperclip className="ico" aria-hidden />
+                {a.tipo === 'IMAGEN' ? <ImageIcon className="ico" aria-hidden /> : <Paperclip className="ico" aria-hidden />}
                 <span>{a.nombreArchivo}</span>
               </span>
             ))}
@@ -155,13 +160,16 @@ function Bandeja() {
           <iframe title={`Vista previa: ${n.asunto}`} className="prev-correo" sandbox="" srcDoc={n.vistaPrevia ?? n.cuerpo} />
         ) : (
           <div className="prev-wa" aria-label="Vista previa del WhatsApp">
-            {n.adjuntos.map((a) => (
-              <div key={a.nombreArchivo} className="doc">
-                <FileText className="ico ico-24" aria-hidden />
-                {a.nombreArchivo}
-              </div>
-            ))}
-            <div className="burbuja">
+            {n.adjuntos
+              .filter((a) => a.tipo !== 'IMAGEN')
+              .map((a) => (
+                <div key={a.nombreArchivo} className="doc">
+                  <FileText className="ico ico-24" aria-hidden />
+                  {a.nombreArchivo}
+                </div>
+              ))}
+            <div className={cx('burbuja', imagenWa(n) && 'con-imagen')}>
+              {imagenWa(n) && <img src={imagenWa(n) ?? undefined} alt="Tarjeta ilustrada del aviso" loading="lazy" />}
               <TextoWhatsapp texto={n.cuerpo} />
               <small>{(n.enviadoEn ?? n.creadoEn).slice(11, 16)}</small>
             </div>
@@ -344,7 +352,16 @@ function Recordatorios() {
               ),
             },
             { clave: 'cancha', titulo: 'Partido', celda: (r) => <div><span className="block">{r.cancha}</span><span className="sub t-sec tnum">{fmtFechaHora(r.inicioReserva, { h24: true })}</span></div> },
-            { clave: 'enviar', titulo: 'Se envía', celda: (r) => <span className="tnum">{fmtFechaHora(r.enviarEn, { h24: true, sinAnio: true })}</span> },
+            {
+              clave: 'enviar',
+              titulo: 'Se envía',
+              celda: (r) => (
+                <div>
+                  <span className="block tnum">{fmtFechaHora(r.enviarEn, { h24: true, sinAnio: true })}</span>
+                  {r.minutosAntes !== undefined && <span className="sub t-sec tnum">{fmtMinutosAntes(r.minutosAntes)} antes</span>}
+                </div>
+              ),
+            },
             { clave: 'estado', titulo: 'Estado', celda: (r) => <Estado dominio="recordatorio" estado={r.estado} /> },
             { clave: 'detalle', titulo: 'Detalle', celda: (r) => <span className="celda-larga">{r.detalle ?? (r.enviadoEn ? `Enviado ${fmtFechaHora(r.enviadoEn, { h24: true, sinAnio: true })}` : '—')}</span> },
           ]}
@@ -365,4 +382,19 @@ function Recordatorios() {
       </ModalConfirmar>
     </>
   );
+}
+
+/**
+ * Tarjeta ilustrada que acompaña al WhatsApp: `imagenTarjeta` del detalle (data URI) o, si no llega, la copia del JPG
+ * en /public/whatsapp según el adjunto IMAGEN. Si la imagen no se pudo enviar (NO_DISPONIBLE) no se muestra.
+ */
+function imagenWa(n: { adjuntos: Adjunto[]; imagenTarjeta?: string | null }): string | null {
+  const a = n.adjuntos.find((x) => x.tipo === 'IMAGEN');
+  if (a?.estado === 'NO_DISPONIBLE') return null;
+  if (n.imagenTarjeta) return n.imagenTarjeta;
+  if (!a) return null;
+  if (a.url && /^(https?:|\/)/.test(a.url)) return a.url;
+  const base = (a.nombreArchivo || a.referencia || '').split(/[\\/]/).pop() ?? '';
+  if (!base) return null;
+  return `/whatsapp/${/\.(jpe?g|png|webp)$/i.test(base) ? base : `${base}.jpg`}`;
 }

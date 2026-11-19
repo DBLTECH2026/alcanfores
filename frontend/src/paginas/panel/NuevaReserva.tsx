@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
@@ -43,7 +43,7 @@ import { Avatar, Esqueleto, Segmentado, Spinner, Vacio } from '@/componentes/ui/
 import { Alerta } from '@/componentes/ui/Estados';
 import { IconoDeporte } from '@/componentes/ui/Marca';
 import { Modal } from '@/componentes/ui/Modal';
-import { ahoraLima, diaSemanaCorto, fmtFecha, hoyLima, numeroDia, sumarDias, textoHorario } from '@/utilidades/fecha';
+import { ahoraLima, diaSemanaCorto, fmtFecha, fmtHora24, hoyLima, numeroDia, sumarDias, textoHorario } from '@/utilidades/fecha';
 import { aTitulo, fmtSoles, plural } from '@/utilidades/formato';
 import { normalizarCelular, RE_DNI } from '@/utilidades/documentos';
 import { comprobanteDe, crearEsquemaManual } from './esquemasPanel';
@@ -52,7 +52,7 @@ type Entrada = z.input<ReturnType<typeof crearEsquemaManual>>;
 type Salida = z.output<ReturnType<typeof crearEsquemaManual>>;
 const CAMPOS = ['idsTurno', 'dni', 'nombres', 'apellidos', 'telefono', 'correo', 'origen', 'nota', 'monto', 'metodo', 'tipoPago', 'codigoOperacion', 'ruc', 'razonSocial', 'direccionFiscal'];
 
-/** /admin/nueva-reserva — reserva presencial o telefónica (prototipo adm-20). Acepta ?idCancha=&fecha=&idTurno= desde la agenda. */
+/** /admin/nueva-reserva — reserva presencial o telefónica (prototipo adm-20). Acepta ?idCancha=&fecha=&hora= (o &idTurno=) desde la agenda. */
 export default function NuevaReserva() {
   useTituloPagina('Nueva reserva');
   const navigate = useNavigate();
@@ -122,6 +122,17 @@ export default function NuevaReserva() {
   useEffect(() => {
     if (!idCancha && canchas[0]) setIdCancha(canchas[0].idCancha);
   }, [canchas, idCancha]);
+  // Desde la agenda (?hora=HH:mm): deja marcado ese turno si sigue libre. Solo una vez, al cargar la cancha.
+  const horaUrl = useRef(sp.get('hora'));
+  useEffect(() => {
+    const h = horaUrl.current;
+    if (!h || !cancha) return;
+    horaUrl.current = null;
+    const t = cancha.turnos.find((x) => fmtHora24(x.horaInicio) === fmtHora24(h));
+    if (t && t.estado === 'DISPONIBLE' && !(fecha === hoyLima() && t.horaFin <= ahoraLima().format('HH:mm')) && !getValues('idsTurno')?.length) {
+      setValue('idsTurno', [t.idTurno], { shouldValidate: true });
+    }
+  }, [cancha, fecha, getValues, setValue]);
   useEffect(() => {
     if (v.conPago) setValue('monto', (v.tipoPago === 'TOTAL' ? total : adelanto).toFixed(2));
   }, [v.conPago, v.tipoPago, total, adelanto, setValue]);

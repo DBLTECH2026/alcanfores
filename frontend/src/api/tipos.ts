@@ -30,6 +30,8 @@ export interface UsuarioSesion {
   usuario: string;
   correo: string;
   rol: Rol;
+  /** v2: celular opcional (9 dígitos) para recuperar la contraseña por WhatsApp. */
+  telefono?: string | null;
 }
 export interface RespuestaLogin {
   token: string;
@@ -52,7 +54,17 @@ export interface Complejo {
   latitud: number;
   longitud: number;
   horario: { primerTurno: string; ultimoTurno: string; duracionMin: number; inicioNoche: string; diasVisibles: number };
-  reglas: { adelantoPct: number; devolucionHoras: number; minutosParaPagar: number; recordatorioHoras: number };
+  reglas: {
+    adelantoPct: number;
+    devolucionHoras: number;
+    minutosParaPagar: number;
+    /** v1 (se mantiene mientras el back exponga ambos). */
+    recordatorioHoras?: number;
+    /** v2: avisos antes del partido, en minutos (p. ej. [120, 15]). */
+    recordatorioMinutos?: number[];
+    /** v2: desde cuántos minutos antes del partido se marca la asistencia. */
+    asistenciaDesdeMin?: number;
+  };
   pagos: { yapeNumero: string; yapeTitular: string; plinNumero: string };
 }
 
@@ -250,6 +262,11 @@ export interface ReservaDetalle extends ReservaCreada {
   puedeCancelar: boolean;
   puedeReenviarComprobante: boolean;
   puedeResenar: boolean;
+  /** Reprogramar (19-nov): cuántas veces se cambió el horario y si el cliente aún puede (una vez, hasta 2 h antes). */
+  reprogramaciones?: number;
+  puedeReprogramar?: boolean;
+  /** Monto del comprobante que el complejo está validando (0 si no hay); cuenta como pagado al cambiar el horario. */
+  montoEnRevision?: number;
 }
 
 // ------------------------------ v2: cuentas de clientes (SPEC_V2 §E) ------------------------------
@@ -278,8 +295,12 @@ export interface RegistroCliente {
   aceptaTerminos: boolean;
   aceptaPrivacidad: boolean;
 }
-/** Ítem de «Mis reservas» (GET /api/cliente/reservas). */
-export interface ReservaDeCliente extends ReservaDetalle {
+/**
+ * Ítem de «Mis reservas» (GET /api/cliente/reservas). `cancelacion` puede no venir (back anterior): sin ella, una
+ * reserva que venció por falta de pago se ve como «Cancelada» en vez de «No confirmada».
+ */
+export interface ReservaDeCliente extends Omit<ReservaDetalle, 'cancelacion'> {
+  cancelacion?: Cancelacion | null;
   resenada?: boolean;
 }
 
@@ -409,4 +430,33 @@ export interface DashboardHoy {
   proximas: Array<{ codigoReserva: string; cancha: string; fecha: string; horaInicio: string; horaFin: string; cliente: string; estado: EstadoReserva; estadoPago: EstadoPago }>;
   agenda: Array<{ idCancha: number; nombre: string; turnos: Array<{ horaInicio: string; estado: string; codigoReserva: string | null; cliente: string | null; estadoPago: EstadoPago | null }> }>;
   alertas: Array<{ tipo: string; mensaje: string; codigoReserva: string | null }>;
+}
+
+// ------------------------------ v2: recuperar contraseña ------------------------------
+export type TipoCuenta = 'CLIENTE' | 'ADMIN';
+export type CanalRecuperacion = 'CORREO' | 'WHATSAPP';
+export interface OpcionCanal {
+  canal: CanalRecuperacion;
+  /** Enmascarado por el back: «lu***@gmail.com», «*** *** 659». */
+  destino: string;
+}
+export interface OpcionesRecuperacion {
+  canales: OpcionCanal[];
+}
+export interface CodigoEnviado {
+  destino: string;
+  expiraEn: string;
+  /** Desde cuándo se puede pedir otro código (fecha-hora de Lima) o en cuántos segundos. */
+  reenviarEn: string | number;
+  /** Segundos para pedir otro código (60): se prefiere a `reenviarEn` porque no depende del reloj. */
+  reenviarEnSegundos?: number;
+  /** true = el canal no está configurado en el complejo: el código no salió de verdad. */
+  simulado?: boolean;
+  /** Solo en local: el código para probar sin correo ni WhatsApp. */
+  codigoPrueba?: string | null;
+  canal?: CanalRecuperacion;
+}
+export interface CodigoVerificado {
+  tokenRestablecer: string;
+  expiraEn: string;
 }

@@ -1,9 +1,12 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft,
+  ArrowRight,
   BadgeCheck,
   Ban,
+  Bot,
+  CalendarClock,
   CalendarDays,
   CalendarPlus,
   Check,
@@ -25,6 +28,7 @@ import {
   NotebookPen,
   Phone,
   ReceiptText,
+  Monitor,
   Send,
   Timer,
   TriangleAlert,
@@ -37,7 +41,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { clientesApi, pagosAdminApi, reservasAdminApi } from '@/api/admin';
-import type { FilaPago, ReservaAdmin } from '@/api/admin/tipos';
+import type { FilaPago, HorarioReprogramado, Reprogramacion, ReservaAdmin } from '@/api/admin/tipos';
 import { esErrorApi } from '@/api/cliente';
 import { useCarga } from '@/hooks/useCarga';
 import { useComplejo } from '@/hooks/useDatosPublicos';
@@ -45,20 +49,22 @@ import { useTituloPagina } from '@/hooks/useTituloPagina';
 import { useToast } from '@/contexto/ToastContext';
 import { usePanel } from '@/componentes/panel/PanelLayout';
 import { ErrorCarga, Estado, ModalConfirmar } from '@/componentes/panel/Herramientas';
-import { ICONO_METODO, ModalCancelar, ModalCobrar, ModalRechazar, ModalValidar, TEXTO_METODO, TEXTO_TIPO_PAGO } from '@/componentes/panel/ModalesReserva';
+import { ICONO_METODO, ModalCancelar, ModalCobrar, ModalRechazar, ModalValidar, TEXTO_METODO, TEXTO_TIPO_PAGO, horario24, horasA24 } from '@/componentes/panel/ModalesReserva';
 import { VisorComprobante } from '@/componentes/panel/VisorComprobante';
+import { ModalReprogramar } from '@/componentes/reserva/ModalReprogramar';
 import { abrirArchivo, descargarArchivo } from '@/componentes/panel/archivos';
 import { Boton, BotonEnlace, BotonExterno } from '@/componentes/ui/Boton';
-import { Alerta, InsigniaEstado } from '@/componentes/ui/Estados';
+import { Alerta, Insignia, InsigniaEstado, type TonoInsignia } from '@/componentes/ui/Estados';
 import { Avatar, Cargando, Vacio } from '@/componentes/ui/Datos';
 import { Busto, IconoDeporte } from '@/componentes/ui/Marca';
 import { LineaTiempo, type Hito } from '@/componentes/ui/Reserva';
-import { ahoraLima, deLima, fmtDuracion, fmtFecha, fmtFechaHora, fmtHace } from '@/utilidades/fecha';
+import { ASISTENCIA_DESDE_MIN, ahoraLima, deLima, fmtDuracion, fmtFecha, fmtFechaHora, fmtHace, inicioAsistencia, puedeMarcarAsistencia } from '@/utilidades/fecha';
 import { horarioDeReserva } from '@/componentes/portal/EstadoReserva';
 import { fmtCelular, fmtSoles } from '@/utilidades/formato';
 
 const EVENTOS: Record<string, { titulo: string; icono: LucideIcon; estado?: Hito['estado'] }> = {
   REGISTRADA: { titulo: 'Registrada', icono: ClipboardPlus },
+  REPROGRAMADA: { titulo: 'Horario cambiado', icono: CalendarClock },
   COMPROBANTE_RECIBIDO: { titulo: 'Comprobante recibido', icono: Upload },
   PAGO_REGISTRADO: { titulo: 'Pago registrado', icono: Upload },
   OBSERVADO: { titulo: 'Comprobante observado', icono: TriangleAlert, estado: 'error' },
@@ -80,8 +86,9 @@ function hitos(r: ReservaAdmin): Hito[] {
     const noAsistio = e.evento === 'ASISTENCIA' && /no asisti/i.test(e.detalle ?? '');
     return {
       titulo: noAsistio ? 'No asistió' : ev?.titulo ?? legible(e.evento),
-      detalle: e.detalle,
-      fecha: e.fecha,
+      // el panel va en 24 h: la fecha ya formateada (LineaTiempo la muestra tal cual) y las horas del texto del back convertidas
+      detalle: e.detalle ? horasA24(e.detalle) : e.detalle,
+      fecha: e.fecha && /T\d\d:/.test(e.fecha) ? fmtFechaHora(e.fecha, { h24: true }) : e.fecha,
       estado: noAsistio ? 'error' : ev?.estado ?? 'hecho',
       icono: noAsistio ? UserX : ev?.icono,
     };
@@ -91,6 +98,19 @@ function hitos(r: ReservaAdmin): Hito[] {
     h.push({ titulo: 'Esperando pago', detalle: r.venceEn ? `Vence ${fmtFechaHora(r.venceEn, { h24: true, sinAnio: true })}` : null, estado: 'actual', icono: Wallet });
   if (r.estado === 'CONFIRMADA' && r.asistencia === 'PENDIENTE') h.push({ titulo: 'Asistencia', detalle: 'Por marcar', estado: 'pendiente', icono: UserCheck });
   return h;
+}
+
+/** true por debajo de 1100 px, donde .grid-det pasa a una sola columna. */
+function useUnaColumna() {
+  const consulta = '(max-width: 1099px)';
+  const [m, setM] = useState(() => window.matchMedia(consulta).matches);
+  useEffect(() => {
+    const mq = window.matchMedia(consulta);
+    const f = () => setM(mq.matches);
+    mq.addEventListener('change', f);
+    return () => mq.removeEventListener('change', f);
+  }, []);
+  return m;
 }
 
 /** Detalle de una reserva (prototipo adm-11): turno, montos, asistencia, cliente, historial y pagos con el visor. */
@@ -104,8 +124,9 @@ export default function ReservaDetalle({ codigo }: { codigo: string }) {
   const pagos = useCarga(() => pagosAdminApi.listar({ q: codigo, size: 20, sort: 'fechaEnvio,desc' }), `p-${codigo}-${version}`);
   const dni = r.datos?.cliente.dni ?? null;
   const cliente = useCarga(() => clientesApi.historial(dni ?? ''), dni ? `c-${dni}-${version}` : null);
-  const [modal, setModal] = useState<null | 'validar' | 'rechazar' | 'cobrar' | 'cancelar' | 'ASISTIO' | 'NO_ASISTIO'>(null);
+  const [modal, setModal] = useState<null | 'validar' | 'rechazar' | 'cobrar' | 'cancelar' | 'reprogramar' | 'ASISTIO' | 'NO_ASISTIO'>(null);
   const [idPago, setIdPago] = useState<number | null>(null);
+  const unaColumna = useUnaColumna();
 
   const recargar = () => {
     setModal(null);
@@ -130,8 +151,71 @@ export default function ReservaDetalle({ codigo }: { codigo: string }) {
   const conImagen = pendiente ?? filasPago.find((p) => p.tieneArchivo);
   const inicio = deLima(`${res.fecha}T${res.horaInicio}:00`);
   const minutos = inicio.diff(ahoraLima(), 'minute');
+  const desdeMin = res.asistenciaDesdeMin ?? complejo.datos?.reglas.asistenciaDesdeMin ?? ASISTENCIA_DESDE_MIN;
+  const puedeAsistencia = res.puedeMarcarAsistencia ?? puedeMarcarAsistencia(res.fecha, res.horaInicio, desdeMin);
   const enJuego = minutos <= 0 && deLima(`${res.fecha}T${res.horaFin}:00`).diff(ahoraLima(), 'minute') > 0;
   const nombre = `${res.cliente.nombres} ${res.cliente.apellidos}`;
+  // Sin el campo (back anterior): activa, sin asistencia y que el partido aún no empiece.
+  const puedeReprogramar = res.puedeReprogramar ?? (res.estado !== 'CANCELADA' && res.asistencia === 'PENDIENTE' && minutos > 0);
+  const cambios = res.reprogramaciones ?? [];
+  // Con un comprobante por validar, en una columna «Validar / Rechazar» va justo después del turno y los montos.
+  const comprobanteArriba = unaColumna && Boolean(pendiente);
+  const tarjetaComprobante = (
+    <section className="pc">
+      <div className="pc-cab">
+        <h2>
+          <ReceiptText className="ico" aria-hidden />
+          Comprobante
+        </h2>
+        {conImagen && (
+          <div className="pc-der">
+            <Estado dominio="pago" estado={conImagen.estado} />
+          </div>
+        )}
+      </div>
+      <div className="pc-cuerpo grid gap-3">
+        {pagos.cargando && !pagos.datos ? (
+          <Cargando texto="Cargando pagos…" className="!py-8" />
+        ) : !conImagen ? (
+          <Vacio
+            ilustracion="IL-04-paso3-comprobante"
+            titulo={filasPago.length ? 'Pago sin imagen' : 'Sin comprobante'}
+            texto={res.estado === 'PENDIENTE' ? 'El cliente aún no envía su comprobante.' : undefined}
+            compacto
+            acciones={res.puedeCobrarSaldo ? <Boton variante="secundario" icono={HandCoins} onClick={() => setModal('cobrar')}>Cobrar en caja</Boton> : undefined}
+          />
+        ) : (
+          <>
+            {conImagen.tieneArchivo && <VisorComprobante idPago={conImagen.id} leyenda={`${TEXTO_METODO[conImagen.metodo] ?? conImagen.metodo} · ${conImagen.codigoOperacion ?? ''}`} />}
+            <DatosPago pago={conImagen} esperado={conImagen.tipoPago === 'TOTAL' ? res.montoTotal : res.montoAdelanto} />
+            {conImagen.estado === 'PENDIENTE' && (
+              <div className="grid grid-cols-2 gap-2">
+                <Boton
+                  variante="peligro-contorno"
+                  icono={X}
+                  onClick={() => {
+                    setIdPago(conImagen.id);
+                    setModal('rechazar');
+                  }}
+                >
+                  Rechazar
+                </Boton>
+                <Boton
+                  icono={Check}
+                  onClick={() => {
+                    setIdPago(conImagen.id);
+                    setModal('validar');
+                  }}
+                >
+                  Validar
+                </Boton>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </section>
+  );
   const copiar = async () => {
     try {
       await navigator.clipboard.writeText(res.codigoReserva);
@@ -175,11 +259,16 @@ export default function ReservaDetalle({ codigo }: { codigo: string }) {
         </div>
         <div className="grupo-botones">
           <Boton variante="secundario" icono={FileText} onClick={() => void abrirArchivo(reservasAdminApi.rutaConstancia(res.codigoReserva))}>
-            Constancia
+            Constancia PDF
           </Boton>
           {res.puedeCobrarSaldo && (
             <Boton variante={pendiente ? 'secundario' : 'primario'} icono={HandCoins} onClick={() => setModal('cobrar')}>
               Cobrar en caja
+            </Boton>
+          )}
+          {puedeReprogramar && (
+            <Boton variante="secundario" icono={CalendarClock} onClick={() => setModal('reprogramar')}>
+              Reprogramar
             </Boton>
           )}
           {res.puedeCancelar && (
@@ -205,6 +294,12 @@ export default function ReservaDetalle({ codigo }: { codigo: string }) {
                     <span className="badge b-menta badge-sm">
                       <Timer className="ico" aria-hidden />
                       <span>{enJuego ? 'En juego' : minutos > 0 ? `En ${fmtDuracion(minutos)}` : 'Jugado'}</span>
+                    </span>
+                  )}
+                  {cambios.length > 0 && (
+                    <span className="badge b-neutro badge-sm">
+                      <CalendarClock className="ico" aria-hidden />
+                      <span>{cambios.length === 1 ? 'Reprogramada' : `Reprogramada ${cambios.length} veces`}</span>
                     </span>
                   )}
                 </div>
@@ -245,6 +340,8 @@ export default function ReservaDetalle({ codigo }: { codigo: string }) {
             </div>
           </section>
 
+          {comprobanteArriba && tarjetaComprobante}
+
           {res.cancelacion && (
             <Alerta tipo="error" titulo={`Cancelada por ${legible(res.cancelacion.canceladoPor).toLowerCase()} · ${fmtFechaHora(res.cancelacion.fecha, { h24: true })}`}>
               {res.cancelacion.motivo}
@@ -268,17 +365,17 @@ export default function ReservaDetalle({ codigo }: { codigo: string }) {
                 {res.asistencia === 'PENDIENTE' ? (
                   <>
                     <div className="flex flex-wrap gap-2">
-                      <Boton variante={enJuego ? 'oscuro' : 'secundario'} icono={UserCheck} disabled={!res.puedeMarcarAsistencia} onClick={() => setModal('ASISTIO')}>
+                      <Boton variante={enJuego ? 'oscuro' : 'secundario'} icono={UserCheck} disabled={!puedeAsistencia} onClick={() => setModal('ASISTIO')}>
                         Asistió
                       </Boton>
-                      <Boton variante="secundario" icono={UserX} disabled={!res.puedeMarcarAsistencia} onClick={() => setModal('NO_ASISTIO')}>
+                      <Boton variante="secundario" icono={UserX} disabled={!puedeAsistencia} onClick={() => setModal('NO_ASISTIO')}>
                         No asistió
                       </Boton>
                     </div>
-                    {!res.puedeMarcarAsistencia && (
+                    {!puedeAsistencia && (
                       <span className="dato-ico">
                         <Clock className="ico" aria-hidden />
-                        Desde las {inicio.subtract(15, 'minute').format('HH:mm')} del {fmtFecha(res.fecha, 'dia-mes')}
+                        Desde las {inicioAsistencia(res.fecha, res.horaInicio, desdeMin).format('HH:mm')} del {fmtFecha(res.fecha, 'dia-mes')}
                       </span>
                     )}
                   </>
@@ -345,6 +442,24 @@ export default function ReservaDetalle({ codigo }: { codigo: string }) {
             </div>
           </section>
 
+          {/* cambios de horario (más reciente primero) */}
+          {cambios.length > 0 && (
+            <section className="pc">
+              <div className="pc-cab">
+                <h2>
+                  <CalendarClock className="ico" aria-hidden />
+                  Cambios de horario
+                </h2>
+                <span className="pc-der dato-ico">{cambios.length}</span>
+              </div>
+              <ul className="rp-hist">
+                {cambios.map((c) => (
+                  <CambioHorario key={c.id} cambio={c} />
+                ))}
+              </ul>
+            </section>
+          )}
+
           {/* historial */}
           <section className="pc">
             <div className="pc-cab">
@@ -362,60 +477,7 @@ export default function ReservaDetalle({ codigo }: { codigo: string }) {
 
         {/* pagos y comprobante */}
         <aside className="grid gap-4 min-w-0">
-          <section className="pc">
-            <div className="pc-cab">
-              <h2>
-                <ReceiptText className="ico" aria-hidden />
-                Comprobante
-              </h2>
-              {conImagen && (
-                <div className="pc-der">
-                  <Estado dominio="pago" estado={conImagen.estado} />
-                </div>
-              )}
-            </div>
-            <div className="pc-cuerpo grid gap-3">
-              {pagos.cargando && !pagos.datos ? (
-                <Cargando texto="Cargando pagos…" className="!py-8" />
-              ) : !conImagen ? (
-                <Vacio
-                  ilustracion="IL-04-paso3-comprobante"
-                  titulo={filasPago.length ? 'Pago sin imagen' : 'Sin comprobante'}
-                  texto={res.estado === 'PENDIENTE' ? 'El cliente aún no envía su comprobante.' : undefined}
-                  compacto
-                  acciones={res.puedeCobrarSaldo ? <Boton variante="secundario" icono={HandCoins} onClick={() => setModal('cobrar')}>Cobrar en caja</Boton> : undefined}
-                />
-              ) : (
-                <>
-                  {conImagen.tieneArchivo && <VisorComprobante idPago={conImagen.id} leyenda={`${TEXTO_METODO[conImagen.metodo] ?? conImagen.metodo} · ${conImagen.codigoOperacion ?? ''}`} />}
-                  <DatosPago pago={conImagen} esperado={conImagen.tipoPago === 'TOTAL' ? res.montoTotal : res.montoAdelanto} />
-                  {conImagen.estado === 'PENDIENTE' && (
-                    <div className="grid grid-cols-2 gap-2">
-                      <Boton
-                        variante="peligro-contorno"
-                        icono={X}
-                        onClick={() => {
-                          setIdPago(conImagen.id);
-                          setModal('rechazar');
-                        }}
-                      >
-                        Rechazar
-                      </Boton>
-                      <Boton
-                        icono={Check}
-                        onClick={() => {
-                          setIdPago(conImagen.id);
-                          setModal('validar');
-                        }}
-                      >
-                        Validar
-                      </Boton>
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          </section>
+          {!comprobanteArriba && tarjetaComprobante}
 
           {filasPago.length > 0 && (
             <section className="pc">
@@ -458,6 +520,7 @@ export default function ReservaDetalle({ codigo }: { codigo: string }) {
       <ModalRechazar idPago={modal === 'rechazar' ? idPago : null} alCerrar={() => setModal(null)} alHecho={recargar} />
       <ModalCobrar reserva={modal === 'cobrar' ? res : null} alCerrar={() => setModal(null)} alHecho={() => { setVersion((v) => v + 1); refrescarContador(); }} />
       <ModalCancelar reserva={modal === 'cancelar' ? res : null} devolucionHoras={complejo.datos?.reglas.devolucionHoras} alCerrar={() => setModal(null)} alHecho={recargar} />
+      <ModalReprogramar modo="panel" reserva={modal === 'reprogramar' ? res : null} alCerrar={() => setModal(null)} alReprogramar={recargar} />
       <ModalConfirmar
         abierto={modal === 'ASISTIO' || modal === 'NO_ASISTIO'}
         alCerrar={() => setModal(null)}
@@ -492,6 +555,49 @@ export default function ReservaDetalle({ codigo }: { codigo: string }) {
         </div>
       </ModalConfirmar>
     </>
+  );
+}
+
+const ACTOR: Record<Reprogramacion['actor'], { texto: string; icono: LucideIcon; tono: TonoInsignia }> = {
+  CLIENTE: { texto: 'Cliente', icono: UserRound, tono: 'menta' },
+  CANCHITA: { texto: 'Canchita', icono: Bot, tono: 'amarillo' },
+  PANEL: { texto: 'Panel', icono: Monitor, tono: 'noche' },
+};
+
+function LadoCambio({ h, nuevo }: { h: HorarioReprogramado; nuevo?: boolean }) {
+  return (
+    <span className={nuevo ? 'rp-hist-lado nuevo' : 'rp-hist-lado'}>
+      <b>{h.cancha.split(' · ')[0]}</b>
+      <span className="tnum">{`${fmtFecha(h.fecha, 'dia-mes')} · ${horario24(h)}`}</span>
+      <span className="tnum">{fmtSoles(h.total)}</span>
+    </span>
+  );
+}
+
+/** Un cambio de horario: quién (insignia + usuario), cuándo, antes → después y el motivo (nota interna). */
+function CambioHorario({ cambio: c }: { cambio: Reprogramacion }) {
+  const a = ACTOR[c.actor] ?? ACTOR.PANEL;
+  return (
+    <li>
+      <div className="rp-hist-cab">
+        <Insignia tono={a.tono} icono={a.icono} tamano="sm">
+          {a.texto}
+        </Insignia>
+        {c.usuario && <span className="truncar">{c.usuario}</span>}
+        <span className="der tnum">{fmtFechaHora(c.creadoEn, { h24: true })}</span>
+      </div>
+      <div className="rp-hist-cambio">
+        <LadoCambio h={c.anterior} />
+        <ArrowRight className="ico" aria-label="pasó a" />
+        <LadoCambio h={c.nuevo} nuevo />
+      </div>
+      {c.motivo && (
+        <p className="rp-hist-motivo">
+          <NotebookPen className="ico" aria-hidden />
+          <span>{`«${c.motivo}»`}</span>
+        </p>
+      )}
+    </li>
   );
 }
 

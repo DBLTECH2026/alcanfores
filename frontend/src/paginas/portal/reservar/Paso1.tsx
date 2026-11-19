@@ -96,6 +96,7 @@ export default function Paso1() {
   const siguienteConLibres = cal.datos?.find((d) => d.fecha > (fecha ?? '') && d.libres > 0);
   const marcaHoy = fecha ? marcas.get(fecha) : undefined;
   const sel = r.turno && r.turno.fecha === fecha && r.turno.idCancha === idCancha ? r.turno : null;
+  const hayLibres = turnos.some((t) => t.estado === 'DISPONIBLE');
 
   return (
     <div className="grid gap-5">
@@ -163,14 +164,20 @@ export default function Paso1() {
               {marcaHoy.recargo ? `Cada turno lleva un adicional de ${fmtSoles(marcaHoy.recargo, { decimales: 0 })} (ya incluido en el precio).` : 'La cancha abre con su precio normal.'}
             </Alerta>
           )}
-          <LeyendaTurnos
-            extra={
-              <span className="ml-auto inline-flex items-center gap-1.5 t-mini" role="status">
-                {disp.cargando ? 'Cargando…' : actualizado ? fmtHace(actualizado) : ''}
-                <Boton variante="fantasma" tamano="sm" icono={RefreshCw} etiqueta="Actualizar disponibilidad" className="!w-9 !h-9 !min-h-9 -my-2 -mr-2" cargando={disp.cargando} onClick={actualizar} />
+          <LeyendaTurnos />
+          {/* Una sola línea: la pista de varios turnos y cuándo se actualizó (con el botón de actualizar). */}
+          <div className="turnos-nota">
+            {hayLibres && (
+              <span className="turnos-nota-txt">
+                <Layers className="ico ico-16 text-verde" aria-hidden />
+                Marca uno o varios turnos
               </span>
-            }
-          />
+            )}
+            <span className="turnos-nota-estado" role="status">
+              {disp.cargando ? 'Cargando…' : actualizado ? fmtHace(actualizado) : ''}
+              <Boton variante="fantasma" icono={RefreshCw} etiqueta="Actualizar disponibilidad" cargando={disp.cargando} onClick={actualizar} />
+            </span>
+          </div>
           {disp.cargando && !disp.datos ? (
             <div className="grilla-turnos" aria-busy="true" aria-label="Cargando horarios…">
               {Array.from({ length: 12 }, (_, i) => (
@@ -185,7 +192,7 @@ export default function Paso1() {
             <div className="card">
               <Vacio ilustracion="IL-26-sin-turnos" titulo={marcaHoy?.tipo === 'cerrado' ? `Cerrado: ${marcaHoy.nombre}` : 'Sin horarios ese día'} texto={marcaHoy ? undefined : 'La cancha no abre ese día.'} compacto />
             </div>
-          ) : !turnos.some((t) => t.estado === 'DISPONIBLE') ? (
+          ) : !hayLibres ? (
             <div className="grid gap-4">
               <div className="card">
                 <Vacio
@@ -205,10 +212,6 @@ export default function Paso1() {
             </div>
           ) : (
             <>
-              <p className="t-sec flex items-center gap-2 -mb-1">
-                <Layers className="ico ico-16 text-verde" aria-hidden />
-                Puedes marcar varios turnos para jugar más horas.
-              </p>
               <GrillaTurnos turnos={turnos} seleccionados={marcados} alElegir={alternar} />
               {sel && sel.partes.length > 1 && (
                 <div className="seleccion-turnos" role="status">

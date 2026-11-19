@@ -39,6 +39,9 @@ export const MSJ = {
   puntuacion: 'Elige de 1 a 5 estrellas.',
   contrasena: 'Ingresa tu contraseña.',
   codigoAprobacion: 'El código de aprobación tiene 6 dígitos.',
+  // Campo vacío: primero se pide escribirlo; el mensaje de formato queda para cuando hay algo escrito.
+  nombresVacio: 'Escribe tus nombres.',
+  apellidosVacio: 'Escribe tus apellidos.',
 } as const;
 
 export const TAMANIO_MAX_IMAGEN = 5 * 1024 * 1024;
@@ -56,6 +59,10 @@ export const esquemaNombre = z
   .max(60, MSJ.nombre)
   .regex(RE_NOMBRE, MSJ.nombre)
   .refine((v) => !/\s{2,}/.test(v), MSJ.nombre);
+
+/** Nombres / apellidos obligatorios: vacío → «Escribe tus …»; con texto → la regla de formato. */
+export const esquemaNombres = z.string().trim().min(1, MSJ.nombresVacio).pipe(esquemaNombre);
+export const esquemaApellidos = z.string().trim().min(1, MSJ.apellidosVacio).pipe(esquemaNombre);
 
 /** Celular: se acepta con espacios o +51 y se normaliza a 9 dígitos. */
 export const esquemaCelular = z

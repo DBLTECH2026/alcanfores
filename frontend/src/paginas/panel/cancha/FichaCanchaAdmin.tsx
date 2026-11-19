@@ -117,7 +117,7 @@ export default function FichaCanchaAdmin({ id, apartado }: { id: number; apartad
         subtitulo={
           <span className="inline-flex flex-wrap items-center gap-2">
             <InsigniaEstado dominio="cancha" estado={cancha.estado} tamano="sm" />
-            {horario ? textoSemana(horario.dias) : cancha.deporteTexto}
+            {horario ? textoSemana(horario.dias, true) : cancha.deporteTexto}
           </span>
         }
         busto="BU-rosa-gorra"

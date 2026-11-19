@@ -11,6 +11,7 @@ import {
   Info,
   Receipt,
   Timer,
+  Trophy,
   UserX,
 } from 'lucide-react';
 import { reportesApi } from '@/api/admin';
@@ -21,10 +22,10 @@ import { CabeceraPagina } from '@/componentes/panel/PanelLayout';
 import { ErrorCarga } from '@/componentes/panel/Herramientas';
 import { descargarArchivo } from '@/componentes/panel/archivos';
 import { Boton } from '@/componentes/ui/Boton';
-import { Esqueleto, Tabla, TarjetaKpi, Vacio } from '@/componentes/ui/Datos';
+import { Esqueleto, TarjetaKpi, Vacio } from '@/componentes/ui/Datos';
 import { Alerta } from '@/componentes/ui/Estados';
 import { ahoraLima, fmtFecha, hoyLima, sumarDias } from '@/utilidades/fecha';
-import { fmtSoles } from '@/utilidades/formato';
+import { fmtSoles, plural } from '@/utilidades/formato';
 import dayjs from 'dayjs';
 
 /** Paleta categórica validada (scripts/validate_palette.js, modo claro): verde, ámbar, azul, magenta. Orden fijo. */
@@ -78,8 +79,16 @@ function validarRango(r: Rango): string | null {
 }
 
 /** Tooltip con tokens de texto (el color solo en la marca). */
-function Globo({ active, payload, label, formato = (v) => String(v), etiqueta }: TooltipProps<number, string> & { formato?: (v: number) => string; etiqueta?: (l: string) => string }) {
+function Globo({
+  active,
+  payload,
+  label,
+  formato = (v) => String(v),
+  etiqueta,
+  extra,
+}: TooltipProps<number, string> & { formato?: (v: number) => string; etiqueta?: (l: string) => string; extra?: (fila: Record<string, number>) => Array<[string, string]> }) {
   if (!active || !payload?.length) return null;
+  const lineas = extra?.((payload[0]?.payload ?? {}) as Record<string, number>) ?? [];
   return (
     <div className="rounded-[10px] border border-borde-panel bg-white px-3 py-2 shadow-flota text-[12.5px] grid gap-1">
       <b className="text-noche">{etiqueta ? etiqueta(String(label)) : label}</b>
@@ -90,22 +99,48 @@ function Globo({ active, payload, label, formato = (v) => String(v), etiqueta }:
           <b className="ml-auto pl-3 text-noche tnum">{formato(Number(p.value))}</b>
         </span>
       ))}
+      {lineas.map(([k, v]) => (
+        <span key={k} className="flex items-center gap-2 text-texto-suave">
+          <i className="w-2.5 h-2.5 inline-block" />
+          {k}
+          <b className="ml-auto pl-3 text-noche tnum">{v}</b>
+        </span>
+      ))}
     </div>
   );
 }
 
-function Grafico({ titulo, icono: I, children, nota, alto = false }: { titulo: string; icono: typeof Gauge; children: ReactNode; nota?: ReactNode; alto?: boolean }) {
+/** Tarjeta con la cabecera de los reportes (ícono + título; en celular la nota baja debajo del título). */
+function Tarjeta({ titulo, icono: I, nota, children }: { titulo: string; icono: typeof Gauge; nota?: ReactNode; children: ReactNode }) {
   return (
-    <section className="pc">
-      <div className="pc-cab">
+    <section className="pc min-w-0 flex flex-col">
+      <div className="pc-cab max-sm:flex-col max-sm:!items-start max-sm:gap-0.5">
         <h2>
           <I className="ico" aria-hidden />
           {titulo}
         </h2>
-        {nota && <span className="pc-der t-sec text-[12.5px]">{nota}</span>}
+        {nota && <span className="pc-der t-sec text-[12.5px] max-sm:!ml-0 max-sm:pl-[27px]">{nota}</span>}
       </div>
-      <div className={`pc-cuerpo ${alto ? 'grafico-alto' : 'grafico'}`}>{children}</div>
+      {children}
     </section>
+  );
+}
+
+/**
+ * `alto`: gráfico de 320 px; `altoPx`: alto MÍNIMO (p. ej. la barra única de Asistencia). Con `altoPx` el gráfico
+ * llena la tarjeta cuando la fila es más alta (2 columnas) y mide `altoPx` cuando va sola (celular y tablet).
+ */
+function Grafico({ titulo, icono, children, nota, alto = false, altoPx }: { titulo: string; icono: typeof Gauge; children: ReactNode; nota?: ReactNode; alto?: boolean; altoPx?: number }) {
+  return (
+    <Tarjeta titulo={titulo} icono={icono} nota={nota}>
+      {altoPx ? (
+        <div className="pc-cuerpo relative flex-1" style={{ minHeight: altoPx }}>
+          <div className="absolute inset-x-[18px] inset-y-4">{children}</div>
+        </div>
+      ) : (
+        <div className={`pc-cuerpo ${alto ? 'grafico-alto' : 'grafico'}`}>{children}</div>
+      )}
+    </Tarjeta>
   );
 }
 
@@ -176,24 +211,27 @@ export default function Reportes() {
       />
 
       <section className="card card-pad flex flex-wrap items-end gap-3">
-        <div className="rango-rapido" role="group" aria-label="Rango rápido">
+        <div className="rango-rapido max-sm:w-full [&>button]:whitespace-nowrap [&>button]:max-sm:flex-auto" role="group" aria-label="Rango rápido">
           {RAPIDOS.map((r) => (
             <button key={r.id} type="button" aria-pressed={rapido === r.id} onClick={() => aplicar(r.rango(), r.id)}>
               {r.texto}
             </button>
           ))}
         </div>
-        <label className="grid gap-1 text-[12px] text-texto-suave">
-          Desde
-          <input type="date" className="bb-fecha" value={borrador.desde} max={hoyLima()} onChange={(e) => setBorrador((b) => ({ ...b, desde: e.target.value }))} />
-        </label>
-        <label className="grid gap-1 text-[12px] text-texto-suave">
-          Hasta
-          <input type="date" className="bb-fecha" value={borrador.hasta} onChange={(e) => setBorrador((b) => ({ ...b, hasta: e.target.value }))} />
-        </label>
-        <Boton variante="oscuro" icono={CalendarDays} onClick={() => aplicar(borrador)}>
-          Aplicar
-        </Boton>
+        {/* Desde, Hasta y Aplicar son un solo bloque: se envuelven juntos (en celular, fechas lado a lado y Aplicar debajo). */}
+        <div className="grid grid-cols-2 items-end gap-3 max-sm:w-full sm:flex sm:flex-wrap">
+          <label className="grid gap-1 text-[12px] text-texto-suave min-w-0">
+            Desde
+            <input type="date" className="bb-fecha w-full min-w-0" value={borrador.desde} max={hoyLima()} onChange={(e) => setBorrador((b) => ({ ...b, desde: e.target.value }))} />
+          </label>
+          <label className="grid gap-1 text-[12px] text-texto-suave min-w-0">
+            Hasta
+            <input type="date" className="bb-fecha w-full min-w-0" value={borrador.hasta} onChange={(e) => setBorrador((b) => ({ ...b, hasta: e.target.value }))} />
+          </label>
+          <Boton variante="oscuro" icono={CalendarDays} className="max-sm:col-span-2" onClick={() => aplicar(borrador)}>
+            Aplicar
+          </Boton>
+        </div>
         <span className="dato-ico ml-auto">
           <Info className="ico" aria-hidden />
           Según fecha del turno · hora de Lima
@@ -219,14 +257,14 @@ export default function Reportes() {
       ) : (
         <>
           <div className="kpis">
-            <TarjetaKpi etiqueta="Ingresos" valor={fmtSoles(ing.total, { decimales: 0 })} icono={Banknote} tono="verde" detalle={`${ing.cantidadPagos} pagos validados`} />
+            <TarjetaKpi etiqueta="Ingresos" valor={fmtSoles(ing.total, { decimales: 0 })} icono={Banknote} tono="verde" detalle={plural(ing.cantidadPagos, 'pago validado', 'pagos validados')} />
             <TarjetaKpi etiqueta="Ticket promedio" valor={fmtSoles(ing.ticketPromedio)} icono={Receipt} tono="noche" detalle={ing.reembolsado ? `${fmtSoles(ing.reembolsado)} reembolsado` : 'sin reembolsos'} />
-            <TarjetaKpi etiqueta="Registradas" valor={t.registradas} icono={ClipboardList} tono="noche" detalle={`${t.pendientes} pendientes`} />
+            <TarjetaKpi etiqueta="Registradas" valor={t.registradas} icono={ClipboardList} tono="noche" detalle={plural(t.pendientes, 'pendiente', 'pendientes')} />
             <TarjetaKpi etiqueta="Confirmadas" valor={t.confirmadas} icono={CalendarCheck} tono="verde" barra={t.registradas ? (t.confirmadas / t.registradas) * 100 : 0} detalle={`${t.registradas ? Math.round((t.confirmadas / t.registradas) * 100) : 0} % de ${t.registradas}`} />
             <TarjetaKpi etiqueta="Canceladas" valor={t.canceladas} icono={CircleX} tono="rojo" detalle={Object.entries(res.cancelaciones.porActor).map(([k, v]) => `${v} ${(TEXTO_ACTOR[k] ?? k).split(' ')[0]?.toLowerCase()}`).join(' · ')} />
-            <TarjetaKpi etiqueta="No asistió" valor={`${t.tasaNoShowPct} %`} icono={UserX} tono="rojo" detalle={`${t.noAsistio} de ${t.asistidas + t.noAsistio} partidos`} />
+            <TarjetaKpi etiqueta="No asistió" valor={`${t.tasaNoShowPct} %`} icono={UserX} tono="rojo" detalle={`${t.noAsistio} de ${plural(t.asistidas + t.noAsistio, 'partido', 'partidos')}`} />
             <TarjetaKpi etiqueta="Ocupación" valor={`${t.ocupacionPct} %`} icono={Gauge} tono="gris" barra={t.ocupacionPct} detalle="turnos reservados" />
-            <TarjetaKpi etiqueta="Validación" valor={ing.tiempoMedioValidacionMin != null ? `${Math.round(ing.tiempoMedioValidacionMin)} min` : '—'} icono={Timer} tono="gol" detalle={`${ing.pagosRechazados} rechazados`} />
+            <TarjetaKpi etiqueta="Validación" valor={ing.tiempoMedioValidacionMin != null ? `${Math.round(ing.tiempoMedioValidacionMin)} min` : '—'} icono={Timer} tono="gol" detalle={plural(ing.pagosRechazados, 'rechazado', 'rechazados')} />
           </div>
 
           <div className="graficos">
@@ -255,25 +293,25 @@ export default function Reportes() {
                 </BarChart>
               </ResponsiveContainer>
             </Grafico>
-            <Grafico titulo="Por cancha" icono={ClipboardList} nota="reservas · ocupación en el globo">
+            <Grafico titulo="Por cancha" icono={ClipboardList} nota="reservas · toca una barra para ver la ocupación">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={porCancha} layout="vertical" margin={{ top: 0, right: 16, left: 8, bottom: 0 }}>
                   <CartesianGrid horizontal={false} stroke="#EEF2F0" />
                   <XAxis type="number" allowDecimals={false} tick={EJE} tickLine={false} axisLine={false} />
                   <YAxis type="category" dataKey="cancha" tick={EJE} tickLine={false} axisLine={false} width={96} />
-                  <Tooltip cursor={{ fill: 'rgba(9,26,42,.05)' }} content={<Globo formato={(v) => String(v)} />} />
+                  <Tooltip cursor={{ fill: 'rgba(9,26,42,.05)' }} content={<Globo formato={(v) => String(v)} extra={(f) => [['Ocupación', `${f.Ocupación ?? 0} %`]]} />} />
                   <Bar dataKey="Reservas" fill={C.verde} radius={[0, 4, 4, 0]} barSize={22} label={etiquetaDer(String)} />
                 </BarChart>
               </ResponsiveContainer>
             </Grafico>
             <Grafico titulo="Ocupación por cancha" icono={Gauge} nota="% de turnos reservados">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={porCancha} margin={{ top: 16, right: 4, left: -18, bottom: 0 }}>
-                  <CartesianGrid vertical={false} stroke="#EEF2F0" />
-                  <XAxis dataKey="cancha" tick={EJE} tickLine={false} axisLine={{ stroke: '#E3EAE6' }} interval={0} />
-                  <YAxis tick={EJE} tickLine={false} axisLine={false} unit=" %" />
+                <BarChart data={porCancha} layout="vertical" margin={{ top: 0, right: 40, left: 8, bottom: 0 }}>
+                  <CartesianGrid horizontal={false} stroke="#EEF2F0" />
+                  <XAxis type="number" tick={EJE} tickLine={false} axisLine={false} unit=" %" />
+                  <YAxis type="category" dataKey="cancha" tick={EJE} tickLine={false} axisLine={false} width={96} />
                   <Tooltip cursor={{ fill: 'rgba(9,26,42,.05)' }} content={<Globo formato={(v) => `${v} %`} />} />
-                  <Bar dataKey="Ocupación" fill={C.azul} radius={[4, 4, 0, 0]} barSize={36} label={etiquetaArriba((v) => `${v} %`)} />
+                  <Bar dataKey="Ocupación" fill={C.azul} radius={[0, 4, 4, 0]} barSize={22} label={etiquetaDer((v) => `${v} %`)} />
                 </BarChart>
               </ResponsiveContainer>
             </Grafico>
@@ -310,9 +348,9 @@ export default function Reportes() {
                 </BarChart>
               </ResponsiveContainer>
             </Grafico>
-            <Grafico titulo="Asistencia (no-show)" icono={UserX} nota={`${t.tasaNoShowPct} % no asistió`}>
+            <Grafico titulo="Asistencia (no-show)" icono={UserX} nota={`${t.tasaNoShowPct} % no asistió`} altoPx={136}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={asistencia} layout="vertical" margin={{ top: 24, right: 16, left: 8, bottom: 0 }} barSize={40}>
+                <BarChart data={asistencia} layout="vertical" margin={{ top: 0, right: 16, left: 8, bottom: 0 }} barSize={36}>
                   <XAxis type="number" allowDecimals={false} tick={EJE} tickLine={false} axisLine={false} />
                   <YAxis type="category" dataKey="k" hide />
                   <Tooltip cursor={false} content={<Globo />} />
@@ -329,34 +367,41 @@ export default function Reportes() {
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2 lg:items-start">
-            <section className="grid gap-2">
-              <h2 className="t-h3">Mejores clientes</h2>
-              <Tabla
-                etiqueta="Mejores clientes"
-                filas={res.topClientes}
-                claveFila={(c) => c.dni}
-                vacio="Sin datos"
-                columnas={[
-                  { clave: 'nombre', titulo: 'Cliente', celda: (c) => <b>{c.nombre}</b> },
-                  { clave: 'dni', titulo: 'DNI', celda: (c) => <span className="tnum">{c.dni}</span> },
-                  { clave: 'reservas', titulo: 'Reservas', alinear: 'der', celda: (c) => <span className="tnum">{c.reservas}</span> },
-                  { clave: 'asistidas', titulo: 'Asistió', alinear: 'der', celda: (c) => <span className="tnum">{c.asistidas}</span> },
-                ]}
-              />
-            </section>
-            <section className="grid gap-2">
-              <h2 className="t-h3">Motivos de cancelación</h2>
-              <Tabla
-                etiqueta="Motivos de cancelación"
-                filas={res.cancelaciones.motivosFrecuentes}
-                claveFila={(m) => m.motivo}
-                vacio="Sin cancelaciones"
-                columnas={[
-                  { clave: 'motivo', titulo: 'Motivo', celda: (m) => m.motivo },
-                  { clave: 'veces', titulo: 'Veces', alinear: 'der', celda: (m) => <b className="tnum">{m.veces}</b> },
-                ]}
-              />
-            </section>
+            <Tarjeta titulo="Mejores clientes" icono={Trophy} nota="por reservas">
+              {res.topClientes.length ? (
+                <ol className="m-0 p-0 list-none divide-y divide-borde-panel">
+                  {res.topClientes.map((c, i) => (
+                    <li key={c.dni} className="flex items-center gap-3 px-[18px] py-3">
+                      <span className="grid place-items-center w-7 h-7 rounded-full bg-menta text-verde text-[12.5px] font-bold tnum shrink-0">{i + 1}</span>
+                      <span className="grid min-w-0 flex-1">
+                        <b className="line-clamp-2 [overflow-wrap:anywhere] text-noche">{c.nombre}</b>
+                        <span className="t-sec text-[12.5px] tnum">DNI {c.dni}</span>
+                      </span>
+                      <span className="grid text-right shrink-0">
+                        <b className="tnum text-noche">{plural(c.reservas, 'reserva', 'reservas')}</b>
+                        <span className="t-sec text-[12.5px] tnum">asistió a {c.asistidas}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <Vacio ilustracion="IL-24-sin-resultados" titulo="Sin clientes en el periodo" compacto />
+              )}
+            </Tarjeta>
+            <Tarjeta titulo="Motivos de cancelación" icono={CircleX} nota={plural(t.canceladas, 'cancelada', 'canceladas')}>
+              {res.cancelaciones.motivosFrecuentes.length ? (
+                <ul className="m-0 p-0 list-none divide-y divide-borde-panel">
+                  {res.cancelaciones.motivosFrecuentes.map((m) => (
+                    <li key={m.motivo} className="flex items-center gap-3 px-[18px] py-3">
+                      <span className="min-w-0 flex-1 text-noche">{m.motivo}</span>
+                      <b className="tnum text-noche shrink-0">{plural(m.veces, 'vez', 'veces')}</b>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <Vacio ilustracion="IL-23-todo-al-dia" titulo="Sin cancelaciones" compacto />
+              )}
+            </Tarjeta>
           </div>
         </>
       )}

@@ -150,17 +150,9 @@ export default function CanchaFormulario({ id }: { id?: number }) {
                 <CampoTexto label="Superficie" requerido maxLength={40} placeholder="Grass sintético" error={errors.superficie?.message} {...register('superficie')} />
                 <CampoTexto label="Medidas" opcional maxLength={40} placeholder="30 x 18 m" error={errors.medidas?.message} {...register('medidas')} />
               </div>
-              <div className="form-3">
-                <CampoTexto label="Capacidad" requerido inputMode="numeric" sufijo="jug." maxLength={2} error={errors.capacidad?.message} {...register('capacidad')} />
-                <CampoTexto label="Orden" requerido inputMode="numeric" maxLength={2} ayuda="Posición en el portal" error={errors.orden?.message} {...register('orden')} />
-                <Selector
-                  label="Estado"
-                  opciones={[
-                    { valor: 'ACTIVA', texto: 'Activa' },
-                    { valor: 'INACTIVA', texto: 'Inactiva' },
-                  ]}
-                  {...register('estado')}
-                />
+              <div className="form-2">
+                <CampoTexto label="Capacidad" requerido inputMode="numeric" sufijo="jugadores" maxLength={2} error={errors.capacidad?.message} {...register('capacidad')} />
+                <CampoTexto label="Orden en el portal" requerido inputMode="numeric" maxLength={2} ayuda="1 = primera" error={errors.orden?.message} {...register('orden')} />
               </div>
               <div className="flex flex-wrap gap-6">
                 <Interruptor activo={Boolean(v.techada)} alCambiar={(x) => setValue('techada', x, { shouldDirty: true })}>
@@ -169,8 +161,18 @@ export default function CanchaFormulario({ id }: { id?: number }) {
                 <Interruptor activo={Boolean(v.iluminacionLed)} alCambiar={(x) => setValue('iluminacionLed', x, { shouldDirty: true })}>
                   <span className="inline-flex items-center gap-1">
                     <Lightbulb className="ico ico-16" aria-hidden />
-                    Iluminación LED
+                    Luz LED
                   </span>
+                </Interruptor>
+              </div>
+              {/* Mismo switch que en «Configuración» de la cancha (antes era un select «Estado»). */}
+              <div className="flex flex-wrap items-center gap-3 border-t border-borde-panel pt-4">
+                <div className="grid gap-0.5 flex-1 min-w-[200px]">
+                  <b className="text-[15px]">{v.estado === 'ACTIVA' ? 'Visible en el portal' : 'Oculta en el portal'}</b>
+                  <span className="t-sec text-[13px]">{v.estado === 'ACTIVA' ? 'Se puede reservar apenas la crees.' : 'No se puede reservar hasta activarla.'}</span>
+                </div>
+                <Interruptor activo={v.estado === 'ACTIVA'} alCambiar={(x) => setValue('estado', x ? 'ACTIVA' : 'INACTIVA', { shouldDirty: true })}>
+                  {v.estado === 'ACTIVA' ? 'Activa' : 'Inactiva'}
                 </Interruptor>
               </div>
             </div>

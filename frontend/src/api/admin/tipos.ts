@@ -93,8 +93,37 @@ export interface ReservaAdmin {
   cancelacion: { canceladoPor: string; motivo: string; fecha: string; devolucion: boolean; montoDevolucion: number | null } | null;
   linea: Array<{ evento: string; fecha: string; detalle: string | null }>;
   puedeCancelar: boolean;
-  puedeMarcarAsistencia: boolean;
+  /** Lo calcula el back con `asistencia_desde_min`; si no llega, el front lo calcula. */
+  puedeMarcarAsistencia?: boolean;
+  asistenciaDesdeMin?: number;
   puedeCobrarSaldo: boolean;
+  /** Reprogramar (19-nov): estado activo y que el partido aún no empiece (el panel no tiene límite de veces ni plazo). */
+  puedeReprogramar?: boolean;
+  /** Cambios de horario, el más reciente primero. */
+  reprogramaciones?: Reprogramacion[];
+}
+
+/** Un horario de la reserva en el historial de cambios (antes o después). `horarioTexto` viene en 12 h. */
+export interface HorarioReprogramado {
+  idCancha: number;
+  cancha: string;
+  fecha: string;
+  horaInicio: string;
+  horaFin: string;
+  horarioTexto: string | null;
+  idsTurno: number[];
+  cantidadTurnos: number;
+  total: number;
+}
+/** Cambio de horario: quién lo hizo (cliente, Canchita o el panel), el motivo (nota interna del panel) y antes/después. */
+export interface Reprogramacion {
+  id: number;
+  actor: 'CLIENTE' | 'CANCHITA' | 'PANEL';
+  usuario: string | null;
+  motivo: string | null;
+  creadoEn: string;
+  anterior: HorarioReprogramado;
+  nuevo: HorarioReprogramado;
 }
 
 export interface NuevaReservaManual {
@@ -131,6 +160,8 @@ export interface TurnoAgenda {
     estado: EstadoReserva;
     estadoPago: EstadoPago;
     asistencia: Asistencia;
+    /** v2: si ya se puede marcar la asistencia (lo dice el back). */
+    puedeMarcarAsistencia?: boolean;
     /** v2: reservas de varios turnos. */
     cantidadTurnos?: number;
     horarioTexto?: string;
@@ -403,7 +434,10 @@ export type Configuracion = Record<string, string>;
 
 // ------------------------------ notificaciones ------------------------------
 export interface Adjunto {
-  tipo: 'CONSTANCIA' | 'COMPROBANTE';
+  /** v2: IMAGEN = tarjeta ilustrada que acompaña al WhatsApp (los JPG viven en /public/whatsapp). */
+  tipo: 'CONSTANCIA' | 'COMPROBANTE' | 'IMAGEN';
+  /** v2 (opcional): URL de la imagen si el back la sirve. */
+  url?: string | null;
   referencia: string;
   nombreArchivo: string;
   estado: 'PENDIENTE' | 'ADJUNTADO' | 'NO_DISPONIBLE';
@@ -430,6 +464,8 @@ export interface DetalleNotificacion extends Omit<FilaNotificacion, 'adjuntos'> 
   vistaPrevia: string | null;
   adjuntos: Adjunto[];
   reintentable: boolean;
+  /** v2: tarjeta ilustrada del WhatsApp como data URI JPG (o null). */
+  imagenTarjeta?: string | null;
 }
 export interface Recordatorio {
   id: number;
@@ -439,6 +475,8 @@ export interface Recordatorio {
   cancha: string;
   inicioReserva: string;
   enviarEn: string;
+  /** v2: cuántos minutos antes del partido (una fila por cada recordatorio). */
+  minutosAntes?: number;
   estado: 'PROGRAMADO' | 'ENVIADO' | 'CANCELADO' | 'OMITIDO';
   enviadoEn: string | null;
   detalle: string | null;
@@ -469,6 +507,8 @@ export interface UsuarioAdmin {
   apellidos: string;
   usuario: string;
   correo: string;
+  /** v2: celular opcional para recuperar la contraseña por WhatsApp. */
+  telefono?: string | null;
   rol: Rol;
   estado: 'ACTIVO' | 'INACTIVO';
   bloqueado: boolean;
@@ -482,8 +522,46 @@ export interface SolicitudUsuario {
   apellidos: string;
   usuario: string;
   correo: string;
+  telefono?: string | null;
   rol: Rol;
   contrasena?: string;
+}
+
+// ------------------------------ v2: correo (SMTP) ------------------------------
+export type SeguridadSmtp = 'SSL' | 'STARTTLS';
+export interface ConfigCorreo {
+  configurado: boolean;
+  /** De dónde salen los datos: el panel, las variables del servidor o ninguno (simulado). */
+  origen: string;
+  host: string | null;
+  puerto: number | null;
+  usuario: string | null;
+  remitente: string | null;
+  nombreRemitente: string | null;
+  seguridad: SeguridadSmtp | null;
+  tieneClave: boolean;
+  actualizadoEn?: string | null;
+  actualizadoPor?: string | null;
+}
+export interface SolicitudCorreo {
+  host: string;
+  puerto: number;
+  seguridad: SeguridadSmtp;
+  usuario: string;
+  /** Vacía = conservar la guardada. */
+  clave: string;
+  remitente: string;
+  nombreRemitente: string;
+}
+/** Respuesta de la prueba (el back puede devolver más datos; se lee con tolerancia). */
+export interface ResultadoPruebaCorreo {
+  destino?: string;
+  enviado?: boolean;
+  simulado?: boolean;
+  estado?: string;
+  mensaje?: string | null;
+  error?: string | null;
+  ultimoError?: string | null;
 }
 export interface EntradaBitacora {
   id: number;

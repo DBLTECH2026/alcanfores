@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Banknote,
   CalendarClock,
@@ -8,7 +8,6 @@ import {
   ChevronUp,
   Clock,
   Globe,
-  History,
   Lock,
   Mail,
   Moon,
@@ -64,7 +63,7 @@ export function Stepper({ actual, completados = [], alIr }: { actual: 1 | 2 | 3;
               {i > 0 && <span className={cx('stepper-linea', (n <= actual || completados.includes(n)) && 'hecha')} aria-hidden />}
               <span className={cx('stepper-paso', esActual ? 'actual' : hecho ? 'hecho' : 'pendiente')} aria-current={esActual ? 'step' : undefined}>
                 {hecho && !esActual && alIr ? (
-                  <button type="button" className="flex items-center gap-2 bg-transparent border-0 p-0 cursor-pointer" onClick={() => alIr(n)} aria-label={`Volver al paso ${n}: ${p.texto}`}>
+                  <button type="button" className="flex items-center gap-2 min-h-[36px] bg-transparent border-0 p-0 cursor-pointer" onClick={() => alIr(n)} aria-label={`Volver al paso ${n}: ${p.texto}`}>
                     {contenido}
                   </button>
                 ) : (
@@ -152,7 +151,10 @@ export function GrillaTurnos({ turnos, seleccionados, alElegir }: { turnos: Turn
   );
 }
 
-/** Leyenda de estados de los turnos. */
+/**
+ * Leyenda de estados de los turnos en UNA fila (se desliza si no entra). Solo los 3 estados que se ven a diario:
+ * «No disponible» y «Pasado» ya lo dicen en el propio turno.
+ */
 export function LeyendaTurnos({ extra }: { extra?: ReactNode }) {
   const mue = (cls: string, Icono?: LucideIcon, icCls?: string) => (
     <span className={cx('leyenda-mue !w-[22px] !h-[18px] !rounded-[5px] grid place-items-center', cls)} aria-hidden>
@@ -160,12 +162,10 @@ export function LeyendaTurnos({ extra }: { extra?: ReactNode }) {
     </span>
   );
   return (
-    <div className="leyenda items-center">
+    <div className="leyenda leyenda-fila items-center" role="group" aria-label="Leyenda de los turnos">
       <span className="leyenda-item">{mue('')}Disponible</span>
       <span className="leyenda-item">{mue('sel', Check, 'text-white')}Seleccionado</span>
       <span className="leyenda-item">{mue('ocu', Lock, 'text-gris')}Ocupado</span>
-      <span className="leyenda-item">{mue('man', Wrench, 'text-profundo')}No disponible</span>
-      <span className="leyenda-item">{mue('pas', History, 'text-gris')}Pasado</span>
       {extra}
     </div>
   );
@@ -288,28 +288,52 @@ export function ResumenReserva({
   );
 }
 
-/** Barra inferior fija del móvil: resumen corto + CTA, con el resumen completo plegable. */
+/** ¿El contenedor todavía tiene contenido por debajo de lo visible? */
+function quedaContenido(el: HTMLElement | null): boolean {
+  return Boolean(el && el.scrollTop + el.clientHeight < el.scrollHeight - 4);
+}
+
+/**
+ * Barra inferior fija del móvil: resumen corto + CTA, con el resumen completo plegable.
+ * Arriba la fecha y el horario COMPLETOS (nunca se recorta la hora); abajo la cancha y los montos.
+ */
 export function BarraResumen({ datos, cta, ayuda, completo }: { datos: DatosResumen; cta: ReactNode; ayuda?: ReactNode; completo?: ReactNode }) {
   const [abierto, setAbierto] = useState(false);
+  // Degradado al pie del detalle solo mientras queda contenido por ver.
+  const [conMas, setConMas] = useState(false);
+  const plegable = useRef<HTMLDivElement>(null);
+  const medir = () => setConMas(quedaContenido(plegable.current));
+  useEffect(() => {
+    if (abierto) setConMas(quedaContenido(plegable.current));
+  }, [abierto, datos]);
   const t = datos.turno;
   const adelanto = t ? datos.montoAdelanto ?? calcularAdelanto(t.precio, datos.adelantoPct) : 0;
   return (
     <div className="barra-fija solo-movil">
-      {abierto && completo && <div className="resumen-plegable">{completo}</div>}
+      {abierto && completo && (
+        <div ref={plegable} className={cx('resumen-plegable', conMas && 'con-mas')} onScroll={medir}>
+          {completo}
+        </div>
+      )}
       <div className="barra-resumen">
         <div className="barra-resumen-txt">
           {t ? (
             <>
-              <b>{`${t.nombreCancha} · ${fmtFecha(t.fecha)} · ${t.horarioTexto}`}</b>
-              <span>
-                Adelanto <b>{fmtSoles(adelanto)}</b> · Total {fmtSoles(t.precio)}
-                {t.partes.length > 1 ? ` · ${t.partes.length} turnos` : ''}
+              <span className="barra-fila1">
+                <b className="barra-cuando tnum">{`${fmtFecha(t.fecha)} · ${t.horarioTexto}`}</b>
                 {completo && (
-                  <button type="button" className="barra-toggle ml-2" aria-expanded={abierto} onClick={() => setAbierto((a) => !a)}>
+                  <button type="button" className="barra-toggle" aria-expanded={abierto} onClick={() => setAbierto((a) => !a)}>
                     {abierto ? 'Ocultar' : 'Ver detalle'}
                     {abierto ? <ChevronDown className="ico ico-14" aria-hidden /> : <ChevronUp className="ico ico-14" aria-hidden />}
                   </button>
                 )}
+              </span>
+              <span className="barra-montos">
+                <span>{t.nombreCancha.split(' · ')[0]}</span>
+                <span>
+                  · Adelanto <b>{fmtSoles(adelanto)}</b>
+                </span>
+                <span>{`· Total ${fmtSoles(t.precio)}`}</span>
               </span>
             </>
           ) : (

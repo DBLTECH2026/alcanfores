@@ -63,8 +63,8 @@
 .visor-pantalla-marco.con-zoom { overflow: auto; }
 .visor-pantalla-marco img { max-width: min(1200px, 100%); max-height: calc(100dvh - 200px); object-fit: contain; border-radius: 10px; transition: transform .2s; cursor: zoom-in; }
 .visor-pantalla-marco.con-zoom img { cursor: zoom-out; }
-.visor-flecha { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border-radius: 50%; border: 0; background: rgba(255,255,255,.12); color: #fff; display: grid; place-items: center; cursor: pointer; z-index: 2; }
-.visor-flecha:hover { background: rgba(255,255,255,.22); }
+.visor-flecha { position: absolute; top: 50%; transform: translateY(-50%); width: 48px; height: 48px; border-radius: 50%; border: 1px solid rgba(255,255,255,.35); background: rgba(9,26,42,.55); color: #fff; display: grid; place-items: center; cursor: pointer; z-index: 2; }
+.visor-flecha:hover { background: rgba(9,26,42,.72); }
 .visor-flecha.izq { left: 12px; } .visor-flecha.der { right: 12px; }
 .visor-leyenda { margin: 0; text-align: center; font-size: 14px; color: #C9D6CF; padding: 8px 16px 0; }
 .visor-miniaturas { display: flex; gap: 8px; justify-content: center; padding: 12px 16px 18px; overflow-x: auto; }
@@ -95,7 +95,8 @@
 .metodo-marca { position: absolute; top: 12px; right: 12px; width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid var(--borde-campo); background: #fff; }
 .metodo[aria-checked="true"] .metodo-marca { border: 6px solid var(--verde); }
 .metodos.con-error .metodo { border-color: var(--rojo); }
-@media (min-width: 1024px) { .metodos { grid-template-columns: repeat(var(--n-metodos, 4), minmax(0, 1fr)); } }
+/* Desde 640 px todos los métodos en una fila (3 a 768: sin el hueco de «Alcanfores Pay» solo) */
+@media (min-width: 640px) { .metodos { grid-template-columns: repeat(var(--n-metodos, 4), minmax(0, 1fr)); } }
 
 /* ---------- reloj de plazo ---------- */
 .plazo { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border-radius: var(--r-12); background: var(--amarillo-tinte); border: 1px solid var(--aviso-borde); font-size: 14px; }
@@ -103,9 +104,22 @@
 .plazo.vencido { background: var(--rojo-tinte); border-color: var(--error-borde); }
 
 /* ---------- resumen plegable (móvil) ---------- */
-.barra-fija .resumen-plegable { margin: -2px 0 10px; max-height: 52dvh; overflow: auto; border-radius: var(--r-16); }
+/* 62dvh + degradado al pie: el adelanto nunca queda medio tapado y se nota que hay más abajo */
+.barra-fija .resumen-plegable { margin: -2px 0 10px; max-height: 62dvh; overflow: auto; overscroll-behavior: contain; border-radius: var(--r-16); }
+.barra-fija .resumen-plegable.con-mas { -webkit-mask-image: linear-gradient(#000 calc(100% - 44px), transparent); mask-image: linear-gradient(#000 calc(100% - 44px), transparent); }
 .barra-fija .resumen-plegable .resumen { box-shadow: none; }
-.barra-toggle { display: inline-flex; align-items: center; gap: 4px; border: 0; background: transparent; color: var(--verde); font: inherit; font-size: 13px; font-weight: 700; padding: 2px 0; cursor: pointer; }
+.barra-toggle { display: inline-flex; align-items: center; gap: 4px; min-height: 36px; border: 0; background: transparent; color: var(--verde); font: inherit; font-size: 13px; font-weight: 700; padding: 6px 0; cursor: pointer; white-space: nowrap; vertical-align: middle; }
+/* Barra inferior: arriba fecha y horario COMPLETOS (nunca se recorta la hora); abajo cancha y montos */
+.barra-resumen-txt .barra-fila1 { display: flex; align-items: flex-start; gap: 10px; }
+.barra-resumen-txt b.barra-cuando { flex: 1; min-width: 0; white-space: normal; overflow: visible; text-overflow: clip; line-height: 1.3; }
+.barra-resumen-txt .barra-fila1 .barra-toggle { flex: none; margin: -9px 0 -9px auto; }
+.barra-resumen-txt .barra-montos { display: flex; flex-wrap: wrap; align-items: center; column-gap: 5px; row-gap: 0; margin-top: 2px; }
+.barra-resumen-txt .barra-montos > span { display: inline; white-space: nowrap; }
+/* Métodos de pago en celular: de a dos y el último impar a todo el ancho (sin hueco) */
+@media (max-width: 639px) {
+  .metodos > .metodo:last-child:nth-child(odd) { grid-column: 1 / -1; grid-template-columns: 40px minmax(0, 1fr); column-gap: 12px; row-gap: 2px; align-items: center; align-content: center; min-height: 72px; padding-right: 44px; }
+  .metodos > .metodo:last-child:nth-child(odd) .metodo-ico { grid-row: span 2; }
+}
 
 /* ---------- preguntas frecuentes ---------- */
 .faq { display: grid; gap: 10px; }
@@ -166,6 +180,8 @@
 .prueba:hover { border-color: var(--amarillo); background: var(--amarillo-tinte); }
 .prueba code { font: 600 12.5px ui-monospace, Consolas, monospace; letter-spacing: .03em; white-space: nowrap; }
 .prueba span { margin-left: auto; color: var(--texto-suave); font-size: 12px; text-align: right; }
+/* Celular: número arriba y resultado debajo en una línea (no una columnita de 3-4 líneas) */
+@media (max-width: 479px) { .prueba { flex-wrap: wrap; row-gap: 2px; } .prueba span { margin-left: 26px; width: 100%; text-align: left; } }
 
 /* ---------- panel: menú plegado ---------- */
 @media (min-width: 1024px) {
@@ -277,11 +293,15 @@
 .mc-cuenta { display: inline-flex; align-items: center; gap: 8px; height: 40px; padding: 0 10px 0 4px; border-radius: 999px; color: var(--noche); font-weight: 600; font-size: 14px; text-decoration: none; }
 .mc-cuenta:hover, .mc-cuenta[aria-current="page"] { background: var(--superficie-suave); }
 .mc-cuenta-av { width: 32px; height: 32px; border-radius: 50%; background: var(--noche); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 700; }
-@media (max-width: 767px) { .mc-ingresar span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); } .mc-ingresar { padding: 0 8px; } }
+/* En celular «Ingresar» y el avatar ya están en el menú lateral: fuera de la cabecera para que la hamburguesa siempre entre */
+@media (max-width: 767px) { .mc-ingresar, .mc-cuenta { display: none; } }
 .cuenta-caja { display: grid; max-width: 920px; margin: 0 auto; background: #fff; border: 1px solid var(--borde); border-radius: var(--r-24); overflow: hidden; box-shadow: var(--sombra-1); }
-@media (min-width: 768px) { .cuenta-caja { grid-template-columns: 340px 1fr; } .cuenta-caja.ancha { max-width: 1040px; } }
+/* Dos columnas (ilustración + formulario) recién desde 1024: a 768 el formulario de 2 columnas quedaba en ~290 px */
+@media (min-width: 1024px) { .cuenta-caja { grid-template-columns: 340px 1fr; } .cuenta-caja.ancha { max-width: 1040px; } }
 .cuenta-il { display: grid; place-items: center; background: var(--menta); padding: 28px; }
 .cuenta-il img { width: 100%; max-width: 280px; height: auto; }
+/* Debajo de 1024: ilustración chica arriba, como en Recuperar */
+@media (max-width: 1023px) { .cuenta-il { padding: 16px; } .cuenta-il img { max-width: 120px; } }
 .cuenta-form { display: grid; gap: 16px; padding: 28px 22px; align-content: start; }
 @media (min-width: 768px) { .cuenta-form { padding: 36px 36px; } }
 .cuenta-sep { display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--texto-suave); }
@@ -303,4 +323,148 @@
   .mr-fila > :nth-child(2) { grid-column: 2; grid-row: 1; }
   .mr-fila > :nth-child(3) { grid-column: 2; grid-row: 2; justify-self: start; }
   .mr-fila > :nth-child(4) { grid-column: 3; grid-row: 1 / span 2; }
+  /* Mis reseñas: «Calificar» / «Ver reseñas» en su propia fila, debajo (el nombre de la cancha queda entero) */
+  .mr-fila > :nth-child(4):not(.mr-ir) { grid-column: 2 / -1; grid-row: 3; justify-self: start; }
+  .mr-fila:has(> :nth-child(4):not(.mr-ir)) { grid-template-columns: 50px minmax(0, 1fr); }
 }
+
+/* ---------- v2: recuperar contraseña ---------- */
+.rec-pasos { display: flex; align-items: center; gap: 6px; margin-bottom: 4px; }
+.rec-pasos span { width: 28px; height: 5px; border-radius: 99px; background: var(--gris-claro); }
+.rec-pasos span.hecho { background: var(--suave); }
+.rec-pasos span.actual { background: var(--verde); }
+.rec-pasos small { margin-left: 6px; font-size: 12px; color: var(--texto-suave); font-weight: 600; }
+.rec-canal { display: flex; align-items: center; gap: 14px; width: 100%; padding: 14px 16px; border: 1.5px solid var(--borde); border-radius: var(--r-16); background: #fff; cursor: pointer; font: inherit; color: var(--noche); transition: border-color .15s, box-shadow .15s, background .15s; }
+.rec-canal:hover:not(:disabled) { border-color: var(--verde); box-shadow: var(--sombra-2); }
+.rec-canal:disabled { cursor: default; }
+.rec-canal:disabled:not(:has(.spinner)) { opacity: .55; background: var(--superficie-suave); }
+.rec-canal b { font-size: 16px; }
+.rec-canal .tnum { font-size: 14px; color: var(--texto-suave); }
+.rec-canal-ico { flex: none; width: 48px; height: 48px; border-radius: 14px; display: grid; place-items: center; background: var(--info-tinte); color: var(--noche); }
+.rec-canal.wa .rec-canal-ico { background: var(--menta); color: var(--profundo); }
+.otp { display: grid; grid-template-columns: repeat(6, minmax(0, 52px)); gap: 8px; justify-content: center; }
+.otp input { width: 100%; height: 58px; border: 1.5px solid var(--borde-campo); border-radius: 12px; text-align: center; font: 700 26px/1 var(--f-titular); color: var(--noche); background: #fff; font-variant-numeric: tabular-nums; }
+.otp input:focus { outline: 3px solid var(--foco-color); outline-offset: 1px; border-color: var(--noche); }
+.otp input:disabled { background: var(--deshabilitado-fondo); color: var(--deshabilitado-texto); }
+.otp.is-error input { border-color: var(--rojo); background: var(--rojo-tinte); }
+@media (max-width: 380px) { .otp { gap: 6px; } .otp input { height: 50px; font-size: 22px; } }
+.rec-prueba { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; border: 1.5px dashed var(--aviso-borde); background: #FFFCF0; border-radius: var(--r-16); padding: 10px 14px; }
+.rec-prueba b { font: 800 22px/1 var(--f-titular); letter-spacing: .18em; color: var(--noche); }
+.rec-prueba .btn { margin-left: auto; }
+.rec-acciones { display: flex; flex-wrap: wrap; gap: 6px 10px; justify-content: center; }
+.rec-listo { justify-self: center; width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; background: var(--menta); color: var(--verde); }
+.reglas-clave { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; font-size: 13px; color: var(--texto-suave); }
+.reglas-clave li { display: flex; align-items: center; gap: 6px; }
+.reglas-clave li.ok { color: var(--profundo); font-weight: 600; }
+.reglas-clave .punto { width: 16px; height: 16px; flex: none; border-radius: 50%; border: 1.5px solid var(--borde-campo); }
+.reglas-clave.con-error li:not(.ok) { color: var(--error-texto); }
+.reglas-clave.con-error li:not(.ok) .punto { border-color: var(--rojo); }
+
+/* =====================================================================
+   v3 · responsive del portal (cabecera, menú lateral, asistente, pie)
+   ===================================================================== */
+
+/* ---------- cabecera en celular: logo + «Mi reserva» + hamburguesa siempre dentro (320-767) ---------- */
+@media (max-width: 767px) {
+  .mc-header-in > .mc-logo { flex: none; }
+  .mc-acciones { min-width: 0; }
+  .mc-hamburguesa { flex: none; }
+}
+@media (max-width: 400px) {
+  .mc-header-in { gap: 6px; }
+  .mc-acciones { gap: 6px; }
+  .mc-logo img { height: 26px; }
+  .mc-mireserva-movil { padding: 0 10px; gap: 5px; }
+}
+/* Debajo de 360: «Mi reserva / Mis reservas» queda solo con el ícono (40x40); el nombre sigue en aria-label */
+@media (max-width: 359px) {
+  .mc-mireserva-movil { --btn-alto: 40px; width: 40px; padding: 0; gap: 0; }
+  .mc-mireserva-txt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+/* «Ayuda» del asistente con área táctil de 40 px, igual que los otros botones de la cabecera */
+.mc-ayuda { min-height: 40px; padding: 0 10px; border-radius: 10px; }
+.mc-ayuda:hover { background: var(--superficie-suave); color: var(--noche); }
+/* Debajo de 360 (asistente): «Ayuda» solo con el ícono para que «Salir» no se salga de la pantalla */
+@media (max-width: 359px) {
+  .mc-ayuda { width: 40px; padding: 0; justify-content: center; }
+  .mc-ayuda > span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+
+/* ---------- menú lateral del portal: es un PanelLateral (entra de DERECHA a IZQUIERDA); aquí solo su contenido ---------- */
+.pl.menu-portal .pl-cab { align-items: center; padding-top: max(14px, env(safe-area-inset-top)); padding-bottom: 12px; }
+.pl.menu-portal .pl-titulo { display: flex; align-items: center; min-height: 40px; }
+.pl.menu-portal .pl-cuerpo { padding: 10px 10px 12px; }
+.menu-portal .drawer-nav { padding: 0; }
+.menu-portal .drawer-nav a { min-height: 52px; padding: 0 14px; font-size: 15.5px; }
+.menu-portal .drawer-nav a .ico { width: 20px; height: 20px; }
+.pl.menu-portal .pl-pie { flex-direction: column; align-items: stretch; gap: 10px; padding: 14px 16px calc(16px + env(safe-area-inset-bottom)); }
+.pl.menu-portal .pl-pie > .btn { flex: none; white-space: normal; }
+.pl.menu-portal .pl-pie > .sello-demo { align-self: flex-start; }
+
+/* ---------- pie en celular y tablet (<1024): enlaces de 36 px de alto para el dedo ---------- */
+@media (max-width: 1023px) {
+  .mc-footer-base nav a { display: inline-flex; align-items: center; min-height: 36px; }
+  .mc-footer-base nav { row-gap: 0; }
+  /* WhatsApp: área táctil de 36 px sin agrandar la fila (así el ícono queda a la altura del número y de «Yape · Plin · Tarjeta») */
+  .mc-footer .fila-ico > a { display: inline-block; padding-block: 8px; margin-block: -8px; white-space: nowrap; }
+}
+/* Debajo de 360 px el número y «Yape · Plin · Tarjeta» no entran en media columna: cada dato ocupa todo el ancho */
+@media (max-width: 359px) {
+  .mc-footer ul > li.fila-ico { grid-column: 1 / -1; }
+}
+
+/* ---------- cancha elegida (paso 1 y «Nueva reserva» del panel) ---------- */
+.sc-elegida-txt { display: grid; gap: 2px; min-width: 0; }
+.sc-elegida b.sc-elegida-nom { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; line-height: 1.25; overflow-wrap: anywhere; }
+.sc-dep { min-width: 0; max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sc-dep svg { flex: none; }
+.sc-dep-txt { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* En la tarjeta elegida el deporte baja a 2 líneas en vez de cortarse («Multiusos (vóley y básquet)»); hay alto de sobra */
+.sc-elegida .sc-dep { white-space: normal; align-items: flex-start; line-height: 1.3; }
+.sc-elegida .sc-dep svg { margin-top: 1px; }
+.sc-elegida .sc-dep-txt { white-space: normal; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; overflow: hidden; }
+@media (max-width: 399px) {
+  .sc-cambiar { --btn-alto: 40px; width: 40px; padding: 0; gap: 0; }
+  .sc-cambiar-txt { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
+
+/* ---------- modal «Elige la cancha» en celular: tarjetas horizontales, las 4 canchas en una pantalla ---------- */
+@media (max-width: 639px) {
+  .modal-canchas .sc-grilla { grid-template-columns: 1fr; gap: 8px; }
+  .modal-canchas .sc-tarjeta { grid-template-columns: 96px minmax(0, 1fr); grid-template-rows: auto; }
+  .modal-canchas .sc-tarjeta .sc-portada { aspect-ratio: auto; height: 100%; min-height: 72px; }
+  .modal-canchas .sc-cuerpo { gap: 4px; padding: 10px 12px; }
+  .modal-canchas .sc-nombre { font-size: 17px; }
+  /* la marca va sobre la foto para no tapar el deporte */
+  .modal-canchas .sc-marca { top: 6px; left: 6px; right: auto; width: 24px; height: 24px; }
+  .modal-canchas .sc-marca .ico { width: 14px; height: 14px; }
+}
+
+/* ---------- paso 1: tira de días + calendario, leyenda en una fila ---------- */
+.fechas-fila { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.fechas-fila > .tira-flechas { flex: 1; min-width: 0; }
+.fechas-cal { --btn-alto: 40px; width: 40px; flex: none; }
+@media (min-width: 768px) { .fechas-fila { gap: 14px; } }
+.leyenda.leyenda-fila { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; gap: 16px; white-space: nowrap; }
+.leyenda.leyenda-fila::-webkit-scrollbar { display: none; }
+.leyenda-fila .leyenda-item { flex: none; }
+/* Debajo de 360 las 3 muestras no entran en una fila: bajan a una segunda en vez de cortar «Ocupado» */
+@media (max-width: 359px) { .leyenda.leyenda-fila { flex-wrap: wrap; overflow-x: visible; gap: 6px 14px; } }
+.turnos-nota { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin-top: -6px; font-size: 13px; color: var(--texto-suave); }
+.turnos-nota-txt { display: inline-flex; align-items: center; gap: 6px; }
+.turnos-nota-estado { margin: 0 -8px 0 auto; display: inline-flex; align-items: center; gap: 0; font-size: 12px; white-space: nowrap; }
+.turnos-nota-estado .btn-icono { --btn-alto: 40px; width: 40px; }
+
+/* ---------- paso 2: razón social y dirección traídas de SUNAT, como texto que se ajusta ---------- */
+.dato-verificado { display: flex; gap: 12px; align-items: flex-start; padding: 12px 14px; border-radius: var(--r-12); background: var(--superficie-suave); border: 1px solid var(--borde); }
+.dato-verificado > .ico { flex: none; width: 20px; height: 20px; margin-top: 1px; color: var(--verde); }
+.dato-verificado dl { margin: 0; display: grid; gap: 10px; min-width: 0; }
+.dato-verificado dt { font-size: 12.5px; font-weight: 600; color: var(--texto-suave); }
+.dato-verificado dd { margin: 2px 0 0; font-size: 14.5px; font-weight: 600; line-height: 1.35; color: var(--noche); overflow-wrap: anywhere; }
+
+/* ---------- Mi cuenta en celular: las 3 pestañas enteras, repartidas y sin íconos ---------- */
+@media (max-width: 479px) {
+  .mc .pestanas .pestana { flex: 1 1 auto; justify-content: center; padding: 0 6px; }
+  .mc .pestanas .pestana > .ico { display: none; }
+}
+@media (max-width: 359px) { .mc .pestanas .pestana { padding: 0 4px; font-size: 13.5px; } }

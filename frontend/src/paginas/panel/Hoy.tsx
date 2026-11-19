@@ -5,6 +5,8 @@ import {
   ArrowRight,
   CalendarDays,
   ChartNoAxesColumn,
+  ChevronDown,
+  ChevronUp,
   CircleCheck,
   ClipboardList,
   Clock,
@@ -24,7 +26,7 @@ import { useCarga } from '@/hooks/useCarga';
 import { useTituloPagina } from '@/hooks/useTituloPagina';
 import { CabeceraPagina } from '@/componentes/panel/PanelLayout';
 import { DatoIcono, ErrorCarga } from '@/componentes/panel/Herramientas';
-import { TEXTO_METODO } from '@/componentes/panel/ModalesReserva';
+import { TEXTO_METODO, horasA24 } from '@/componentes/panel/ModalesReserva';
 import { Boton, BotonEnlace } from '@/componentes/ui/Boton';
 import { Etiqueta, InsigniaEstado } from '@/componentes/ui/Estados';
 import { Esqueleto, Tabla, TarjetaKpi, Vacio } from '@/componentes/ui/Datos';
@@ -37,6 +39,9 @@ interface PorValidar {
   reserva: FilaReserva;
   pago: FilaPago | undefined;
 }
+
+/** Alertas visibles antes de «Ver todas». */
+const MAX_ALERTAS = 5;
 
 /** Minutos que faltan para el inicio del turno (negativo si ya empezó). */
 const minutosPara = (fecha: string, hora: string) => deLima(`${fecha}T${hora}:00`).diff(ahoraLima(), 'minute');
@@ -74,6 +79,9 @@ export default function Hoy() {
   const ocupadasPorCancha = (id: number) => d.datos?.agenda.find((c) => c.idCancha === id)?.turnos.filter((t) => t.estado === 'RESERVADO').length ?? 0;
   const ahora = ahoraLima().format('HH:mm');
   const idxAhora = agenda.findIndex((f) => f.hora > ahora);
+  const [verTodas, setVerTodas] = useState(false);
+  const alertas = d.datos?.alertas ?? [];
+  const alertasVistas = verTodas ? alertas : alertas.slice(0, MAX_ALERTAS);
 
   return (
     <>
@@ -148,9 +156,9 @@ export default function Hoy() {
                   {pv.datos.map(({ reserva: r, pago }, i) => {
                     const min = minutosPara(r.fecha, r.horaInicio);
                     return (
-                      <li key={r.codigoReserva} className={cx('flex items-center gap-3 px-4 py-3', i > 0 && 'border-t border-[#EEF2F0]')}>
-                        <div className="grid justify-items-center rounded-[10px] bg-amarillo-tinte px-2 py-1.5 min-w-[64px]">
-                          <span className="text-[11.5px] text-texto-suave">{fmtFecha(r.fecha, 'relativa')}</span>
+                      <li key={r.codigoReserva} className={cx('grid grid-cols-[auto_minmax(0,1fr)_auto] max-[479px]:grid-cols-[auto_minmax(0,1fr)] items-center gap-3 px-4 py-3', i > 0 && 'border-t border-[#EEF2F0]')}>
+                        <div className="grid justify-items-center rounded-[10px] bg-amarillo-tinte px-2 py-1.5 w-[86px] flex-none">
+                          <span className="text-[11.5px] text-texto-suave whitespace-nowrap">{fmtFecha(r.fecha, 'relativa')}</span>
                           <b className="font-titular text-[20px] leading-none tnum">{fmtHora24(r.horaInicio)}</b>
                         </div>
                         <div className="grid gap-1 min-w-0 flex-1">
@@ -177,7 +185,8 @@ export default function Hoy() {
                             </div>
                           )}
                         </div>
-                        <BotonEnlace to={`/admin/reservas/${r.codigoReserva}`} variante={i === 0 ? 'primario' : 'secundario'} tamano="sm" iconoDer={ArrowRight}>
+                        {/* En celular «Revisar» baja bajo los datos (col. 2) y los datos usan todo el ancho en vez de partirse en 7 líneas. */}
+                        <BotonEnlace to={`/admin/reservas/${r.codigoReserva}`} variante={i === 0 ? 'primario' : 'secundario'} tamano="sm" iconoDer={ArrowRight} className="max-[479px]:col-start-2 max-[479px]:justify-self-start">
                           Revisar
                         </BotonEnlace>
                       </li>
@@ -185,8 +194,8 @@ export default function Hoy() {
                   })}
                 </ul>
               )}
-              <div className="px-4 py-3 border-t border-[#EEF2F0]">
-                <Link to="/admin/reservas?estadoPago=EN_REVISION" className="enlace inline-flex items-center gap-1 text-[13.5px]">
+              <div className="px-4 py-1.5 border-t border-[#EEF2F0]">
+                <Link to="/admin/reservas?estadoPago=EN_REVISION" className="enlace inline-flex items-center gap-1 text-[13.5px] min-h-[36px]">
                   Ver en Reservas
                   <ArrowRight className="ico ico-16" aria-hidden />
                 </Link>
@@ -203,7 +212,7 @@ export default function Hoy() {
                   Agenda de hoy
                 </h2>
                 <div className="pc-der">
-                  <Link to="/admin/agenda" className="enlace inline-flex items-center gap-1 text-[13.5px]">
+                  <Link to="/admin/agenda" className="enlace inline-flex items-center gap-1 text-[13.5px] min-h-[36px]">
                     Ver agenda
                     <ArrowRight className="ico ico-16" aria-hidden />
                   </Link>
@@ -300,21 +309,32 @@ export default function Hoy() {
               {d.datos && d.datos.alertas.length === 0 ? (
                 <Vacio ilustracion="IL-23-todo-al-dia" titulo="Todo al día" compacto />
               ) : (
-                <ul className="grid">
-                  {(d.datos?.alertas ?? []).map((a, i) => (
-                    <li key={i} className="flex items-start gap-3 px-4 py-3 border-t border-[#EEF2F0] first:border-t-0 text-[13.5px]">
-                      <Etiqueta tono={a.tipo === 'URGENTE' ? 'urgente' : a.tipo === 'VENCIDO' ? 'vencido' : 'neutro'} icono={a.tipo === 'URGENTE' ? AlarmClock : undefined}>
-                        {a.tipo.toLowerCase().replace(/_/g, ' ')}
-                      </Etiqueta>
-                      <span className="flex-1">{a.mensaje}</span>
-                      {a.codigoReserva && (
-                        <Link className="enlace text-[13px] tnum" to={`/admin/reservas/${a.codigoReserva}`}>
-                          {a.codigoReserva}
-                        </Link>
-                      )}
-                    </li>
-                  ))}
-                </ul>
+                <>
+                  {/* Insignia y código arriba, el texto debajo a todo el ancho: se lee igual en el celular y en la columna angosta del escritorio. */}
+                  <ul className="grid">
+                    {alertasVistas.map((a, i) => (
+                      <li key={i} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-3 border-t border-[#EEF2F0] first:border-t-0 text-[13.5px]">
+                        <Etiqueta tono={a.tipo === 'URGENTE' ? 'urgente' : a.tipo === 'VENCIDO' ? 'vencido' : 'neutro'} icono={a.tipo === 'URGENTE' ? AlarmClock : undefined}>
+                          {a.tipo.toLowerCase().replace(/_/g, ' ')}
+                        </Etiqueta>
+                        {a.codigoReserva && (
+                          <Link className="enlace text-[13px] tnum whitespace-nowrap ml-auto inline-flex items-center min-h-[36px]" to={`/admin/reservas/${a.codigoReserva}`}>
+                            {a.codigoReserva}
+                          </Link>
+                        )}
+                        <span className="basis-full">{horasA24(a.mensaje)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  {alertas.length > MAX_ALERTAS && (
+                    <div className="px-4 py-3 border-t border-[#EEF2F0]">
+                      <button type="button" className="enlace inline-flex items-center gap-1 text-[13.5px] min-h-[36px] bg-transparent border-0 p-0 cursor-pointer" aria-expanded={verTodas} onClick={() => setVerTodas((v) => !v)}>
+                        {verTodas ? 'Ver menos' : `Ver todas (${alertas.length})`}
+                        {verTodas ? <ChevronUp className="ico ico-16" aria-hidden /> : <ChevronDown className="ico ico-16" aria-hidden />}
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </section>
           </div>

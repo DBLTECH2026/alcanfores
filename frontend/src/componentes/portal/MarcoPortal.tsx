@@ -1,12 +1,12 @@
-import { useEffect, useState, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
-import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   CalendarPlus,
   Clock,
   LayoutGrid,
   Lock,
   LogIn,
+  LogOut,
   MapPin,
   Menu,
   MessageCircle,
@@ -17,14 +17,15 @@ import {
   X,
 } from 'lucide-react';
 import { useCuenta } from '@/contexto/CuentaContext';
-import { iniciales } from '@/utilidades/formato';
+import { fmtCelular, iniciales } from '@/utilidades/formato';
 import { Logo, PatronCancha } from '@/componentes/ui/Marca';
 import { Modal } from '@/componentes/ui/Modal';
 import { Boton, BotonEnlace, BotonExterno } from '@/componentes/ui/Boton';
+import { PanelLateral } from '@/componentes/ui/PanelLateral';
 import { useComplejo } from '@/hooks/useDatosPublicos';
 import { fmtHora12 } from '@/utilidades/fecha';
 import { MODO_MOCK } from '@/utilidades/recursos';
-import { cx } from '@/utilidades/cx';
+import { ChatCanchita } from './ChatCanchita';
 
 const NAV = [
   { a: '/canchas', texto: 'Canchas', icono: LayoutGrid },
@@ -38,6 +39,21 @@ export function enlaceWhatsapp(numero: string | undefined, texto?: string): stri
 }
 
 const SELLO = MODO_MOCK ? 'Proyecto UTP · datos simulados' : 'Proyecto UTP · Desarrollo Web Integrado';
+
+/** «+51 914 995 187» con el número que venga del API (crudo o ya formateado). */
+function telefonoComplejo(numero: string | undefined): string {
+  return numero && /\d/.test(numero) ? fmtCelular(numero, { prefijo: true }) : '+51 914 995 187';
+}
+
+/**
+ * Ítem resaltado del menú: «Mis reservas» (/mi-cuenta) solo en su pantalla; «Mi cuenta» (/mi-cuenta/datos) en datos y
+ * reseñas; el resto por sección (/canchas también resalta en /canchas/:slug). Así nunca quedan dos a la vez.
+ */
+function esActivo(a: string, pathname: string): boolean {
+  if (a === '/mi-cuenta') return pathname === '/mi-cuenta' || pathname === '/mi-cuenta/';
+  if (a === '/mi-cuenta/datos') return pathname.startsWith('/mi-cuenta/') && pathname !== '/mi-cuenta/';
+  return pathname === a || pathname.startsWith(`${a}/`);
+}
 
 /**
  * Marco del portal (prototipo `marcoCliente`): cabecera fija con logo SIN eslogan, navegación y «Reservar»;
@@ -53,13 +69,16 @@ export function MarcoPortal({ children, modo = 'completo' }: { children: ReactNo
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const enInicio = pathname === '/';
+  const botonMenu = useRef<HTMLButtonElement>(null);
+  const telefono = telefonoComplejo(complejo?.whatsapp);
 
   useEffect(() => {
     setMenu(false);
     window.scrollTo({ top: 0 });
   }, [pathname]);
 
-  const horario = complejo ? `Todos los días · ${fmtHora12(complejo.horario.primerTurno)} – ${fmtHora12(complejo.horario.ultimoTurno)}` : 'Todos los días · 8:00 a. m. – 11:00 p. m.';
+  // Sin datos del back: el horario por defecto (SPEC_V2 §0), armado igual (con espacios duros) para que no se parta.
+  const horario = `Todos los días · ${fmtHora12(complejo?.horario.primerTurno ?? '08:00')} – ${fmtHora12(complejo?.horario.ultimoTurno ?? '23:00')}`;
 
   return (
     <div className="pantalla">
@@ -86,16 +105,17 @@ export function MarcoPortal({ children, modo = 'completo' }: { children: ReactNo
               <>
                 <nav className="mc-nav" aria-label="Principal">
                   {nav.map(({ a, texto, icono: Icono }) => (
-                    <NavLink key={a} to={a} className="gap-2" aria-current={pathname.startsWith(a) ? 'page' : undefined}>
+                    <Link key={a} to={a} className="gap-2" aria-current={esActivo(a, pathname) ? 'page' : undefined}>
                       <Icono className="ico ico-18" aria-hidden />
                       {texto}
-                    </NavLink>
+                    </Link>
                   ))}
                 </nav>
                 <div className="mc-acciones">
                   {/* v2: cuenta del cliente, discreta (reservar sin cuenta sigue igual) */}
+                  {/* En celular (<768) el avatar e «Ingresar» se ocultan: ya están en el menú lateral. */}
                   {cliente ? (
-                    <Link to="/mi-cuenta" className="mc-cuenta" aria-label={`Mi cuenta: ${cliente.nombres}`} aria-current={pathname.startsWith('/mi-cuenta') ? 'page' : undefined}>
+                    <Link to="/mi-cuenta/datos" className="mc-cuenta" aria-label={`Mi cuenta: ${cliente.nombres}`} aria-current={esActivo('/mi-cuenta/datos', pathname) ? 'page' : undefined}>
                       <span className="mc-cuenta-av">{iniciales(`${cliente.nombres} ${cliente.apellidos}`)}</span>
                       <span className="solo-escritorio">{cliente.nombres.split(' ')[0]}</span>
                     </Link>
@@ -105,10 +125,11 @@ export function MarcoPortal({ children, modo = 'completo' }: { children: ReactNo
                       <span>Ingresar</span>
                     </Link>
                   )}
-                  <BotonEnlace to={aMiReserva} variante="secundario" tamano="sm" icono={Ticket} className="mc-mireserva-movil">
-                    {cliente ? 'Mis reservas' : 'Mi reserva'}
+                  <BotonEnlace to={aMiReserva} variante="secundario" tamano="sm" icono={Ticket} className="mc-mireserva-movil" etiqueta={cliente ? 'Mis reservas' : 'Mi reserva'}>
+                    {/* Debajo de 360 px queda solo el ícono (el texto sigue para lectores de pantalla). */}
+                    <span className="mc-mireserva-txt">{cliente ? 'Mis reservas' : 'Mi reserva'}</span>
                   </BotonEnlace>
-                  <Boton variante="fantasma" icono={Menu} etiqueta="Abrir menú" className="mc-hamburguesa" aria-expanded={menu} onClick={() => setMenu(true)} />
+                  <Boton ref={botonMenu} variante="fantasma" icono={Menu} etiqueta="Abrir menú" className="mc-hamburguesa" aria-haspopup="dialog" aria-expanded={menu} onClick={() => setMenu(true)} />
                   <span className="solo-tablet-arriba">
                     <BotonEnlace to="/reservar" variante={enInicio ? 'oscuro' : 'primario'} icono={CalendarPlus}>
                       Reservar
@@ -149,7 +170,7 @@ export function MarcoPortal({ children, modo = 'completo' }: { children: ReactNo
                     <MessageCircle className="ico ico-18" aria-hidden />
                     <a href={enlaceWhatsapp(complejo?.whatsapp)} target="_blank" rel="noopener noreferrer">
                       <span className="sr-only">WhatsApp: </span>
-                      {complejo?.whatsapp ?? '+51 914 995 187'}
+                      {telefono}
                     </a>
                   </li>
                   <li className="fila-ico">
@@ -193,46 +214,51 @@ export function MarcoPortal({ children, modo = 'completo' }: { children: ReactNo
         )}
       </div>
 
-      {menu &&
-        createPortal(
-          <div className="capa-modal" style={{ padding: 0, justifyContent: 'flex-end' }} onMouseDown={(e) => e.target === e.currentTarget && setMenu(false)}>
-            <aside className="drawer drawer-der animate-entrar" role="dialog" aria-modal="true" aria-label="Menú">
-              <div className="drawer-cab">
-                <Logo variante="horizontal" className="h-[24px]" />
-                <Boton variante="fantasma" icono={X} etiqueta="Cerrar menú" onClick={() => setMenu(false)} autoFocus />
-              </div>
-              <nav className="drawer-nav">
-                {[
-                  { a: '/reservar', texto: 'Reservar', icono: CalendarPlus },
-                  ...nav,
-                  cliente ? { a: '/mi-cuenta', texto: 'Mi cuenta', icono: UserRound } : { a: '/ingresar', texto: 'Ingresar', icono: LogIn },
-                  { a: '/terminos', texto: 'Términos', icono: ShieldCheck },
-                  { a: '/privacidad', texto: 'Privacidad', icono: Lock },
-                ].map(
-                  ({ a, texto, icono: Icono }) => (
-                    <Link key={a} to={a} aria-current={pathname.startsWith(a) ? 'page' : undefined} onClick={() => setMenu(false)}>
-                      <Icono className="ico" aria-hidden />
-                      {texto}
-                    </Link>
-                  ),
-                )}
-              </nav>
-              <div className="drawer-pie">
-                <BotonExterno href={enlaceWhatsapp(complejo?.whatsapp)} target="_blank" variante="whatsapp" icono={MessageCircle} bloque>
-                  {`WhatsApp ${complejo?.whatsapp ?? '+51 914 995 187'}`}
-                </BotonExterno>
-                <span className={cx('sello-demo claro justify-self-start')}>{SELLO}</span>
-              </div>
-            </aside>
-          </div>,
-          document.body,
-        )}
+      {/* Menú en celular: el mismo PanelLateral del panel (entra de DERECHA a IZQUIERDA, la hamburguesa está a la derecha).
+          Él bloquea el scroll, atrapa el foco, cierra con Esc, la X, el fondo o deslizando, y devuelve el foco a la hamburguesa. */}
+      <PanelLateral
+        abierto={menu}
+        alCerrar={() => setMenu(false)}
+        devolverFoco={botonMenu}
+        className="menu-portal"
+        etiquetaCerrar="Cerrar menú"
+        titulo={
+          <>
+            <Logo variante="horizontal" alt="" className="h-[24px]" />
+            <span className="sr-only">Menú</span>
+          </>
+        }
+        pie={
+          <>
+            <BotonExterno href={enlaceWhatsapp(complejo?.whatsapp)} target="_blank" variante="whatsapp" icono={MessageCircle} bloque>
+              {`WhatsApp ${telefono}`}
+            </BotonExterno>
+            <span className="sello-demo claro">{SELLO}</span>
+          </>
+        }
+      >
+        <nav className="drawer-nav" aria-label="Menú principal">
+          {[
+            { a: '/reservar', texto: 'Reservar', icono: CalendarPlus },
+            ...nav,
+            // Con sesión: «Mis reservas» (/mi-cuenta) y «Mi cuenta» (/mi-cuenta/datos) van a pantallas distintas.
+            cliente ? { a: '/mi-cuenta/datos', texto: 'Mi cuenta', icono: UserRound } : { a: '/ingresar', texto: 'Ingresar', icono: LogIn },
+            { a: '/terminos', texto: 'Términos', icono: ShieldCheck },
+            { a: '/privacidad', texto: 'Privacidad', icono: Lock },
+          ].map(({ a, texto, icono: Icono }) => (
+            <Link key={a} to={a} aria-current={esActivo(a, pathname) ? 'page' : undefined} onClick={() => setMenu(false)}>
+              <Icono className="ico" aria-hidden />
+              {texto}
+            </Link>
+          ))}
+        </nav>
+      </PanelLateral>
 
       <Modal
         abierto={salir}
         alCerrar={() => setSalir(false)}
         titulo="¿Salir de la reserva?"
-        icono={X}
+        icono={LogOut}
         tono="aviso"
         tamano="sm"
         acciones={
@@ -254,6 +280,9 @@ export function MarcoPortal({ children, modo = 'completo' }: { children: ReactNo
       >
         <p className="t-sec">Guardamos lo que elegiste mientras no cierres el navegador.</p>
       </Modal>
+
+      {/* Canchita (IA): botón flotante + chat. Solo si el chat web está activo; en /reservar sube sobre la barra fija. */}
+      <ChatCanchita modo={modo} />
     </div>
   );
 }

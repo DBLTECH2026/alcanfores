@@ -33,30 +33,52 @@
 @media (min-width: 1024px) { .ma-plegar { display: flex; } }
 
 /* ------------------------------ barra superior ------------------------------ */
-.mt-migas, .mt-fecha, .mt-avisos, .mt-usuario, .ma-topbar .mt-buscador { display: none; }
+@media (max-width: 1023px) { .mt-usuario-caja { display: none; } }
+.mt-migas, .mt-fecha, .mt-usuario, .ma-topbar .mt-buscador { display: none; }
+/* campana de comprobantes por validar: también en celular y tablet (a la derecha de la barra oscura) */
+.mt-avisos { display: grid; place-items: center; position: relative; flex: none; margin-left: auto; width: 40px; height: 40px; border: 1px solid rgba(255,255,255,.2); border-radius: 10px; background: transparent; color: #fff; }
+.mt-avisos:hover { background: rgba(255,255,255,.08); }
+.mt-avisos .ico { width: 19px; height: 19px; }
+.mt-avisos i { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--rojo); color: #fff; font: 700 10.5px/18px var(--f-cuerpo, Inter); font-style: normal; text-align: center; font-variant-numeric: tabular-nums; box-shadow: 0 0 0 2px var(--noche); }
 @media (min-width: 1024px) {
   .ma-topbar { height: 60px; padding: 0 28px; gap: 12px; background: #fff; }
   .ma-topbar .buscador, .ma-topbar .ma-reloj, .ma-topbar .btn-nueva { display: none !important; }
-  .mt-migas { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--texto-3); min-width: 0; }
+  /* la miga no se encoge (el chip ya tiene tope de 220 px); el que cede es el buscador */
+  .mt-migas { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--texto-3); flex: 0 0 auto; min-width: 0; }
+  .mt-migas > a, .mt-migas > .ico { flex: none; }
   .mt-migas a { color: inherit; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
   .mt-migas .ico-14 { color: #A8B5AF; }
-  .mt-chip { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 11px; border: 1px solid var(--borde-p); border-radius: 10px; color: var(--noche); font-weight: 600; background: #fff; white-space: nowrap; }
-  .mt-chip .ico { width: 15px; height: 15px; color: var(--verde); }
-  .ma-topbar .mt-buscador { display: flex; align-items: center; gap: 8px; margin-left: auto; width: 290px; height: 38px; padding: 0 8px 0 12px; border: 1px solid var(--borde-p); border-radius: 10px; background: #F8FAF9; color: var(--texto-3); font-size: 13px; }
+  .mt-chip { display: inline-flex; align-items: center; gap: 7px; height: 32px; padding: 0 11px; border: 1px solid var(--borde-p); border-radius: 10px; color: var(--noche); font-weight: 600; background: #fff; white-space: nowrap; min-width: 0; max-width: 220px; }
+  .mt-chip .ico { flex: none; width: 15px; height: 15px; color: var(--verde); }
+  .ma-topbar .mt-buscador { display: flex; align-items: center; gap: 8px; margin-left: auto; flex: 0 1 290px; width: auto; min-width: 170px; height: 38px; padding: 0 8px 0 12px; border: 1px solid var(--borde-p); border-radius: 10px; background: #F8FAF9; color: var(--texto-3); font-size: 13px; }
   .mt-buscador span { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .mt-buscador kbd, .mt-kbd { font: 600 11px/1 var(--f-cuerpo, Inter); color: var(--texto-3); border: 1px solid var(--borde-p); background: #fff; border-radius: 6px; padding: 4px 6px; }
   .mt-fecha { display: inline-flex; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border: 1px solid var(--borde-p); border-radius: 10px; font-size: 13px; color: var(--noche); white-space: nowrap; font-variant-numeric: tabular-nums; }
   .mt-fecha .ico { width: 16px; height: 16px; color: var(--texto-3); }
   .mt-fecha b { font-weight: 700; }
-  .mt-avisos { display: grid; place-items: center; position: relative; width: 38px; height: 38px; border: 1px solid var(--borde-p); border-radius: 10px; color: var(--noche); background: #fff; }
+  .mt-avisos { margin-left: 0; width: 38px; height: 38px; border: 1px solid var(--borde-p); color: var(--noche); background: #fff; }
+  .mt-avisos:hover { background: #F1F5F3; }
   .mt-avisos .ico { width: 18px; height: 18px; }
-  .mt-avisos i { position: absolute; top: -6px; right: -6px; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--rojo); color: #fff; font: 700 10.5px/18px var(--f-cuerpo, Inter); font-style: normal; text-align: center; }
-  .mt-usuario { display: flex; align-items: center; gap: 10px; padding-left: 6px; }
+  .mt-avisos i { box-shadow: 0 0 0 2px #fff; }
+  .mt-usuario { display: flex; align-items: center; gap: 10px; padding-left: 6px; flex: none; }
+  .mt-usuario > div { min-width: 0; }
   .mt-usuario .mt-av { width: 36px; height: 36px; border-radius: 10px; background: var(--noche); color: #fff; display: grid; place-items: center; font-weight: 700; font-size: 13px; }
-  .mt-usuario b { display: block; font-size: 13px; line-height: 1.2; color: var(--noche); }
+  .mt-usuario b { display: block; font-size: 13px; line-height: 1.2; color: var(--noche); white-space: nowrap; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
   .mt-usuario small { display: block; font-size: 11.5px; color: var(--texto-3); }
   .mt-usuario .ico { width: 16px; height: 16px; color: var(--texto-3); }
   .ma-main { padding: 22px 28px 36px; gap: 18px; }
+}
+/* el atajo «Ctrl K» se ve solo si el buscador tiene sitio (por su ancho real, no el de la pantalla):
+   en Reservas (290 px) se ve; con una miga larga («Pagos y comprobantes», 226 px) cede su lugar al texto */
+@media (min-width: 1024px) {
+  .ma-topbar .mt-buscador { container-type: inline-size; }
+  .mt-buscador kbd { display: none; }
+  @container (min-width: 250px) { .mt-buscador kbd { display: inline-flex; } }
+}
+/* laptop chica (1024-1279): sin fecha ni «Alcanfores» en la miga, para que todo quepa en una línea */
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .mt-fecha, .mt-migas-txt { display: none !important; }
+  .ma-topbar .mt-buscador { flex-basis: 240px; }
 }
 
 /* ------------------------------ cabecera ilustrada ------------------------------ */
@@ -72,11 +94,29 @@
 .ma-encabezado .ma-migas { display: none; }
 
 /* ------------------------------ indicadores (KPI) ------------------------------ */
-.ma .kpis { grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)) !important; gap: 12px; }
+/* escritorio: auto-fit, 6 indicadores entran en una fila a 1280 */
+.ma .kpis { grid-template-columns: repeat(auto-fit, minmax(148px, 1fr)) !important; gap: 12px; }
+/* tablet y laptop chica (768-1279): 5 indicadores = 3 + 2 y 6 = 3 + 3 (sin uno solo en la última fila) */
+@media (min-width: 768px) and (max-width: 1279px) {
+  .ma .kpis:has(> :nth-child(5):last-child) { grid-template-columns: repeat(6, minmax(0, 1fr)) !important; }
+  .ma .kpis:has(> :nth-child(5):last-child) > * { grid-column: span 2; }
+  .ma .kpis:has(> :nth-child(5):last-child) > :nth-child(n+4) { grid-column: span 3; }
+  .ma .kpis:has(> :nth-child(6):last-child) { grid-template-columns: repeat(3, minmax(0, 1fr)) !important; }
+}
+/* 8 indicadores (Reportes): 4 + 4 también en escritorio (antes 6 + 2) */
+@media (min-width: 1280px) { .ma .kpis:has(> :nth-child(8):last-child) { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; } }
 .ma .kpi { border-radius: 14px; border-color: var(--borde-p); padding: 14px 16px 13px; gap: 4px; box-shadow: none; overflow: hidden; }
 .ma .kpi::before { content: ""; position: absolute; top: 0; left: 16px; right: 16px; height: 2px; border-radius: 0 0 2px 2px; background: linear-gradient(90deg, transparent, var(--kpi-c, var(--verde)), transparent); opacity: .85; }
 .ma .kpi-cab { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
 .ma .kpi-et { font-size: 10.5px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; color: var(--texto-3); padding-top: 3px; }
+/* desde tablet, todas las etiquetas en una línea (sin que unas se partan y otras no) */
+@media (min-width: 768px) { .ma .kpi-et { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; } }
+/* 6 indicadores en una fila (1280-1439): un poco menos de relleno e ícono para que quepa «RESERVAS HOY» */
+@media (min-width: 1280px) and (max-width: 1439px) {
+  .ma .kpis:has(> :nth-child(6):last-child) .kpi { padding-inline: 12px; }
+  .ma .kpis:has(> :nth-child(6):last-child) .kpi-ico { width: 30px; height: 30px; }
+  .ma .kpis:has(> :nth-child(6):last-child) .kpi-et { letter-spacing: .06em; }
+}
 .ma .kpi-ico { width: 38px; height: 38px; border-radius: 10px; display: grid; place-items: center; background: var(--kpi-t, var(--menta)); color: var(--kpi-c, var(--verde)); flex: none; margin: -2px -4px 0 0; }
 .ma .kpi-ico .ico { width: 18px; height: 18px; }
 .ma .kpi-val { font-size: 22px; font-weight: 700; color: var(--kpi-n, var(--noche)); margin-top: -10px; font-variant-numeric: tabular-nums; }
@@ -94,6 +134,8 @@
 .bb { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .bb-buscar { flex: 1 1 260px; display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 14px; border: 1px solid var(--borde-p); border-radius: 10px; background: #fff; color: var(--texto-3); }
 .bb-buscar input { flex: 1; min-width: 0; border: 0; outline: 0; font: inherit; font-size: 13.5px; background: transparent; color: var(--noche); }
+/* una sola X: la propia (.bb-limpiar), no la nativa de type=search */
+.bb-buscar input::-webkit-search-cancel-button, .mt-buscador input::-webkit-search-cancel-button { -webkit-appearance: none; appearance: none; display: none; }
 .bb-fechas { display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 12px; border: 1px solid var(--borde-p); border-radius: 10px; background: #fff; font-size: 13px; color: var(--noche); white-space: nowrap; font-variant-numeric: tabular-nums; }
 .bb-fechas .ico { width: 16px; height: 16px; color: var(--texto-3); }
 .bb-fechas span.sep { color: var(--texto-3); }
@@ -105,14 +147,8 @@
 .bb-activos .fa { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 6px 0 10px; border-radius: 8px; background: var(--menta); color: var(--profundo, #0B5D33); font-weight: 600; border: 1px solid #CFE3D6; }
 .bb-activos .fa .ico { width: 14px; height: 14px; }
 
-/* panel lateral de filtros (entra desde la derecha) */
-.panel-filtros-capa { position: fixed; inset: 0; z-index: 70; background: rgba(9,26,42,.32); display: flex; justify-content: flex-end; }
-.panel-filtros { width: 380px; max-width: 100%; height: 100%; background: #fff; border-left: 1px solid var(--borde-p); display: flex; flex-direction: column; box-shadow: -16px 0 40px rgba(9,26,42,.14); }
-.pf-cab { display: flex; align-items: center; gap: 12px; padding: 18px 20px; border-bottom: 1px solid var(--borde-p); }
-.pf-cab h2 { margin: 0; font-size: 17px; font-weight: 700; color: var(--noche); }
-.pf-cab small { display: block; font-size: 12px; color: var(--texto-3); }
-.pf-cab .pf-x { margin-left: auto; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--borde-p); background: #fff; display: grid; place-items: center; color: var(--noche); }
-.pf-cuerpo { flex: 1; overflow: auto; padding: 6px 20px 20px; display: grid; gap: 18px; align-content: start; }
+/* panel de filtros: usa PanelLateral (estilos .pl-* en panel-extra.css); aquí solo su contenido */
+.pl .pf-cuerpo { padding: 6px 20px 20px; display: grid; gap: 18px; align-content: start; }
 .pf-grupo { display: grid; gap: 9px; padding-top: 12px; border-top: 1px solid #EEF2F0; }
 .pf-grupo:first-child { border-top: 0; }
 .pf-grupo h3 { margin: 0; font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--texto-3); }
@@ -127,11 +163,11 @@
 .pf-lista label.sel { background: var(--menta); font-weight: 600; }
 .pf-lista .rd { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--borde-campo); flex: none; }
 .pf-lista label.sel .rd { border: 5px solid var(--verde); }
-.pf-pie { display: flex; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--borde-p); }
-.pf-pie .btn { flex: 1; min-height: 42px; }
 
 /* ------------------------------ tabla ------------------------------ */
 .ma .tabla-wrap { border-radius: 14px; border-color: var(--borde-p); box-shadow: none; }
+/* el .sr-only «Acciones» (position:absolute) de la cabecera escapaba del scroll de la tabla y desplazaba toda la página a 1024 */
+.ma .tabla-wrap, .ma .tabla-scroll { position: relative; }
 .ma .tabla { font-size: 13px; }
 .ma .tabla th { font-size: 10.5px; letter-spacing: .09em; background: #fff; color: var(--texto-3); padding: 12px 14px; border-bottom-color: var(--borde-p); }
 .ma .tabla td { padding: 11px 14px; border-bottom-color: #EEF2F0; }
@@ -158,7 +194,7 @@ body:has(.ma) .modal { background: #fff; color: #33443C; border: 1px solid #E3EA
 body:has(.ma) .modal .modal-cab { gap: 12px; padding: 18px 20px 14px; align-items: center; border-bottom: 1px solid #EEF2F0; }
 body:has(.ma) .modal .modal-titulo { font-family: var(--f-cuerpo, Inter); font-size: 16px; font-weight: 700; color: var(--noche); }
 body:has(.ma) .modal .modal-sub { font-size: 11px !important; letter-spacing: .08em; text-transform: uppercase; color: #6B7C74; font-weight: 600; }
-body:has(.ma) .modal .modal-cerrar { width: 32px; height: 32px; border-radius: 9px; border: 1px solid #E3EAE6; color: #4A5C54; background: #fff; }
+body:has(.ma) .modal .modal-cerrar { width: 40px; height: 40px; border-radius: 10px; border: 1px solid #E3EAE6; color: #4A5C54; background: #fff; }
 body:has(.ma) .modal .modal-icono { width: 42px; height: 42px; border-radius: 11px; background: #E8F3EC; color: var(--verde); }
 .modal-busto { flex: none; width: 44px; height: 44px; border-radius: 11px; overflow: hidden; position: relative; background: #E8F3EC; }
 .modal-busto img { position: absolute; left: 50%; bottom: -2px; width: 52px; height: 52px; transform: translateX(-50%); object-fit: cover; object-position: top; }
@@ -166,7 +202,22 @@ body:has(.ma) .modal .modal-icono { width: 42px; height: 42px; border-radius: 11
 .modal-franja > div { padding: 10px 14px; display: grid; gap: 3px; }
 .modal-franja > div + div { border-left: 1px solid #E3EAE6; }
 .modal-franja span { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #6B7C74; }
-.modal-franja b { font-size: 17px; font-variant-numeric: tabular-nums; color: var(--noche); }
+.modal-franja > div { min-width: 0; }
+.modal-franja b { font-size: 17px; font-variant-numeric: tabular-nums; color: var(--noche); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* celular: columnas a la medida de su contenido (un código largo como ALC-PTQNFH no se recorta) */
+@media (max-width: 420px) {
+  .modal-franja { margin: 12px 16px 4px; grid-template-columns: repeat(var(--n, 3), auto); }
+  .modal-franja > div { padding: 8px; }
+  .modal-franja b { font-size: 14px; letter-spacing: 0; }
+  /* «Saldo en caja» en una línea: la franja mide lo mismo en Validar, Cobrar y Cancelar */
+  .modal-franja span { white-space: nowrap; letter-spacing: .06em; font-size: 9.5px; }
+}
+@media (max-width: 340px) {
+  .modal-franja { margin-inline: 12px; }
+  .modal-franja > div { padding: 7px 6px; }
+  .modal-franja b { font-size: 13px; }
+  .modal-franja span { letter-spacing: .06em; }
+}
 .modal-franja b.verde { color: var(--verde); }
 body:has(.ma) .modal .modal-cuerpo { padding: 14px 20px 6px; color: #33443C; }
 body:has(.ma) .modal .modal-acciones { padding: 14px 20px 18px; border-top: 1px solid #EEF2F0; margin-top: 8px; background: #fff !important; }
@@ -175,6 +226,8 @@ body:has(.ma) .modal .modal-acciones { padding: 14px 20px 18px; border-top: 1px 
 .ma .kpi-cab { flex-direction: row !important; }
 @media (max-width: 767px) {
   .ma .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 10px; }
+  /* el último impar ocupa toda la fila (sin indicador huérfano) */
+  .ma .kpis > :last-child:nth-child(odd) { grid-column: 1 / -1; }
   .ma .kpi { padding: 12px 12px 11px; }
   .ma .kpi-ico { width: 32px; height: 32px; }
   .ma .kpi-val { font-size: 20px; margin-top: -6px; }
@@ -185,7 +238,7 @@ body:has(.ma) .modal .modal-acciones { padding: 14px 20px 18px; border-top: 1px 
 /* éxito o aviso con ilustración: ilustración chica en un círculo con insignia (referencia «Venta registrada» de ELESS) */
 body:has(.ma) .modal .modal-ilustracion { width: 132px; height: 132px; margin: 22px auto 0; border-radius: 50%; background: #E8F3EC; overflow: visible; position: relative; padding: 0; }
 body:has(.ma) .modal .modal-ilustracion .il { width: 132px; height: 132px; border-radius: 50%; object-fit: cover; display: block; }
-body:has(.ma) .modal .modal-ilustracion::after { content: ""; position: absolute; right: 4px; bottom: 6px; width: 30px; height: 30px; border-radius: 50%; background: var(--verde) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center/16px no-repeat; border: 3px solid #0E1E2D; }
+body:has(.ma) .modal .modal-ilustracion::after { content: ""; position: absolute; right: 4px; bottom: 6px; width: 30px; height: 30px; border-radius: 50%; background: var(--verde) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center/16px no-repeat; border: 3px solid #fff; }
 body:has(.ma) .modal.centrado .modal-cab { justify-content: center; text-align: center; }
 
 /* pestañas del panel (Agenda, Reportes…) como segmentos con borde, sin subrayado */

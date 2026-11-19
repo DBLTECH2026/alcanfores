@@ -23,8 +23,8 @@ function etiquetaDia(d: DiaCalendario, marca: MarcaDia | undefined, hoy: string)
 }
 
 /**
- * Tira de próximos días que NUNCA se corta: desplazamiento horizontal con flechas (desde tablet) y el botón «Calendario»
- * para elegir cualquier fecha del rango permitido en una vista de mes.
+ * Tira de próximos días que NUNCA se corta: desplazamiento horizontal con flechas (desde tablet) y, al final de la fila,
+ * el botón-ícono «Ver calendario» para elegir cualquier fecha del rango permitido en una vista de mes.
  */
 export function TiraFechas({ dias, seleccionada, alElegir, marcas }: { dias: DiaCalendario[]; seleccionada: string | null; alElegir: (f: string) => void; marcas?: Map<string, MarcaDia> }) {
   const hoy = hoyLima();
@@ -51,7 +51,7 @@ export function TiraFechas({ dias, seleccionada, alElegir, marcas }: { dias: Dia
   const mover = (d: number) => tira.current?.scrollBy({ left: d * tira.current.clientWidth * 0.8, behavior: 'smooth' });
 
   return (
-    <div className="fechas">
+    <div className="fechas fechas-fila">
       <div className={cx('tira-flechas', bordes.izq && 'con-izq', bordes.der && 'con-der')}>
         {bordes.izq && (
           <button type="button" className="tira-flecha izq" aria-label="Días anteriores" onClick={() => mover(-1)}>
@@ -87,9 +87,7 @@ export function TiraFechas({ dias, seleccionada, alElegir, marcas }: { dias: Dia
           </button>
         )}
       </div>
-      <Boton variante="secundario" tamano="sm" icono={CalendarDays} className="justify-self-start" onClick={() => setCalendario(true)}>
-        Ver calendario
-      </Boton>
+      <Boton variante="secundario" icono={CalendarDays} etiqueta="Ver calendario" title="Ver calendario" className="fechas-cal" onClick={() => setCalendario(true)} />
       <ModalCalendario abierto={calendario} dias={dias} marcas={marcas} seleccionada={seleccionada} alCerrar={() => setCalendario(false)} alElegir={alElegir} />
     </div>
   );

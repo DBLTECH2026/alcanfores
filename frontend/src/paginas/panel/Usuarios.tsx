@@ -18,7 +18,7 @@ import { CampoTexto } from '@/componentes/ui/Campo';
 import { Avatar, Paginacion, Segmentado, Tabla, Vacio } from '@/componentes/ui/Datos';
 import { Etiqueta } from '@/componentes/ui/Estados';
 import { fmtFechaHora, fmtHace } from '@/utilidades/fecha';
-import { aTitulo } from '@/utilidades/formato';
+import { aTitulo, fmtCelular } from '@/utilidades/formato';
 import { esquemaRestablecer, esquemaUsuarioEditar, esquemaUsuarioNuevo } from './esquemasPanel';
 
 /** /admin/usuarios — cuentas del panel: crear, editar y rol, activar/desactivar, restablecer contraseña. Solo ADMIN. */
@@ -70,18 +70,18 @@ export default function Usuarios() {
         placeholder="Nombre, usuario o correo"
         conteo={lista.datos ? `${lista.datos.totalElementos} usuarios` : ''}
         extra={
-          <>
+          <div className="grid grid-cols-2 gap-2 w-full md:flex md:w-auto [&>select]:min-w-0">
             <select className="bb-select" aria-label="Rol" value={filtros.rol} onChange={(e) => f.poner({ rol: e.target.value })}>
-              <option value="">Todos los roles</option>
+              <option value="">Rol</option>
               <option value="ADMIN">Administrador</option>
               <option value="RECEPCION">Recepción</option>
             </select>
             <select className="bb-select" aria-label="Estado" value={filtros.estado} onChange={(e) => f.poner({ estado: e.target.value })}>
-              <option value="">Activos e inactivos</option>
+              <option value="">Estado</option>
               <option value="ACTIVO">Activos</option>
               <option value="INACTIVO">Inactivos</option>
             </select>
-          </>
+          </div>
         }
       />
       {lista.error ? (
@@ -95,8 +95,14 @@ export default function Usuarios() {
           vacio={lista.cargando ? 'Cargando…' : <Vacio ilustracion="IL-24-sin-resultados" titulo="Sin usuarios" compacto />}
           insignias={(u) => (
             <>
-              <Estado dominio="rol" estado={u.rol} />
-              <Estado dominio="usuario" estado={u.estado} />
+              {/* Mismo tamaño que en la tabla (22 px). */}
+              <Estado dominio="rol" estado={u.rol} tamano="sm" />
+              <Estado dominio="usuario" estado={u.estado} tamano="sm" />
+              {u.bloqueado && (
+                <Etiqueta tono="rojo" icono={Lock}>
+                  bloqueado
+                </Etiqueta>
+              )}
             </>
           )}
           columnas={[
@@ -116,7 +122,16 @@ export default function Usuarios() {
                 </div>
               ),
             },
-            { clave: 'correo', titulo: 'Correo', celda: (u) => u.correo },
+            {
+              clave: 'correo',
+              titulo: 'Contacto',
+              celda: (u) => (
+                <div className="grid">
+                  <span>{u.correo}</span>
+                  {u.telefono && <span className="sub t-sec tnum">{fmtCelular(u.telefono)}</span>}
+                </div>
+              ),
+            },
             { clave: 'rol', titulo: 'Rol', enTarjeta: false, celda: (u) => <Estado dominio="rol" estado={u.rol} /> },
             {
               clave: 'estado',
@@ -137,6 +152,7 @@ export default function Usuarios() {
           ]}
           acciones={(u) => (
             <MenuFila
+              contexto={{ titulo: `${u.nombres} ${u.apellidos}`, subtitulo: `@${u.usuario} · ${u.rol === 'ADMIN' ? 'Administrador' : 'Recepción'}` }}
               acciones={[
                 { texto: 'Editar', icono: Pencil, alPulsar: () => setForm({ usuario: u }) },
                 { texto: 'Restablecer contraseña', icono: KeyRound, alPulsar: () => setClave(u) },
@@ -185,17 +201,17 @@ function FormUsuario({ usuario, esYo, alCerrar, alHecho }: { usuario: UsuarioAdm
   } = useForm<EntradaNuevo>({
     resolver: zodResolver((nuevo ? esquemaUsuarioNuevo : esquemaUsuarioEditar) as typeof esquemaUsuarioNuevo),
     mode: 'onTouched',
-    defaultValues: { nombres: usuario?.nombres ?? '', apellidos: usuario?.apellidos ?? '', usuario: usuario?.usuario ?? '', correo: usuario?.correo ?? '', rol: usuario?.rol ?? 'RECEPCION', contrasena: '', confirmacion: '' },
+    defaultValues: { nombres: usuario?.nombres ?? '', apellidos: usuario?.apellidos ?? '', usuario: usuario?.usuario ?? '', correo: usuario?.correo ?? '', telefono: usuario?.telefono ?? '', rol: usuario?.rol ?? 'RECEPCION', contrasena: '', confirmacion: '' },
   });
   const enviar = handleSubmit(async (d) => {
-    const datos = { nombres: aTitulo(d.nombres), apellidos: aTitulo(d.apellidos), usuario: d.usuario.trim(), correo: d.correo.trim(), rol: d.rol };
+    const datos = { nombres: aTitulo(d.nombres), apellidos: aTitulo(d.apellidos), usuario: d.usuario.trim(), correo: d.correo.trim(), telefono: d.telefono || null, rol: d.rol };
     try {
       if (nuevo) await usuariosApi.crear({ ...datos, contrasena: d.contrasena });
       else await usuariosApi.editar(usuario.id, datos);
       toast.exito(nuevo ? 'Usuario creado' : 'Usuario guardado');
       alHecho();
     } catch (e) {
-      const { aplicados } = aplicarErroresServidor(e, setError, ['nombres', 'apellidos', 'usuario', 'correo', 'rol', 'contrasena']);
+      const { aplicados } = aplicarErroresServidor(e, setError, ['nombres', 'apellidos', 'usuario', 'correo', 'telefono', 'rol', 'contrasena']);
       if (!aplicados) toast.error(esErrorApi(e) ? e.message : 'No se pudo guardar.');
     }
   });
@@ -217,6 +233,7 @@ function FormUsuario({ usuario, esYo, alCerrar, alHecho }: { usuario: UsuarioAdm
           <CampoTexto label="Usuario" requerido icono={AtSign} autoComplete="off" maxLength={30} ayuda="Minúsculas, 4 a 30" error={errors.usuario?.message} {...register('usuario')} />
           <CampoTexto label="Correo" requerido type="email" icono={Mail} error={errors.correo?.message} {...register('correo')} />
         </div>
+        <CampoTexto label="Celular" opcional prefijo="+51" inputMode="tel" autoComplete="off" maxLength={15} ayuda="Para recuperar la contraseña por WhatsApp" error={errors.telefono?.message} {...register('telefono')} />
         <span className="etiqueta-osc">Rol</span>
         <Segmentado
           etiqueta="Rol"

@@ -7,6 +7,9 @@ import type {
   Comprobante,
   Configuracion,
   ConexionWhatsapp,
+  ConfigCorreo,
+  ResultadoPruebaCorreo,
+  SolicitudCorreo,
   Dashboard,
   DetalleNotificacion,
   DiaEspecialAdmin,
@@ -72,6 +75,9 @@ export const reservasAdminApi = {
   cancelar: (codigo: string, motivo: string, devolucion: boolean | null) =>
     d(http.post<ReservaAdmin>(`/admin/reservas/${codigo}/cancelar`, limpiar({ motivo, devolucion }), S)),
   asistencia: (codigo: string, asistencia: 'ASISTIO' | 'NO_ASISTIO') => d(http.post<ReservaAdmin>(`/admin/reservas/${codigo}/asistencia`, { asistencia })),
+  /** Cambia cancha, fecha u hora (ADMIN y RECEPCION) con un motivo de 5 a 200 caracteres; devuelve el detalle. */
+  reprogramar: (codigo: string, idsTurno: number[], motivo: string) =>
+    d(http.post<ReservaAdmin>(`/admin/reservas/${codigo}/reprogramar`, { idsTurno, motivo }, S)),
   rutaConstancia: (codigo: string) => `/admin/reservas/${codigo}/constancia.pdf`,
 };
 
@@ -195,6 +201,13 @@ export const usuariosApi = {
   editar: (id: number, datos: Omit<SolicitudUsuario, 'contrasena'>) => d(http.put<UsuarioAdmin>(`/admin/usuarios/${id}`, datos, S)),
   estado: (id: number, estado: 'ACTIVO' | 'INACTIVO') => d(http.patch<UsuarioAdmin>(`/admin/usuarios/${id}/estado`, { estado })),
   restablecer: (id: number, nueva: string) => d(http.post<Record<string, string>>(`/admin/usuarios/${id}/restablecer-contrasena`, { nueva }, S)),
+};
+
+/** v2: servidor de correo (SMTP) para los avisos y los códigos de recuperación. */
+export const correoApi = {
+  obtener: () => d(http.get<ConfigCorreo>('/admin/correo', S)),
+  guardar: (datos: SolicitudCorreo) => d(http.put<ConfigCorreo>('/admin/correo', datos, S)),
+  prueba: (destino: string) => d(http.post<ResultadoPruebaCorreo>('/admin/correo/prueba', { destino }, { ...S, timeout: 45000 })),
 };
 
 export const bitacoraApi = {

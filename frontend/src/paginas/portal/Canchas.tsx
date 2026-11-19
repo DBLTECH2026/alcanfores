@@ -31,7 +31,7 @@ export default function Canchas() {
             <Moon className="ico ico-14" aria-hidden />
             {h ? `Noche ${fmtHora12(h.inicioNoche)} – ${fmtHora12(h.ultimoTurno)}` : 'Noche'}
           </span>
-          <span>Precios por hora · en soles</span>
+          <span>Precios por turno · en soles</span>
         </p>
       </header>
 
@@ -69,7 +69,7 @@ export default function Canchas() {
           <section className="grid gap-4 lg:grid-cols-[1.5fr_1fr] lg:gap-8 lg:items-start" aria-labelledby="h-tarifas">
             <div className="grid gap-3">
               <h2 id="h-tarifas" className="t-h2">
-                Tarifas por hora
+                Tarifas por turno
               </h2>
               <Tabla<CanchaResumen>
                 etiqueta="Tarifas por cancha"
@@ -92,8 +92,8 @@ export default function Canchas() {
                     ),
                   },
                   { clave: 'cap', titulo: 'Jugadores', alinear: 'centro', celda: (c) => <span className="tnum">{c.capacidad}</span> },
-                  { clave: 'dia', titulo: 'Día', alinear: 'der', celda: (c) => <b className="tnum">{fmtSoles(c.precioDia)}</b> },
-                  { clave: 'noche', titulo: 'Noche', alinear: 'der', celda: (c) => <b className="tnum">{fmtSoles(c.precioNoche)}</b> },
+                  { clave: 'dia', titulo: 'Día', alinear: 'der', celda: (c) => <b className="tnum whitespace-nowrap">{fmtSoles(c.precioDia, { decimales: 0 })}</b> },
+                  { clave: 'noche', titulo: 'Noche', alinear: 'der', celda: (c) => <b className="tnum whitespace-nowrap">{fmtSoles(c.precioNoche, { decimales: 0 })}</b> },
                   {
                     clave: 'calif',
                     titulo: 'Calificación',

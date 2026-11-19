@@ -14,7 +14,7 @@ import { Vacio } from '@/componentes/ui/Datos';
 import { ResumenReserva } from '@/componentes/portal/Asistente';
 import { HeroEstado, estadoCliente, turnoDeReserva } from '@/componentes/portal/EstadoReserva';
 import { fmtHora12 } from '@/utilidades/fecha';
-import { enmascararCelular, enmascararCorreo, fmtSoles } from '@/utilidades/formato';
+import { enmascararCelular, enmascararCorreo, fmtMinutosAntes, fmtSoles } from '@/utilidades/formato';
 import { RE_CODIGO_RESERVA } from '@/utilidades/documentos';
 import type { ReservaDetalle } from '@/api/tipos';
 
@@ -97,7 +97,7 @@ export default function ReservaListo() {
   const constancia = reservasApi.urlConstancia(codigo, ultima.dni);
 
   return (
-    <div className="contenedor grid gap-6 py-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-8 lg:py-10">
+    <div className="contenedor grid gap-6 py-6 md:max-lg:max-w-[640px] lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-8 lg:py-10">
       <div className="grid gap-5 content-start min-w-0">
         <HeroEstado clave={clave} titulo={clave === 'EN_REVISION' ? '¡Listo! Tu horario está separado' : undefined} sub={siguiente} />
 
@@ -148,7 +148,7 @@ export default function ReservaListo() {
               </span>
             </li>
           </ul>
-          <p className="t-mini">{`Te recordamos ${complejo?.reglas.recordatorioHoras ?? 2} h antes de tu partido (${fmtHora12(base.horaInicio)}).`}</p>
+          <p className="t-mini">{`Te recordamos ${textoRecordatorios(complejo?.reglas)} antes de tu partido (${fmtHora12(base.horaInicio)}).`}</p>
         </div>
       </div>
 
@@ -183,4 +183,11 @@ export default function ReservaListo() {
       </aside>
     </div>
   );
+}
+
+/** «2 h y 15 min» con los recordatorios de la v2 (o las horas de la v1). */
+function textoRecordatorios(reglas: { recordatorioMinutos?: number[]; recordatorioHoras?: number } | undefined): string {
+  const lista = reglas?.recordatorioMinutos?.length ? [...reglas.recordatorioMinutos].sort((x, y) => y - x) : [(reglas?.recordatorioHoras ?? 2) * 60];
+  const t = lista.map(fmtMinutosAntes);
+  return t.length > 1 ? `${t.slice(0, -1).join(', ')} y ${t[t.length - 1]}` : (t[0] ?? '2 h');
 }

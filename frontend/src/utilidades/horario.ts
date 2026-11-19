@@ -1,5 +1,5 @@
 import type { DiaHorario, Franja } from '@/api/tipos';
-import { fmtHora12 } from './fecha';
+import { fmtHora12, fmtHora24 } from './fecha';
 
 /**
  * v2 (SPEC_V2 §A): utilidades del horario propio de cada cancha.
@@ -60,8 +60,12 @@ export function turnosDelDia(d: DiaHorario | undefined, duracion: number, inicio
   return lista;
 }
 
-/** «Lun a vie 8:00 a. m.–11:00 p. m. · Sáb y dom 7:00 a. m.–11:00 p. m.» (agrupa días seguidos con el mismo horario). */
-export function textoSemana(dias: DiaHorario[]): string {
+/**
+ * «Lun a vie 8:00 a. m.–11:00 p. m. · Sáb y dom 7:00 a. m.–11:00 p. m.» (agrupa días seguidos con el mismo horario).
+ * Con h24 (panel): «Todos los días 08:00–23:00».
+ */
+export function textoSemana(dias: DiaHorario[], h24 = false): string {
+  const hora = h24 ? fmtHora24 : fmtHora12;
   const orden = [...dias].sort((a, b) => a.diaSemana - b.diaSemana);
   const clave = (d: DiaHorario) => (d.abierto ? `${d.apertura}-${d.cierre}` : 'cerrado');
   const grupos: Array<{ desde: number; hasta: number; d: DiaHorario }> = [];
@@ -71,14 +75,14 @@ export function textoSemana(dias: DiaHorario[]): string {
     else grupos.push({ desde: d.diaSemana, hasta: d.diaSemana, d });
   }
   if (grupos.length === 1 && grupos[0] && grupos[0].d.abierto && orden.length === 7) {
-    return `Todos los días ${fmtHora12(grupos[0].d.apertura)}–${fmtHora12(grupos[0].d.cierre)}`;
+    return `Todos los días ${hora(grupos[0].d.apertura)}–${hora(grupos[0].d.cierre)}`;
   }
   return grupos
     .map((g) => {
       const a = DIAS_CORTOS[g.desde - 1] ?? '';
       const b = (DIAS_CORTOS[g.hasta - 1] ?? '').toLowerCase();
       const dias = g.desde === g.hasta ? a : g.hasta === g.desde + 1 ? `${a} y ${b}` : `${a} a ${b}`;
-      return `${dias} ${g.d.abierto ? `${fmtHora12(g.d.apertura)}–${fmtHora12(g.d.cierre)}` : 'cerrado'}`;
+      return `${dias} ${g.d.abierto ? `${hora(g.d.apertura)}–${hora(g.d.cierre)}` : 'cerrado'}`;
     })
     .join(' · ');
 }

@@ -1,4 +1,4 @@
-import type { CSSProperties, ReactNode } from 'react';
+import { useEffect, useRef, type CSSProperties, type KeyboardEvent, type MouseEvent, type ReactNode } from 'react';
 import { ArrowDownRight, ArrowUpRight, ChevronLeft, ChevronRight, type LucideIcon } from 'lucide-react';
 import { cx } from '@/utilidades/cx';
 import { iniciales } from '@/utilidades/formato';
@@ -142,8 +142,20 @@ export interface Pestana<T extends string> {
 }
 /** Pestañas con contador (en el panel se ven como segmentos con borde). */
 export function Pestanas<T extends string>({ items, activa, alCambiar, etiqueta = 'Secciones' }: { items: Array<Pestana<T>>; activa: T; alCambiar: (v: T) => void; etiqueta?: string }) {
+  const tira = useRef<HTMLDivElement>(null);
+  // Si la tira desborda (celular), la pestaña activa se desplaza a la vista. Sin scrollIntoView: la página no salta en vertical (CU-03).
+  useEffect(() => {
+    const c = tira.current;
+    if (!c || c.scrollWidth <= c.clientWidth + 1) return;
+    const b = c.querySelector<HTMLElement>('[aria-selected="true"]');
+    if (!b) return;
+    const rc = c.getBoundingClientRect();
+    const rb = b.getBoundingClientRect();
+    if (rb.left >= rc.left && rb.right <= rc.right) return;
+    c.scrollLeft = Math.max(0, c.scrollLeft + rb.left - rc.left - 16);
+  }, [activa]);
   return (
-    <div className="pestanas" role="tablist" aria-label={etiqueta}>
+    <div ref={tira} className="pestanas" role="tablist" aria-label={etiqueta}>
       {items.map((p) => {
         const Icono = p.icono;
         return (
@@ -199,6 +211,24 @@ export function Segmentado<T extends string>({
 }
 
 // ------------------------------ Tabla ------------------------------
+const INTERACTIVOS = 'a, button, input, select, textarea, label, summary';
+/** Toque en la tarjeta: abre el detalle salvo que se toque un control propio (⋯, enlace) o llegue de un portal (menú, panel lateral, modal). */
+function alTocarTarjeta(e: MouseEvent<HTMLElement>, abrir: () => void) {
+  const t = e.target as HTMLElement;
+  if (!e.currentTarget.contains(t)) return;
+  const control = t.closest(INTERACTIVOS);
+  if (control && e.currentTarget.contains(control)) return;
+  if (window.getSelection()?.toString()) return;
+  abrir();
+}
+function alTeclaTarjeta(e: KeyboardEvent<HTMLElement>, abrir: () => void) {
+  if (e.target !== e.currentTarget) return;
+  if (e.key === 'Enter' || e.key === ' ') {
+    e.preventDefault();
+    abrir();
+  }
+}
+
 export interface Columna<F> {
   clave: string;
   titulo: string;
@@ -210,7 +240,8 @@ export interface Columna<F> {
 }
 /**
  * Tabla del sistema. En < 1024 px se vuelve lista de tarjetas (2 columnas entre 768 y 1023).
- * `tituloTarjeta` = clave de la columna que encabeza la tarjeta; `acciones` = botones al pie (tarjeta) o columna final.
+ * `tituloTarjeta` = clave de la columna que encabeza la tarjeta; `acciones` = ⋯ arriba a la derecha (tarjeta) o columna final.
+ * Con `alPulsarFila`, la fila (escritorio) y la tarjeta entera (< 1024) abren el detalle.
  */
 export function Tabla<F>({
   columnas,
@@ -285,10 +316,22 @@ export function Tabla<F>({
       </div>
       <div className="tabla-tarjetas">
         {filas.length ? (
-          filas.map((f) => (
-            <article key={claveFila(f)} className="tt-card">
+          filas.map((f) => {
+            const abrir = alPulsarFila ? () => alPulsarFila(f) : undefined;
+            // Sin acciones la tarjeta es un botón; con ⋯ adentro no lleva role=button (interactivos anidados): el teclado usa el ⋯.
+            const comoBoton = abrir && !acciones;
+            return (
+            <article
+              key={claveFila(f)}
+              className={cx('tt-card', abrir && 'es-pulsable')}
+              role={comoBoton ? 'button' : undefined}
+              tabIndex={comoBoton ? 0 : undefined}
+              onClick={abrir ? (e) => alTocarTarjeta(e, abrir) : undefined}
+              onKeyDown={comoBoton ? (e) => alTeclaTarjeta(e, abrir) : undefined}
+            >
               <div className="tt-cab">
                 <div className="tt-titulo">{colTitulo?.celda(f)}</div>
+                {acciones ? <div className="tt-cab-acc">{acciones(f)}</div> : abrir && <ChevronRight className="ico ico-18 tt-pista" aria-hidden />}
               </div>
               {insignias && <div className="tt-badges">{insignias(f)}</div>}
               <dl className="tt-filas">
@@ -301,9 +344,9 @@ export function Tabla<F>({
                     </div>
                   ))}
               </dl>
-              {acciones && <div className="tt-acc">{acciones(f)}</div>}
             </article>
-          ))
+            );
+          })
         ) : (
           <div className="tt-card t-sec text-center">{vacio}</div>
         )}

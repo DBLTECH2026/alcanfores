@@ -188,6 +188,12 @@ Regla de oro: equilibrar funcionalidad con simpleza (una acción principal por p
 | Paso 1: tarjeta de la cancha elegida + modal de tarjetas; tira de días con flechas + calendario de mes con feriados y cerrados | `componentes/portal/SelectorCancha.tsx` (también en «Nueva reserva»), `componentes/portal/Fechas.tsx` |
 | Cuentas de clientes: `/ingresar`, `/crear-cuenta`, `/mi-cuenta[/resenas|/datos]`; paso 2 lleno con la cuenta; reseña con sesión | `contexto/CuentaContext.tsx`, `paginas/portal/cuenta/*`, `paginas/portal/CanchaDetalle.tsx` |
 | Reintentos: un GET con 502/503/504 o sin red se reintenta 3 veces (0,8 · 1,6 · 3,2 s) y se ve «Actualizando el sistema, un momento…» | `api/cliente.ts` (`reintentable`), `componentes/ui/AvisoReintento.tsx` |
+| Recuperar contraseña (portal `/recuperar`, panel `/admin/recuperar`): 4 pasos (cuenta → canal Correo/WhatsApp con destino enmascarado → código de 6 casillas con reenvío, cambio de canal, aviso «simulado» y recuadro «Modo prueba» con `codigoPrueba` → contraseña nueva con reglas visibles) | `componentes/cuenta/AsistenteRecuperar.tsx`, `paginas/portal/cuenta/Recuperar.tsx`, `paginas/panel/Recuperar.tsx`, `recuperarApi` en `api/servicios.ts` |
+| Configuración → «Correo» (SMTP): estado Configurado/Simulado + origen, formulario, «Usar datos de Hostinger» (smtp.hostinger.com · 465 · SSL), correo de prueba | `paginas/panel/ConfigCorreo.tsx`, `correoApi` en `api/admin/index.ts` |
+| Celular de administradores (Usuarios: crear/editar; Mi cuenta: correo + celular con `PUT /auth/yo`) | `paginas/panel/Usuarios.tsx`, `paginas/panel/Cuenta.tsx`, `AuthContext.actualizarUsuario` |
+| Reglas de reserva: «Recordatorios» en chips (máx. 3, `recordatorio_minutos` = «120,15») y «Marcar asistencia desde» (`asistencia_desde_min`) | `paginas/panel/ChipsRecordatorios.tsx`, `GRUPOS_CONFIG` en `esquemasPanel.ts` |
+| Asistencia: botón habilitado con `puedeMarcarAsistencia` del back; si no llega, se calcula con `asistenciaDesdeMin` (por defecto 30) | `utilidades/fecha.ts` (`puedeMarcarAsistencia`, `inicioAsistencia`), `ReservaDetalle.tsx`, `Agenda.tsx` |
+| Notificaciones: el adjunto `IMAGEN` (tarjeta ilustrada) se ve sobre la burbuja de WhatsApp (JPG copiados en `public/whatsapp/`) | `paginas/panel/Notificaciones.tsx` (`imagenWa`) |
 
 Decisiones v2:
 - Dos sesiones que no se mezclan: la del panel (`alc-sesion`) y la del cliente (`alc-cuenta`). El token del cliente solo viaja a
@@ -195,4 +201,9 @@ Decisiones v2:
 - «Mis reservas» abre el detalle de siempre (`/mi-reserva`) pasando el DNI de la cuenta en el estado de la navegación (no en la URL).
 - El editor visual pinta el detalle a 980 px de ancho y lo escala con `zoom` (sin iframe); en < 1280 px el panel es una hoja inferior.
 - Un solo «Publicar cambios» a la vista: con un panel de texto abierto vive en su pie; fotos y reseñas se guardan al instante.
+- Recuperar contraseña: las rutas `/auth/recuperar/**` nunca llevan token (aunque haya sesión abierta). `reenviarEn`/`expiraEn` se aceptan como
+  fecha-hora de Lima, con zona o en segundos. Los 6 dígitos se envían solos al completarse (también al pegar). `CODIGO_VENCIDO` y
+  `DEMASIADOS_INTENTOS` bloquean las casillas hasta pedir otro código.
+- `.etiqueta-osc` (etiquetas sueltas dentro de las modales) ahora es oscura: las modales del panel son claras.
+- Capturas de recuperar / correo / recordatorios: `node scripts/capturas-v2-recuperar.mjs [portal|panel|todo] [DNI]` (50–68).
 - Capturas reales de la v2: `../docs/capturas-reales/v2/INDICE.md`. Pendientes del back: `../docs/PENDIENTES_BACK.md` (sección «v2»).

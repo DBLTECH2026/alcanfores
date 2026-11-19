@@ -1,9 +1,11 @@
 import { z } from 'zod';
+import { RE_USUARIO } from '@/utilidades/documentos';
 import {
   MSJ,
   esquemaAcepta,
   esquemaCorreo,
-  esquemaNombre,
+  esquemaNombres,
+  esquemaApellidos,
   esquemaCelular,
   esquemaCodigoReserva,
   esquemaComentarioResena,
@@ -103,12 +105,12 @@ export type YapeBetaEntrada = z.input<typeof esquemaYapeBeta>;
 export const esquemaRegistroCliente = z
   .object({
     dni: esquemaDni,
-    nombres: esquemaNombre,
-    apellidos: esquemaNombre,
+    nombres: esquemaNombres,
+    apellidos: esquemaApellidos,
     telefono: esquemaCelular,
     correo: esquemaCorreo,
     contrasena: esquemaClaveCliente,
-    confirmacion: z.string(),
+    confirmacion: z.string().min(1, 'Repite la contraseña.'),
     aceptaTerminos: esquemaAcepta,
     aceptaPrivacidad: esquemaAcepta,
   })
@@ -121,6 +123,40 @@ export type DatosCuentaEntrada = z.input<typeof esquemaDatosCuenta>;
 
 /** Cambiar contraseña del cliente. */
 export const esquemaCambioClaveCliente = z
-  .object({ actual: z.string().min(1, MSJ.contrasena), nueva: esquemaClaveCliente, confirmacion: z.string() })
+  .object({ actual: z.string().min(1, MSJ.contrasena), nueva: esquemaClaveCliente, confirmacion: z.string().min(1, 'Repite la contraseña.') })
   .refine((d) => d.nueva === d.confirmacion, { path: ['confirmacion'], message: 'Las contraseñas no coinciden.' });
 export type CambioClaveClienteEntrada = z.input<typeof esquemaCambioClaveCliente>;
+
+// ------------------------------ v2: recuperar contraseña ------------------------------
+const RE_CORREO_SIMPLE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+/** Paso 1 del cliente: DNI o correo. */
+export const esquemaRecuperarCliente = z.object({
+  usuario: z
+    .string()
+    .trim()
+    .min(1, 'Escribe tu DNI o tu correo.')
+    .max(100, 'Escribe tu DNI (8 dígitos) o tu correo.')
+    .refine((v) => /^\d{8}$/.test(v) || RE_CORREO_SIMPLE.test(v), 'Escribe tu DNI (8 dígitos) o tu correo.'),
+});
+/** Paso 1 del panel: usuario o correo. */
+export const esquemaRecuperarAdmin = z.object({
+  usuario: z
+    .string()
+    .trim()
+    .min(1, 'Escribe tu usuario o tu correo.')
+    .max(100, 'Escribe tu usuario o tu correo.')
+    .refine((v) => RE_USUARIO.test(v.toLowerCase()) || RE_CORREO_SIMPLE.test(v), 'Escribe tu usuario (4 a 30) o tu correo.'),
+});
+export type RecuperarEntrada = z.input<typeof esquemaRecuperarCliente>;
+
+/** Reglas visibles de la contraseña nueva (las mismas del back). */
+export const REGLAS_CLAVE: Array<{ texto: string; cumple: (v: string) => boolean }> = [
+  { texto: '8 o más caracteres', cumple: (v) => v.length >= 8 && v.length <= 64 },
+  { texto: 'Una mayúscula', cumple: (v) => /[A-Z]/.test(v) },
+  { texto: 'Una minúscula', cumple: (v) => /[a-z]/.test(v) },
+  { texto: 'Un número', cumple: (v) => /\d/.test(v) },
+];
+export const esquemaNuevaClave = z
+  .object({ nueva: esquemaClaveCliente, confirmacion: z.string().min(1, 'Repite la contraseña.') })
+  .refine((d) => d.nueva === d.confirmacion, { path: ['confirmacion'], message: 'Las contraseñas no coinciden.' });
+export type NuevaClaveEntrada = z.input<typeof esquemaNuevaClave>;

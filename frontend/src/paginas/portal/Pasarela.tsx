@@ -24,6 +24,7 @@ import { pagosApi, pasarelaApi } from '@/api/servicios';
 import { esErrorApi } from '@/api/cliente';
 import type { IntentoPasarela, ResultadoPasarela, TarjetaPrueba } from '@/api/tipos';
 import { leerUltimaReserva } from '@/contexto/ReservaContext';
+import { useCuenta } from '@/contexto/CuentaContext';
 import { useCarga } from '@/hooks/useCarga';
 import { useCuentaRegresiva } from '@/hooks/useCuentaRegresiva';
 import { useTituloPagina } from '@/hooks/useTituloPagina';
@@ -384,6 +385,7 @@ export default function Pasarela() {
   const [resultado, setResultado] = useState<ResultadoPasarela | null>(null);
   const reloj = useCuentaRegresiva(intento.datos?.expiraEn);
   const ultima = intento.datos ? leerUltimaReserva(intento.datos.codigoReserva) : null;
+  const { cliente } = useCuenta();
   const pruebas = useMemo(() => (metodos.datos?.tarjetasPrueba?.length ? metodos.datos.tarjetasPrueba : PRUEBAS_SPEC), [metodos.datos]);
 
   useEffect(() => {
@@ -406,7 +408,7 @@ export default function Pasarela() {
         titulo="Pago no encontrado"
         texto={esErrorApi(intento.error) && intento.error.status !== 404 ? intento.error.message : 'Este enlace de pago no existe o ya no está disponible.'}
         accion={
-          <Boton variante="secundario" icono={ArrowLeft} onClick={() => navigate('/mi-reserva')}>
+          <Boton tamano="lg" bloque variante="secundario" icono={ArrowLeft} onClick={() => navigate('/mi-reserva')}>
             Ir a Mi reserva
           </Boton>
         }
@@ -509,7 +511,7 @@ export default function Pasarela() {
             <span className="flex-1">Tiempo para pagar</span>
             <b>{reloj.texto}</b>
           </div>
-          <button type="button" className="enlace bg-transparent border-0 p-0 justify-self-start inline-flex items-center gap-1.5 text-[14px]" onClick={volver}>
+          <button type="button" className="enlace bg-transparent border-0 p-0 min-h-[40px] justify-self-start inline-flex items-center gap-1.5 text-[14px]" onClick={volver}>
             <ArrowLeft className="ico ico-16" aria-hidden />
             Cancelar y volver al comercio
           </button>
@@ -527,7 +529,7 @@ export default function Pasarela() {
             </button>
           </div>
           {pestana === 'tarjeta' ? (
-            <FormTarjeta intento={i} pruebas={pruebas} alResultado={setResultado} correoInicial={ultima?.reserva.cliente.correo ?? ''} />
+            <FormTarjeta intento={i} pruebas={pruebas} alResultado={setResultado} correoInicial={ultima?.reserva.cliente.correo ?? cliente?.correo ?? ''} />
           ) : (
             <FormYape intento={i} aprueba={metodos.datos?.yapePrueba.codigoAprueba ?? '123456'} rechaza={metodos.datos?.yapePrueba.codigoRechaza ?? '000000'} alResultado={setResultado} />
           )}

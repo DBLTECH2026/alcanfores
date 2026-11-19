@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { ArrowLeft, CalendarDays, ChartColumn, CircleCheck, Eye, EyeOff, Lock, LogIn, UserRound, FlaskConical } from 'lucide-react';
@@ -25,7 +25,6 @@ export default function Login() {
   const [params] = useSearchParams();
   const [ver, setVer] = useState(false);
   const [aviso, setAviso] = useState<{ tipo: 'error' | 'advertencia'; titulo: string; texto?: string } | null>(null);
-  const [ayuda, setAyuda] = useState(false);
   const desde = (location.state as { desde?: string } | null)?.desde ?? '/admin/hoy';
   const sesionVencida = expirada || params.get('expirada') === '1';
 
@@ -57,8 +56,9 @@ export default function Login() {
   });
 
   return (
-    <div className="pantalla grid min-h-[100dvh] lg:grid-cols-2">
-      <section className="relative overflow-hidden bg-noche text-white sobre-oscuro grid content-between gap-6 px-6 py-6 lg:px-12 lg:py-12">
+    <div className="pantalla grid min-h-[100dvh] grid-rows-[auto_1fr] lg:grid-rows-1 lg:grid-cols-2">
+      {/* En celular la franja mide 100 px fijos, igual que en Recuperar. */}
+      <section className="relative overflow-hidden bg-noche text-white sobre-oscuro grid content-center h-[100px] gap-6 px-6 lg:h-auto lg:content-between lg:px-12 lg:py-12">
         <PatronCancha className="absolute -left-24 -bottom-24 w-[520px] text-white opacity-[.06] pointer-events-none lg:left-auto lg:-right-24" />
         <div className="relative flex items-center justify-between gap-3">
           <Logo variante="horizontal-oscuro" className="h-[26px] lg:h-[34px]" />
@@ -109,11 +109,10 @@ export default function Login() {
               {...register('contrasena')}
             />
             <div className="flex justify-end -mt-1">
-              <button type="button" className="enlace bg-transparent border-0 p-0 text-[13.5px]" aria-expanded={ayuda} onClick={() => setAyuda((a) => !a)}>
+              <Link to="/admin/recuperar" className="enlace text-[13.5px]">
                 ¿Olvidaste tu contraseña?
-              </button>
+              </Link>
             </div>
-            {ayuda && <Alerta tipo="info">Pide al administrador que la restablezca desde «Usuarios».</Alerta>}
             <Boton type="submit" tamano="lg" bloque icono={LogIn} cargando={isSubmitting} textoCargando="Ingresando…">
               Ingresar
             </Boton>

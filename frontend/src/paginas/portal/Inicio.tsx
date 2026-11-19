@@ -221,7 +221,7 @@ export default function Inicio() {
       {!canchas.error && !sinCanchas && (
         <section className="bg-superficie-suave border-y border-borde py-8 lg:py-14" aria-labelledby="h-tarifas">
           <div className="contenedor grid gap-5 lg:gap-7">
-            <CabSeccion id="h-tarifas" kicker="Tarifas" titulo="Precio por hora" />
+            <CabSeccion id="h-tarifas" kicker="Tarifas" titulo="Precio por turno" />
             <div className="grid gap-5 lg:grid-cols-2 lg:gap-10 lg:items-start">
               <div className="grid gap-4 lg:gap-5">
                 <div className="grid gap-3 md:grid-cols-2">
@@ -248,7 +248,7 @@ export default function Inicio() {
                             <span className="desde-et">Desde</span>
                             <span className="desde-val">
                               {fmtSoles(v, { decimales: 0 })}
-                              <small>/ hora</small>
+                              <small>/ turno</small>
                             </span>
                           </span>
                         )}

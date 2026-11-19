@@ -98,6 +98,7 @@ export const router = createBrowserRouter([
           { path: '/mi-reserva', ...perezosa(() => import('@/paginas/portal/MiReserva')) },
           // v2: cuentas de clientes
           { path: '/ingresar', ...perezosa(() => import('@/paginas/portal/cuenta/Ingresar')) },
+          { path: '/recuperar', ...perezosa(() => import('@/paginas/portal/cuenta/Recuperar')) },
           { path: '/crear-cuenta', ...perezosa(() => import('@/paginas/portal/cuenta/CrearCuenta')) },
           { path: '/mi-cuenta/*', ...perezosa(() => import('@/paginas/portal/cuenta/MiCuenta')) },
           { path: '/pago/resultado', ...perezosa(() => import('@/paginas/portal/PagoResultado')) },
@@ -112,6 +113,7 @@ export const router = createBrowserRouter([
       },
       { path: '/pasarela/:ref', ...perezosa(() => import('@/paginas/portal/Pasarela')) },
       { path: '/admin/login', ...perezosa(() => import('@/paginas/panel/Login')) },
+      { path: '/admin/recuperar', ...perezosa(() => import('@/paginas/panel/Recuperar')) },
       {
         path: '/admin',
         element: <RutaProtegida />,

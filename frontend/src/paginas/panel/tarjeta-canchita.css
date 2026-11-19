@@ -1,0 +1,74 @@
+/* Configuración › WhatsApp › tarjeta «Canchita» (TarjetaCanchita.tsx). Tema claro, mismo lenguaje que .pc del panel. */
+.tc .pc-cab h2 { gap: 8px; }
+.tc-av-mini { width: 22px; height: 22px; border-radius: 50%; box-shadow: 0 0 0 1px var(--borde-p, #E3EAE6); }
+
+.tc-cuerpo { display: grid; gap: 0; }
+.tc-izq, .tc-der { display: grid; align-content: start; gap: 14px; padding: 16px 18px; min-width: 0; }
+.tc-der { border-top: 1px solid var(--borde-p, #E3EAE6); }
+@media (min-width: 1024px) {
+  .tc-cuerpo { grid-template-columns: minmax(300px, 380px) minmax(0, 1fr); }
+  .tc-der { border-top: 0; border-left: 1px solid var(--borde-p, #E3EAE6); }
+}
+
+/* Perfil */
+.tc-perfil { display: flex; align-items: center; gap: 14px; }
+.tc-perfil img { flex: none; width: 64px; height: 64px; border-radius: 50%; box-shadow: 0 0 0 1px var(--borde); }
+.tc-perfil-txt { display: grid; gap: 2px; min-width: 0; font-size: 13.5px; color: var(--texto-3, #6B7A73); }
+.tc-perfil-txt b { font-size: 15px; color: var(--noche); }
+.tc-modelo { font-size: 12.5px; overflow-wrap: anywhere; }
+
+/* Interruptores: fila completa, texto a la izquierda y la pista a la derecha */
+.tc-ints { display: grid; border: 1px solid var(--borde-p, #E3EAE6); border-radius: 12px; overflow: hidden; }
+.tc-ints .switch {
+  display: flex; flex-direction: row-reverse; justify-content: space-between; align-items: center; gap: 12px;
+  width: 100%; min-height: 60px; padding: 8px 14px 8px 10px; text-align: left; background: #fff; font: inherit; color: var(--noche);
+}
+.tc-ints .switch + .switch { border-top: 1px solid var(--borde-p, #E3EAE6); }
+.tc-ints .switch:hover { background: #F8FAF9; }
+.tc-ints .switch:focus-visible { outline: 2px solid var(--noche); outline-offset: -2px; }
+.tc-ints .switch > span:last-child { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.tc-int-txt { display: grid; gap: 1px; min-width: 0; }
+.tc-int-txt b { font-size: 14px; font-weight: 600; }
+.tc-int-txt small { font-size: 12.5px; font-weight: 500; color: var(--texto-3, #6B7A73); }
+.tc-ico { flex: none; width: 36px; height: 36px; border-radius: 10px; display: grid; place-items: center; background: #F1F5F3; color: var(--noche); }
+.tc-ints .switch.is-activo .tc-ico { background: var(--menta); color: var(--verde); }
+.tc-ints .switch.is-deshabilitado { opacity: 1; cursor: progress; }
+.tc-ints .switch.is-deshabilitado .switch-pista { opacity: .55; }
+
+/* Webhook de WhatsApp */
+.tc-webhook { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; padding: 10px 12px 10px 10px; border: 1px solid var(--borde-p, #E3EAE6); border-radius: 12px; }
+.tc-webhook-txt { flex: 1; min-width: 0; display: grid; gap: 1px; }
+.tc-webhook-txt b { font-size: 14px; font-weight: 600; }
+.tc-webhook-txt small { font-size: 12.5px; color: var(--texto-3, #6B7A73); }
+.tc-webhook-error { flex-basis: 100%; }
+
+/* Números del día */
+.tc-numeros { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.tc-numeros li { display: grid; grid-template-columns: auto 1fr; align-items: center; column-gap: 6px; row-gap: 2px; padding: 10px 12px; border: 1px solid var(--borde-p, #E3EAE6); border-radius: 12px; background: #F8FAF9; min-width: 0; }
+.tc-numeros .ico { color: var(--texto-3, #6B7A73); }
+.tc-numeros b { font: 700 20px/1.1 var(--f-titular); color: var(--noche); }
+.tc-numeros span { grid-column: 1 / -1; font-size: 12.5px; color: var(--texto-3, #6B7A73); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+@media (max-width: 640px) { .tc-numeros { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+/* Últimas conversaciones */
+.tc-subtitulo { margin: 4px 0 -4px; font: 600 14px/1.2 var(--f-texto); color: var(--noche); }
+.tc-convs { margin: 0; padding: 0; list-style: none; display: grid; border: 1px solid var(--borde-p, #E3EAE6); border-radius: 12px; overflow: hidden; }
+.tc-conv { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 12px; padding: 10px 12px; background: #fff; }
+.tc-conv + .tc-conv { border-top: 1px solid var(--borde-p, #E3EAE6); }
+.tc-canal { flex: none; width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; }
+.tc-canal.wa { background: #E3F6E8; color: #128C7E; }
+.tc-canal.web { background: #EEF3F7; color: var(--noche); }
+.tc-conv-txt { min-width: 0; display: grid; gap: 2px; }
+.tc-conv-l1 { display: flex; align-items: baseline; flex-wrap: wrap; gap: 2px 8px; min-width: 0; }
+.tc-conv-l1 b { font-size: 14px; font-weight: 600; color: var(--noche); overflow-wrap: anywhere; }
+.tc-codigo { font-size: 12px; font-weight: 600; color: var(--verde); }
+.tc-cuando { margin-left: auto; font-size: 12px; color: var(--texto-3, #6B7A73); white-space: nowrap; }
+.tc-ultimo { margin: 0; font-size: 13px; line-height: 1.35; color: #44544C; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.tc-conv-acc { display: flex; align-items: center; gap: 8px; }
+.tc-conv-acc .btn { min-width: 112px; }
+@media (max-width: 640px) {
+  .tc-izq, .tc-der { padding: 14px; }
+  .tc-conv { grid-template-columns: auto minmax(0, 1fr); align-items: start; row-gap: 8px; }
+  .tc-conv-acc { grid-column: 2; justify-content: space-between; }
+  .tc-cuando { margin-left: 0; }
+}

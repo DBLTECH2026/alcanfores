@@ -9,8 +9,24 @@ import { BarraBusqueda, CeldaDoc, ErrorCarga, FiltrosActivos, GrupoFiltro, Opcio
 import { Paginacion, Tabla, Vacio } from '@/componentes/ui/Datos';
 import { Insignia } from '@/componentes/ui/Estados';
 import { fmtFecha, fmtFechaHora } from '@/utilidades/fecha';
+import { textoAccion, textoEntidad, textoRol, textoServicio } from '@/utilidades/textosBitacora';
 
-const legible = (s: string) => s.charAt(0) + s.slice(1).toLowerCase().replace(/_/g, ' ');
+/** Correo con su punto de corte natural después de la arroba («cliente…@» / «example.com»); el resto, tal cual. */
+const conCorte = (texto: string) => {
+  const i = texto.indexOf('@');
+  return i > 0 ? (
+    <>
+      {texto.slice(0, i + 1)}
+      <wbr />
+      {texto.slice(i + 1)}
+    </>
+  ) : (
+    texto
+  );
+};
+
+/** Opciones del filtro ordenadas por su texto en español. */
+const ordenadas = <T extends { texto: string }>(xs: T[]) => [...xs].sort((a, b) => a.texto.localeCompare(b.texto, 'es'));
 
 /** /admin/bitacora — acciones auditadas de todos los servicios (evento auditoria.accion). Solo ADMIN. */
 export default function Bitacora() {
@@ -31,8 +47,8 @@ export default function Bitacora() {
   );
   const activos = (
     [
-      ['servicio', (v: string) => v],
-      ['accion', legible],
+      ['servicio', textoServicio],
+      ['accion', textoAccion],
       ['desde', (v: string) => `Desde ${fmtFecha(v, 'dia-mes')}`],
       ['hasta', (v: string) => `Hasta ${fmtFecha(v, 'dia-mes')}`],
     ] as Array<[keyof typeof filtros, (v: string) => string]>
@@ -56,18 +72,20 @@ export default function Bitacora() {
           vacio={lista.cargando ? 'Cargando…' : <Vacio ilustracion="IL-24-sin-resultados" titulo="Sin acciones" compacto />}
           columnas={[
             { clave: 'fecha', titulo: 'Fecha', celda: (b) => <span className="tnum whitespace-nowrap">{fmtFechaHora(b.fecha, { h24: true })}</span> },
-            { clave: 'actor', titulo: 'Actor', celda: (b) => <CeldaDoc icono={UserRound} titulo={b.actor} sub={b.rol ? legible(b.rol) : undefined} /> },
-            { clave: 'accion', titulo: 'Acción', celda: (b) => <Insignia tono={/FALLID|RECHAZ|ANUL|CANCEL/.test(b.accion) ? 'rojo-borde' : 'neutro'}>{legible(b.accion)}</Insignia> },
-            { clave: 'entidad', titulo: 'Entidad', celda: (b) => (b.entidad ? <span className="tnum">{`${b.entidad}${b.idEntidad ? ` · ${b.idEntidad}` : ''}`}</span> : <span className="t-sec">—</span>) },
+            { clave: 'actor', titulo: 'Actor', celda: (b) => <CeldaDoc icono={UserRound} titulo={<span className="whitespace-normal [overflow-wrap:anywhere]">{conCorte(b.actor)}</span>} sub={b.rol ? textoRol(b.rol) : undefined} /> },
+            { clave: 'accion', titulo: 'Acción', celda: (b) => <Insignia tono={/FALLID|RECHAZ|ANUL|CANCEL/.test(b.accion) ? 'rojo-borde' : 'neutro'}>{textoAccion(b.accion)}</Insignia> },
+            { clave: 'entidad', titulo: 'Entidad', celda: (b) => (b.entidad ? <span className="tnum">{`${textoEntidad(b.entidad)}${b.idEntidad ? ` · ${b.idEntidad}` : ''}`}</span> : <span className="t-sec">—</span>) },
             { clave: 'detalle', titulo: 'Detalle', celda: (b) => <span className="celda-larga block">{b.detalle ?? '—'}</span> },
             {
               clave: 'servicio',
               titulo: 'Servicio',
               celda: (b) => (
-                <span className="dato-ico whitespace-nowrap">
+                <span className="dato-ico">
                   <Server className="ico" aria-hidden />
-                  {b.servicio.replace('-service', '')}
-                  {b.ip && <span className="t-sec text-[11px]"> · {b.ip}</span>}
+                  <span className="grid min-w-0">
+                    <span>{textoServicio(b.servicio)}</span>
+                    {b.ip && <span className="sub t-sec tnum [overflow-wrap:anywhere]">{b.ip}</span>}
+                  </span>
                 </span>
               ),
             },
@@ -77,10 +95,10 @@ export default function Bitacora() {
       )}
       <PanelFiltros abierto={abierto} alCerrar={() => setAbierto(false)} alLimpiar={() => f.limpiar(['actor'])} resultados={lista.datos?.totalElementos}>
         <GrupoFiltro titulo="Servicio">
-          <OpcionesFiltro valor={filtros.servicio} alCambiar={(v) => f.poner({ servicio: v })} opciones={(opciones.datos?.servicios ?? []).map((s) => ({ valor: s, texto: s.replace('-service', ''), icono: Server }))} />
+          <OpcionesFiltro valor={filtros.servicio} alCambiar={(v) => f.poner({ servicio: v })} opciones={ordenadas((opciones.datos?.servicios ?? []).map((s) => ({ valor: s, texto: textoServicio(s), icono: Server })))} />
         </GrupoFiltro>
         <GrupoFiltro titulo="Acción">
-          <OpcionesFiltro valor={filtros.accion} alCambiar={(v) => f.poner({ accion: v })} opciones={(opciones.datos?.acciones ?? []).map((x) => ({ valor: x, texto: legible(x) }))} />
+          <OpcionesFiltro valor={filtros.accion} alCambiar={(v) => f.poner({ accion: v })} opciones={ordenadas((opciones.datos?.acciones ?? []).map((x) => ({ valor: x, texto: textoAccion(x) })))} />
         </GrupoFiltro>
         <GrupoFiltro titulo="Fecha">
           <div className="pf-fechas">

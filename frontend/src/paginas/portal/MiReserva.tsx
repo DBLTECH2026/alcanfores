@@ -17,6 +17,7 @@ import {
   HandCoins,
   Hash,
   History,
+  Hourglass,
   Info,
   Receipt,
   Search,
@@ -28,6 +29,7 @@ import {
   UserRound,
   Banknote,
   Building2,
+  CalendarClock,
   MapPin,
   Store,
   Wallet,
@@ -49,6 +51,7 @@ import { Ilustracion, IconoDeporte } from '@/componentes/ui/Marca';
 import { Modal } from '@/componentes/ui/Modal';
 import { CodigoReserva, LineaTiempo } from '@/componentes/ui/Reserva';
 import { SubidaImagen } from '@/componentes/ui/SubidaImagen';
+import { ModalReprogramar } from '@/componentes/reserva/ModalReprogramar';
 import { HeroEstado, estadoCliente, hitosDeReserva, horarioDeReserva } from '@/componentes/portal/EstadoReserva';
 import { esquemaCancelacion, esquemaConsulta, type ConsultaEntrada, type DatosCancelacion } from '@/esquemas/otros';
 import { esquemaReenvio, type DatosReenvio, type ReenvioEntrada } from '@/esquemas/reserva';
@@ -184,7 +187,24 @@ function ListaPagos({ pagos, codigo, dni }: { pagos: PagoCliente[]; codigo: stri
 }
 
 // ------------------------------ Modales ------------------------------
-function ModalCancelar({ abierto, alCerrar, reserva, dni, devolucionHoras, alCancelar }: { abierto: boolean; alCerrar: () => void; reserva: ReservaDetalle; dni: string; devolucionHoras: number; alCancelar: (r: ReservaDetalle) => void }) {
+function ModalCancelar({
+  abierto,
+  alCerrar,
+  reserva,
+  dni,
+  devolucionHoras,
+  enRevision,
+  alCancelar,
+}: {
+  abierto: boolean;
+  alCerrar: () => void;
+  reserva: ReservaDetalle;
+  dni: string;
+  devolucionHoras: number;
+  /** Suma de los comprobantes que el complejo aún no valida (0 si no hay). */
+  enRevision: number;
+  alCancelar: (r: ReservaDetalle) => void;
+}) {
   const toast = useToast();
   const [error, setErrorGeneral] = useState<string | null>(null);
   const {
@@ -198,6 +218,9 @@ function ModalCancelar({ abierto, alCerrar, reserva, dni, devolucionHoras, alCan
   const motivo = watch('motivo') ?? '';
   const horas = deLima(`${reserva.fecha}T${reserva.horaInicio}:00`).diff(ahoraLima(), 'minute');
   const corresponde = horas >= devolucionHoras * 60 && reserva.montoPagado > 0;
+  // Un Yape o Plin en revisión aún no es un pago: al cancelar se anula y no se cobra (no hay nada que devolver).
+  const revision = enRevision > 0 || reserva.estadoPago === 'EN_REVISION';
+  const textoRevision = enRevision > 0 ? `Tu comprobante de ${fmtSoles(enRevision)} está en revisión: si cancelas, lo anulamos y no se cobra.` : 'Tu comprobante está en revisión: si cancelas, lo anulamos y no se cobra.';
 
   const cancelar = handleSubmit(async (d) => {
     setErrorGeneral(null);
@@ -237,7 +260,9 @@ function ModalCancelar({ abierto, alCerrar, reserva, dni, devolucionHoras, alCan
           {corresponde ? <HandCoins className="ico" aria-hidden /> : <Info className="ico" aria-hidden />}
           <span>
             {reserva.montoPagado <= 0
-              ? 'No hay pagos que devolver.'
+              ? revision
+                ? textoRevision
+                : 'No hay pagos que devolver.'
               : corresponde
                 ? `Faltan ${fmtDuracion(horas)}: te devolvemos ${fmtSoles(reserva.montoPagado)}.`
                 : `Faltan menos de ${devolucionHoras} h: lo pagado no se devuelve.`}
@@ -440,14 +465,18 @@ function Plazo({ venceEn }: { venceEn: string | null }) {
 function Detalle({ consulta, inicial, alSalir }: { consulta: Consulta; inicial: ReservaDetalle; alSalir: () => void }) {
   const navigate = useNavigate();
   const toast = useToast();
+  const { cliente } = useCuenta();
   const { datos: complejo } = useComplejo();
   const [reserva, setReserva] = useState<ReservaDetalle>(inicial);
   const [cancelar, setCancelar] = useState(false);
   const [reenviar, setReenviar] = useState(false);
+  const [reprogramar, setReprogramar] = useState(false);
   const [pagando, setPagando] = useState(false);
   const [version, setVersion] = useState(0);
   const pagos = useCarga(() => pagosApi.pagosDeReserva(consulta.codigo, consulta.dni), `${consulta.codigo}-${version}`);
   const pedida = facturacionPedida(pagos.datos);
+  // Comprobantes enviados que el complejo aún no valida (no suman en «Pagado»).
+  const enRevision = (pagos.datos ?? []).filter((p) => p.estado === 'PENDIENTE' && p.canal !== 'PASARELA').reduce((s, p) => s + Number(p.monto || 0), 0);
   useTituloPagina(`Reserva ${reserva.codigoReserva}`);
 
   // Los cambios de pago llegan a la reserva por eventos (RabbitMQ): se vuelve a pedir unos segundos hasta verlos.
@@ -481,12 +510,24 @@ function Detalle({ consulta, inicial, alSalir }: { consulta: Consulta; inicial: 
     }
   };
 
+  const botonesPago = (clase: string) => (
+    <div className={clase}>
+      <Boton icono={Upload} tamano="lg" bloque onClick={() => setReenviar(true)}>
+        {reserva.estadoPago === 'OBSERVADO' ? 'Reenviar comprobante' : 'Enviar comprobante'}
+      </Boton>
+      <Boton variante="secundario" icono={CreditCard} bloque cargando={pagando} onClick={pagarConTarjeta}>
+        Pagar con tarjeta
+      </Boton>
+    </div>
+  );
+
   return (
     <div className="contenedor grid gap-6 py-6 lg:grid-cols-[minmax(0,1fr)_380px] lg:gap-8 lg:py-10">
       <div className="grid gap-5 content-start min-w-0">
-        <button type="button" className="btn btn-fantasma btn-sm justify-self-start -ml-3" onClick={alSalir}>
+        {/* Con sesión se vuelve a «Mis reservas»; sin sesión, a consultar otro código. */}
+        <button type="button" className="btn btn-fantasma btn-sm justify-self-start -ml-3" onClick={cliente ? () => navigate('/mi-cuenta') : alSalir}>
           <ArrowLeft className="ico" aria-hidden />
-          <span>Consultar otra</span>
+          <span>{cliente ? 'Mis reservas' : 'Consultar otra'}</span>
         </button>
         <HeroEstado
           clave={clave}
@@ -499,6 +540,8 @@ function Detalle({ consulta, inicial, alSalir }: { consulta: Consulta; inicial: 
           }
         />
         {reserva.estado === 'PENDIENTE' && <Plazo venceEn={reserva.venceEn} />}
+        {/* En celular y tablet la acción de pago va junto al plazo, no al final de la página. */}
+        {pendientePago && botonesPago('grid gap-2 lg:hidden')}
 
         {reserva.cancelacion && (
           <section className="cancelacion">
@@ -554,7 +597,7 @@ function Detalle({ consulta, inicial, alSalir }: { consulta: Consulta; inicial: 
           ayuda=""
           acciones={
             <BotonExterno href={reservasApi.urlConstancia(reserva.codigoReserva, consulta.dni)} target="_blank" variante="fantasma" tamano="sm" icono={Download}>
-              Constancia
+              Constancia PDF
             </BotonExterno>
           }
         />
@@ -600,14 +643,12 @@ function Detalle({ consulta, inicial, alSalir }: { consulta: Consulta; inicial: 
               </span>
               <b>{fmtSoles(reserva.montoTotal)}</b>
             </div>
-            <div className="fila-monto fila-igv">
-              <span>Valor de venta (sin IGV)</span>
-              <span>{fmtSoles(desgloseIgv(reserva.montoTotal).base)}</span>
-            </div>
-            <div className="fila-monto fila-igv">
-              <span>IGV (18 %)</span>
-              <span>{fmtSoles(desgloseIgv(reserva.montoTotal).igv)}</span>
-            </div>
+            {reserva.montoTotal > 0 && (
+              <div className="fila-monto fila-igv">
+                <span>Incluye IGV (18 %)</span>
+                <span>{fmtSoles(desgloseIgv(reserva.montoTotal).igv)}</span>
+              </div>
+            )}
             <div className="fila-monto">
               <span className="inline-flex items-center gap-2">
                 <Wallet className="ico ico-16" aria-hidden />
@@ -615,6 +656,15 @@ function Detalle({ consulta, inicial, alSalir }: { consulta: Consulta; inicial: 
               </span>
               <b>{fmtSoles(reserva.montoPagado)}</b>
             </div>
+            {enRevision > 0 && reserva.estado !== 'CANCELADA' && (
+              <div className="fila-monto">
+                <span className="inline-flex items-center gap-2">
+                  <Hourglass className="ico ico-16" aria-hidden />
+                  En revisión
+                </span>
+                <b>{fmtSoles(enRevision)}</b>
+              </div>
+            )}
             {reserva.estado === 'CANCELADA' ? (
               // Cancelada: ya no hay saldo que pagar (el back conserva `saldo`); se muestra lo devuelto.
               <div className="fila-monto destacada">
@@ -630,28 +680,25 @@ function Detalle({ consulta, inicial, alSalir }: { consulta: Consulta; inicial: 
                   <Store className="ico ico-16" aria-hidden />
                   Saldo al llegar
                 </span>
-                <b>{fmtSoles(reserva.saldo)}</b>
+                {/* Con un comprobante en revisión se descuenta (igual que en Listo); la fila «En revisión» explica de dónde sale. */}
+                <b>{fmtSoles(Math.max(0, reserva.saldo - enRevision))}</b>
               </div>
             )}
           </div>
         </aside>
 
-        {pendientePago && (
-          <div className="grid gap-2">
-            <Boton icono={Upload} tamano="lg" bloque onClick={() => setReenviar(true)}>
-              {reserva.estadoPago === 'OBSERVADO' ? 'Reenviar comprobante' : 'Enviar comprobante'}
-            </Boton>
-            <Boton variante="secundario" icono={CreditCard} bloque cargando={pagando} onClick={pagarConTarjeta}>
-              Pagar con tarjeta
-            </Boton>
-          </div>
-        )}
+        {pendientePago && botonesPago('hidden lg:grid gap-2')}
         {!pendientePago && reserva.puedeReenviarComprobante && (
           <Boton icono={Upload} bloque onClick={() => setReenviar(true)}>
             Reenviar comprobante
           </Boton>
         )}
 
+        {reserva.puedeReprogramar && (
+          <Boton variante="secundario" icono={CalendarClock} bloque onClick={() => setReprogramar(true)}>
+            Cambiar horario
+          </Boton>
+        )}
         {reserva.puedeCancelar && (
           <div className="grid gap-2">
             <p className="t-sec flex gap-2 items-start">
@@ -674,11 +721,23 @@ function Detalle({ consulta, inicial, alSalir }: { consulta: Consulta; inicial: 
         reserva={reserva}
         dni={consulta.dni}
         devolucionHoras={devolucionHoras}
+        enRevision={enRevision}
         alCancelar={(r) => {
           setCancelar(false);
           if (r?.estado) setReserva(r);
           // La nota de crédito (si hubo devolución) la emite pagos al recibir `reserva.cancelada`.
           void recargar().then(() => window.setTimeout(() => setVersion((v) => v + 1), 4000));
+        }}
+      />
+      <ModalReprogramar
+        modo="cliente"
+        reserva={reprogramar ? reserva : null}
+        dni={consulta.dni}
+        alCerrar={() => setReprogramar(false)}
+        alReprogramar={(r) => {
+          setReprogramar(false);
+          setReserva(r);
+          void recargar();
         }}
       />
       <ModalReenviar

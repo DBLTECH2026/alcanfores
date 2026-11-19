@@ -2,6 +2,9 @@ import { http, urlApi } from './cliente';
 import type {
   CanchaDetalle,
   CanchaResumen,
+  CanalRecuperacion,
+  CodigoEnviado,
+  CodigoVerificado,
   Complejo,
   ComprobanteEnviado,
   CuentaCliente,
@@ -17,6 +20,7 @@ import type {
   IntentoPasarela,
   MetodosPago,
   NuevaResena,
+  OpcionesRecuperacion,
   NuevaReserva,
   OrdenResenas,
   PagoCliente,
@@ -30,6 +34,7 @@ import type {
   ReservaDetalle,
   RespuestaLogin,
   ResultadoPasarela,
+  TipoCuenta,
   TipoPago,
   UsuarioSesion,
 } from './tipos';
@@ -43,6 +48,21 @@ export const authApi = {
   yo: () => http.get<UsuarioSesion>('/auth/yo').then((r) => r.data),
   cambiarContrasena: (datos: { actual: string; nueva: string; confirmacion: string }) =>
     http.post<void>('/auth/cambiar-contrasena', datos, { silenciarToast: true }).then((r) => r.data),
+  /** v2: el administrador completa su celular y su correo. */
+  editarYo: (datos: { telefono: string | null; correo: string }) =>
+    http.put<UsuarioSesion>('/auth/yo', datos, { silenciarToast: true }).then((r) => r.data),
+};
+
+// ------------------------------ v2: recuperar contraseña (público, sin token) ------------------------------
+export const recuperarApi = {
+  opciones: (tipoCuenta: TipoCuenta, usuario: string) =>
+    http.post<OpcionesRecuperacion>('/auth/recuperar/opciones', { tipoCuenta, usuario }, { silenciarToast: true }).then((r) => r.data),
+  enviar: (tipoCuenta: TipoCuenta, usuario: string, canal: CanalRecuperacion) =>
+    http.post<CodigoEnviado>('/auth/recuperar/enviar', { tipoCuenta, usuario, canal }, { silenciarToast: true, timeout: 45000 }).then((r) => r.data),
+  verificar: (tipoCuenta: TipoCuenta, usuario: string, codigo: string) =>
+    http.post<CodigoVerificado>('/auth/recuperar/verificar', { tipoCuenta, usuario, codigo }, { silenciarToast: true }).then((r) => r.data),
+  restablecer: (tokenRestablecer: string, nueva: string, confirmacion: string) =>
+    http.post<void>('/auth/recuperar/restablecer', { tokenRestablecer, nueva, confirmacion }, { silenciarToast: true }).then((r) => r.data),
 };
 
 // ------------------------------ catalogo-service ------------------------------
@@ -85,6 +105,9 @@ export const reservasApi = {
     http.get<ReservaDetalle>(`/reservas/${codigo}`, { params: { dni }, silenciarToast: true }).then((r) => r.data),
   cancelar: (codigo: string, dni: string, motivo: string) =>
     http.post<ReservaDetalle>(`/reservas/${codigo}/cancelar`, { dni, motivo }, { silenciarToast: true }).then((r) => r.data),
+  /** Cambia el horario (1 a 8 turnos de una cancha y una fecha); devuelve la reserva actualizada. Errores 409/422 en el modal. */
+  reprogramar: (codigo: string, dni: string, idsTurno: number[]) =>
+    http.post<ReservaDetalle>(`/reservas/${codigo}/reprogramar`, { dni, idsTurno }, { silenciarToast: true }).then((r) => r.data),
   urlConstancia: (codigo: string, dni: string) => urlApi(`/reservas/${codigo}/constancia.pdf?dni=${encodeURIComponent(dni)}`),
 };
 

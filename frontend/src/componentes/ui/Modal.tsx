@@ -69,6 +69,10 @@ export function Modal({
       (el ?? caja.current)?.focus();
     }, 10);
     const alTeclear = (e: KeyboardEvent) => {
+      // Solo responde el diálogo de más arriba: si encima hay otro (visor de la foto, otro modal),
+      // su Esc lo cierra a él y este modal sigue abierto.
+      const dialogos = document.querySelectorAll('[role="dialog"][aria-modal="true"]');
+      if (dialogos[dialogos.length - 1] !== caja.current) return;
       if (e.key === 'Escape' && !sinCerrar) {
         e.stopPropagation();
         cerrarRef.current();

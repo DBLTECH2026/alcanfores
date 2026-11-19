@@ -1,7 +1,9 @@
-/** fmtSoles(80) → «S/ 80.00» · fmtSoles(1284) → «S/ 1,284.00» · {decimales:0} → «S/ 80» */
+/** Espacio duro (U+00A0): une «S/» con el monto, la hora con «a. m.» y el número con su palabra para que nunca se partan. */
+export const ESPACIO_DURO = '\u00a0';
+/** fmtSoles(80) → «S/ 80.00» · fmtSoles(1284) → «S/ 1,284.00» · {decimales:0} → «S/ 80» (con espacio duro: no se parte). */
 export function fmtSoles(n: number | string | null | undefined, { decimales = 2 } = {}): string {
   const v = Number(n ?? 0).toLocaleString('en-US', { minimumFractionDigits: decimales, maximumFractionDigits: decimales });
-  return `S/ ${v}`;
+  return `S/${ESPACIO_DURO}${v}`;
 }
 /** '987654321' → «987 654 321» · {prefijo:true} → «+51 987 654 321» */
 export function fmtCelular(t: string | null | undefined, { prefijo = false } = {}): string {
@@ -47,8 +49,20 @@ export function aTitulo(s: string): string {
     .toLowerCase()
     .replace(/(^|[\s'-])(\p{L})/gu, (_m, a: string, b: string) => a + b.toUpperCase());
 }
+/** plural(3, 'turno', 'turnos') → «3 turnos» (con espacio duro: no se parte). */
 export function plural(n: number, uno: string, varios: string): string {
-  return `${n} ${n === 1 ? uno : varios}`;
+  return `${n}${ESPACIO_DURO}${n === 1 ? uno : varios}`;
+}
+/**
+ * Para textos que llegan armados del back («Paga el adelanto de S/ 135.00 antes de las 3:12 a. m.», «3 turnos»):
+ * cambia por espacio duro los espacios que no deben partir la línea. Solo para pintar, no para enviar al back.
+ */
+export function sinCortes(texto: string | null | undefined): string {
+  return String(texto ?? '')
+    .replace(/S\/ (?=\d)/g, `S/${ESPACIO_DURO}`)
+    .replace(/(\d) ([ap])\. m\./g, `$1${ESPACIO_DURO}$2.${ESPACIO_DURO}m.`)
+    .replace(/(\d) (turnos?|h|min)\b/g, `$1${ESPACIO_DURO}$2`)
+    .replace(/(\d)–(\d)/g, '$1\u2060–\u2060$2');
 }
 
 const DEPORTES: Record<string, string> = { FUTBOL_5: 'Fútbol 5', FUTBOL_6: 'Fútbol 6', FUTBOL_7: 'Fútbol 7', VOLEY: 'Vóley', BASQUET: 'Básquet', MULTIUSO: 'Vóley y básquet' };
@@ -70,4 +84,13 @@ export function desgloseIgv(total: number): { base: number; igv: number } {
   const t = Math.round(Number(total || 0) * 100);
   const base = Math.round(t / 1.18);
   return { base: base / 100, igv: (t - base) / 100 };
+}
+
+/** Minutos antes del partido en texto corto: 15 → «15 min», 60 → «1 h», 90 → «1 h 30 min», 1440 → «1 día». */
+export function fmtMinutosAntes(m: number): string {
+  if (m >= 1440 && m % 1440 === 0) return m === 1440 ? '1 día' : `${m / 1440} días`;
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  if (h && r) return `${h} h ${r} min`;
+  return h ? `${h} h` : `${r} min`;
 }

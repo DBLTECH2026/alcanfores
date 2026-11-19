@@ -79,15 +79,23 @@ export function numeroDia(fecha: string): number {
   return partes(fecha).d;
 }
 
-/** '20:00' → «8:00 p. m.» (el portal usa 12 h). */
+/** Espacio duro y unión sin corte: «8:00 p. m.» y «8:00–9:00» nunca se parten en dos líneas. */
+const ED = '\u00a0';
+const UNIR = '\u2060';
+const AM = `a.${ED}m.`;
+const PM = `p.${ED}m.`;
+/** Guion de rango que no deja cortar la línea a ninguno de sus lados. */
+const GUION = `${UNIR}–${UNIR}`;
+
+/** '20:00' → «8:00 p. m.» (el portal usa 12 h; con espacios duros). */
 export function fmtHora12(h: string | null | undefined): string {
   if (!h) return '';
   // v2: un cierre a medianoche llega como 23:59(:59) o 24:00.
-  if (h.startsWith('23:59') || h.startsWith('24:00')) return '12:00 a. m.';
+  if (h.startsWith('23:59') || h.startsWith('24:00')) return `12:00${ED}${AM}`;
   const [H = 0, M = 0] = h.split(':').map(Number);
-  const s = H >= 12 ? 'p. m.' : 'a. m.';
+  const s = H >= 12 ? PM : AM;
   const h12 = H % 12 === 0 ? 12 : H % 12;
-  return `${h12}:${String(M).padStart(2, '0')} ${s}`;
+  return `${h12}:${String(M).padStart(2, '0')}${ED}${s}`;
 }
 /** '8:00' → '08:00' (el panel usa 24 h). */
 export function fmtHora24(h: string | null | undefined): string {
@@ -96,14 +104,15 @@ export function fmtHora24(h: string | null | undefined): string {
   const [H = 0, M = 0] = h.split(':').map(Number);
   return `${String(H).padStart(2, '0')}:${String(M).padStart(2, '0')}`;
 }
-/** ('20:00','21:00') → «8:00–9:00 p. m.» */
+/** ('20:00','21:00') → «8:00–9:00 p. m.» · ('11:00','13:00') → «11:00 a. m. – 1:00 p. m.» (sin cortes dentro de cada hora ni en el guion pegado). */
 export function fmtRango12(ini: string, fin: string): string {
   const a = fmtHora12(ini);
   const b = fmtHora12(fin);
-  return a.slice(-5) === b.slice(-5) ? `${a.slice(0, -6)}–${b}` : `${a} – ${b}`;
+  // «p. m.» mide 5 caracteres y « p. m.» (con su espacio duro) 6.
+  return a.slice(-5) === b.slice(-5) ? `${a.slice(0, -6)}${GUION}${b}` : `${a}${ED}– ${b}`;
 }
 export function fmtRango24(ini: string, fin: string): string {
-  return `${fmtHora24(ini)}–${fmtHora24(fin)}`;
+  return `${fmtHora24(ini)}${GUION}${fmtHora24(fin)}`;
 }
 /** '2026-10-13T11:32:00' → «13 oct 2026, 11:32 a. m.» */
 export function fmtFechaHora(iso: string | null | undefined, { h24 = false, sinAnio = false } = {}): string {
@@ -146,4 +155,15 @@ export function textoHorario(turnos: Array<{ horaInicio: string; horaFin: string
   }
   const txt = tramos.map(([a, b]) => (h24 ? fmtRango24(a, b) : fmtRango12(a, b)));
   return txt.length <= 1 ? (txt[0] ?? '') : `${txt.slice(0, -1).join(', ')} y ${txt[txt.length - 1]}`;
+}
+
+/** Asistencia por defecto: se marca desde 30 min antes del partido (`asistencia_desde_min`). */
+export const ASISTENCIA_DESDE_MIN = 30;
+/** Hora desde la que se puede marcar la asistencia de un turno (Lima). */
+export function inicioAsistencia(fecha: string, horaInicio: string, desdeMin = ASISTENCIA_DESDE_MIN): Dayjs {
+  return deLima(`${fecha}T${horaInicio.slice(0, 5)}:00`).subtract(desdeMin, 'minute');
+}
+/** Respaldo del front cuando el back aún no devuelve `puedeMarcarAsistencia`. */
+export function puedeMarcarAsistencia(fecha: string, horaInicio: string, desdeMin = ASISTENCIA_DESDE_MIN): boolean {
+  return !ahoraLima().isBefore(inicioAsistencia(fecha, horaInicio, desdeMin));
 }

@@ -81,7 +81,8 @@ export const http = axios.create({
 http.interceptors.request.use((config: InternalAxiosRequestConfig) => {
   const url = String(config.url ?? '');
   const deCliente = rutaDeCliente(url, String(config.method ?? 'get').toLowerCase());
-  const esLogin = /\/login$|\/registro$/.test(url);
+  // Ingreso, registro y recuperar contraseña son públicos: nunca llevan token.
+  const esLogin = /\/login$|\/registro$|^\/auth\/recuperar\//.test(url);
   const token = esLogin ? null : deCliente ? leerTokenCliente() : leerToken();
   config.tipoToken = token ? (deCliente ? 'cliente' : 'panel') : null;
   if (token) config.headers.set('Authorization', `Bearer ${token}`);

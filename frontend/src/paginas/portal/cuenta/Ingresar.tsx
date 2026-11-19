@@ -46,7 +46,7 @@ export default function Ingresar() {
   return (
     <div className="contenedor py-8 lg:py-14">
       <div className="cuenta-caja">
-        <div className="cuenta-il solo-tablet-arriba" aria-hidden>
+        <div className="cuenta-il" aria-hidden>
           <Ilustracion id="IL-03-paso2-datos" carga="eager" />
         </div>
         <form className="cuenta-form" onSubmit={enviar} noValidate>
@@ -70,6 +70,11 @@ export default function Ingresar() {
             }
             {...register('contrasena')}
           />
+          <div className="flex justify-end -mt-2">
+            <Link to="/recuperar" className="enlace text-[13.5px] inline-flex items-center min-h-[36px]">
+              ¿Olvidaste tu contraseña?
+            </Link>
+          </div>
           {error && <Alerta tipo="error">{error}</Alerta>}
           <Boton type="submit" tamano="lg" bloque icono={LogIn} cargando={isSubmitting} textoCargando="Ingresando…">
             Ingresar
@@ -81,7 +86,11 @@ export default function Ingresar() {
             Crear cuenta
           </BotonEnlace>
           <p className="t-mini text-center">
-            También puedes <Link to="/reservar">reservar sin cuenta</Link>.
+            También puedes{' '}
+            <Link to="/reservar" className="enlace">
+              reservar sin cuenta
+            </Link>
+            .
           </p>
         </form>
       </div>

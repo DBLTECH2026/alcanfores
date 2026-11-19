@@ -98,7 +98,7 @@ function ListaCanchas() {
                       <span className="sr-only">{activa ? 'Activa' : 'Inactiva'}</span>
                     </Interruptor>
                   </div>
-                  <DatoIcono icono={Clock}>{c.horario?.texto || (c.horario?.dias?.length ? textoSemana(c.horario.dias) : 'Horario por defecto')}</DatoIcono>
+                  <DatoIcono icono={Clock}>{c.horario?.dias?.length ? textoSemana(c.horario.dias, true) : c.horario?.texto || 'Horario por defecto'}</DatoIcono>
                   <div className="flex flex-wrap gap-x-4 gap-y-1.5">
                     <DatoIcono icono={Layers}>{c.superficie}</DatoIcono>
                     <DatoIcono icono={UsersRound}>{c.capacidad}</DatoIcono>

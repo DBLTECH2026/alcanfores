@@ -36,9 +36,12 @@ import { Modal } from '@/componentes/ui/Modal';
 import { fmtCelular } from '@/utilidades/formato';
 import { normalizarCelular } from '@/utilidades/documentos';
 import type { IdIlustracion } from '@/utilidades/recursos';
+import { ChipsRecordatorios } from './ChipsRecordatorios';
 import { GRUPOS_CONFIG, esquemaConectarWa, esquemaGrupoConfig, esquemaPruebaWa, type DefClave } from './esquemasPanel';
 import { TextoWhatsapp } from './Notificaciones';
 import Feriados from './Feriados';
+import ConfigCorreo from './ConfigCorreo';
+import { TarjetaCanchita } from './TarjetaCanchita';
 
 /** Tarjetas de Configuración (SPEC_V2 §F): ilustración + una línea; cada una abre su pantalla. */
 interface Tarjeta {
@@ -54,6 +57,7 @@ const TARJETAS: Tarjeta[] = [
   { id: 'feriados', titulo: 'Feriados y días no laborables', texto: 'Calendario del año y días cerrados', ilustracion: 'IL-26-sin-turnos' },
   { id: 'comprobantes', titulo: 'Comprobantes', texto: 'Emisor de boletas y facturas', ilustracion: 'ARQ-06-datos-ordenados' },
   { id: 'whatsapp', titulo: 'WhatsApp', texto: 'Conecta el número con el QR', ilustracion: 'IL-04-paso3-comprobante' },
+  { id: 'correo', titulo: 'Correo', texto: 'Envío de correos a los clientes', ilustracion: 'IL-23-todo-al-dia' },
 ];
 
 /** /admin/configuracion[/{tarjeta}] — solo ADMIN. */
@@ -96,7 +100,7 @@ function PantallaTarjeta({ tarjeta }: { tarjeta: Tarjeta }) {
   return (
     <>
       <CabeceraPagina titulo={tarjeta.titulo} subtitulo={tarjeta.texto} busto="BU-rosa-agenda" volver="/admin/configuracion" />
-      {tarjeta.id === 'whatsapp' ? <Whatsapp /> : <FormGrupo id={tarjeta.id} ilustracion={tarjeta.ilustracion} />}
+      {tarjeta.id === 'whatsapp' ? <Whatsapp /> : tarjeta.id === 'correo' ? <ConfigCorreo /> : <FormGrupo id={tarjeta.id} ilustracion={tarjeta.ilustracion} />}
     </>
   );
 }
@@ -107,12 +111,17 @@ function FormGrupo({ id, ilustracion }: { id: string; ilustracion: IdIlustracion
   const defs = GRUPOS_CONFIG.find((g) => g.id === id)?.claves ?? [];
   const conf = useCarga(() => configuracionApi.obtener(), 'configuracion');
   const [errorGeneral, setErrorGeneral] = useState<string | null>(null);
-  const valoresDe = (c: Record<string, string>) => Object.fromEntries(defs.map((d) => [d.clave, c[d.clave] ?? '']));
+  // v1 → v2: si el back aún no tiene `recordatorio_minutos`, se parte de `recordatorio_horas`; `asistencia_desde_min` por defecto 30.
+  const respaldo = (c: Record<string, string>, clave: string) =>
+    clave === 'recordatorio_minutos' && c.recordatorio_horas ? String(Number(c.recordatorio_horas) * 60) : clave === 'asistencia_desde_min' ? '30' : '';
+  const valoresDe = (c: Record<string, string>) => Object.fromEntries(defs.map((d) => [d.clave, c[d.clave] ?? respaldo(c, d.clave)]));
   const {
     register,
     handleSubmit,
     reset,
     setError,
+    setValue,
+    watch,
     formState: { errors, isDirty, isSubmitting },
   } = useForm<Record<string, string>>({ resolver: zodResolver(esquemaGrupoConfig(defs)), mode: 'onTouched' });
   useEffect(() => {
@@ -137,7 +146,8 @@ function FormGrupo({ id, ilustracion }: { id: string; ilustracion: IdIlustracion
 
   if (conf.error) return <ErrorCarga alReintentar={conf.recargar} />;
   if (!conf.datos) return <Cargando texto="Cargando…" />;
-  const campo = (d: DefClave) => {
+  /** Un campo de texto según su tipo. */
+  const campoSolo = (d: DefClave) => {
     const comun = { label: d.etiqueta, requerido: true, error: errors[d.clave]?.message, ayuda: d.ayuda, ...register(d.clave) };
     if (d.tipo === 'CELULAR') return <CampoTexto key={d.clave} prefijo="+51" inputMode="tel" maxLength={15} {...comun} />;
     if (d.tipo === 'ENTERO' || d.tipo === 'PORCENTAJE') return <CampoTexto key={d.clave} inputMode="numeric" sufijo={d.sufijo} maxLength={5} {...comun} />;
@@ -145,6 +155,24 @@ function FormGrupo({ id, ilustracion }: { id: string; ilustracion: IdIlustracion
     if (d.tipo === 'RUC') return <CampoTexto key={d.clave} inputMode="numeric" maxLength={11} {...comun} />;
     if (d.clave === 'direccion' || d.clave === 'referencia') return <AreaTexto key={d.clave} rows={2} maxLength={d.max} {...comun} />;
     return <CampoTexto key={d.clave} type={d.tipo === 'CORREO' ? 'email' : d.tipo === 'URL' ? 'url' : 'text'} maxLength={d.max} {...comun} />;
+  };
+  /** `completo`: ocupa toda la fila (p. ej. el enlace de Maps, para que Latitud y Longitud queden juntas). */
+  const campo = (d: DefClave) => {
+    if (d.tipo === 'MINUTOS_LISTA')
+      return (
+        <ChipsRecordatorios
+          key={d.clave}
+          etiqueta={d.etiqueta}
+          ayuda={d.ayuda}
+          min={d.min ?? 5}
+          max={d.max ?? 2880}
+          valor={watch(d.clave) ?? ''}
+          error={errors[d.clave]?.message}
+          alCambiar={(v) => setValue(d.clave, v, { shouldDirty: true, shouldValidate: true })}
+        />
+      );
+    if (d.completo) return <div key={d.clave} className="sm:col-span-2 min-w-0">{campoSolo(d)}</div>;
+    return campoSolo(d);
   };
 
   return (
@@ -360,32 +388,39 @@ function Whatsapp() {
         </form>
       </section>
 
+      {/* Canchita (IA): debajo de la conexión, a todo el ancho. */}
+      <TarjetaCanchita className="xl:col-span-2" />
+
       {/* QR */}
       <Modal abierto={qr !== null} alCerrar={() => setQr(null)} titulo="Vincular WhatsApp" subtitulo={`Instancia «${e?.instancia ?? 'alcanfores'}»`} busto="BU-rosa-laptop" acciones={<Boton variante="fantasma" onClick={() => setQr(null)}>Cerrar</Boton>}>
         {qr?.cargando ? (
           <div className="grid place-items-center gap-3 py-10">
             <Spinner grande />
-            <span className="text-[#6B7C74]">Pidiendo el QR a Evolution API…</span>
+            <span className="t-sec">Pidiendo el QR a Evolution API…</span>
           </div>
         ) : qr?.error ? (
           <div className="grid gap-3">
-            <div className="qr-caja !bg-transparent !border-white/10">
+            <div className="qr-caja">
               <span className="punto-wa grid place-items-center w-[64px] h-[64px] rounded-[16px] bg-amarillo/15 text-amarillo">
                 <TriangleAlert className="ico ico-32" aria-hidden />
               </span>
               <b className="text-noche text-[16px] text-center">{qr.error.codigo === 'WHATSAPP_NO_CONFIGURADO' ? 'WhatsApp sin configurar' : 'Evolution API no responde'}</b>
-              <span className="text-center text-[#C9D6CF] text-[13.5px]">{qr.error.mensaje}</span>
+              <span className="text-center t-sec text-[13.5px]">{qr.error.mensaje}</span>
             </div>
-            <div className="caja-aviso">
-              <div>
-                <Server className="ico" aria-hidden />
-                Falta EVOLUTION_URL y EVOLUTION_APIKEY en notificaciones-service
+            {qr.error.codigo === 'WHATSAPP_NO_CONFIGURADO' ? (
+              <div className="caja-aviso">
+                <div>
+                  <Server className="ico" aria-hidden />
+                  Falta EVOLUTION_URL y EVOLUTION_APIKEY en notificaciones-service
+                </div>
+                <div>
+                  <MessageCircle className="ico" aria-hidden />
+                  Mientras tanto, los avisos quedan SIMULADOS
+                </div>
               </div>
-              <div>
-                <MessageCircle className="ico" aria-hidden />
-                Mientras tanto, los avisos quedan SIMULADOS
-              </div>
-            </div>
+            ) : (
+              <span className="t-sec text-[13px] text-center">Revisa que Evolution API esté encendido y vuelve a intentar.</span>
+            )}
           </div>
         ) : qr?.datos ? (
           <div className="grid gap-3">
@@ -397,7 +432,7 @@ function Whatsapp() {
                 Esperando que escanees…
               </span>
             </div>
-            {qr.datos.mensaje && <span className="text-[#C9D6CF] text-[13px]">{qr.datos.mensaje}</span>}
+            {qr.datos.mensaje && <span className="t-sec text-[13px] text-center">{qr.datos.mensaje}</span>}
           </div>
         ) : null}
       </Modal>

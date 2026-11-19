@@ -56,6 +56,8 @@ import { esquemaAnular } from './esquemasPanel';
 
 const TEXTO_CANAL: Record<string, string> = { COMPROBANTE: 'Comprobante Yape/Plin', PASARELA: 'Pago en línea', CAJA: 'Caja' };
 const TEXTO_TIPO_COMP: Record<string, string> = { BOLETA: 'Boleta', FACTURA: 'Factura', NOTA_CREDITO: 'Nota de crédito' };
+/** Con texto en el buscador los indicadores cuentan solo lo encontrado. */
+const CON_FILTRO = 'con este filtro';
 
 /** /admin/pagos — pagos (validar, rechazar, ver imagen) y comprobantes electrónicos simulados (PDF, XML, anular → NC). */
 export default function Pagos() {
@@ -121,6 +123,7 @@ function ListaPagos() {
   const filtros = { estado: f.leer('estado'), metodo: f.leer('metodo'), canal: f.leer('canal'), desde: f.leer('desde'), hasta: f.leer('hasta'), q: f.leer('q') };
   const lista = useCarga(() => pagosAdminApi.listar({ ...filtros, page: f.pagina, size: 15, sort: 'fechaEnvio,desc' }), JSON.stringify({ ...filtros, p: f.pagina, version }));
   const c = lista.datos?.conteos ?? {};
+  const conBusqueda = Boolean(filtros.q);
   const tras = () => {
     setModal(null);
     setVersion((v) => v + 1);
@@ -141,16 +144,16 @@ function ListaPagos() {
   return (
     <>
       <div className="kpis">
-        <TarjetaKpi etiqueta="En revisión" valor={c.PENDIENTE ?? 0} icono={Hourglass} tono="gol" detalle="por validar" activa={filtros.estado === 'PENDIENTE'} alPulsar={() => f.poner({ estado: filtros.estado === 'PENDIENTE' ? null : 'PENDIENTE' })} />
-        <TarjetaKpi etiqueta="Validados" valor={c.VALIDADO ?? 0} icono={BadgeCheck} tono="verde" detalle="con comprobante" activa={filtros.estado === 'VALIDADO'} alPulsar={() => f.poner({ estado: filtros.estado === 'VALIDADO' ? null : 'VALIDADO' })} />
-        <TarjetaKpi etiqueta="Rechazados" valor={c.RECHAZADO ?? 0} icono={TriangleAlert} tono="rojo" detalle="observados" activa={filtros.estado === 'RECHAZADO'} alPulsar={() => f.poner({ estado: filtros.estado === 'RECHAZADO' ? null : 'RECHAZADO' })} />
-        <TarjetaKpi etiqueta="Reembolsados" valor={c.REEMBOLSADO ?? 0} icono={History} tono="gris" detalle="con nota de crédito" activa={filtros.estado === 'REEMBOLSADO'} alPulsar={() => f.poner({ estado: filtros.estado === 'REEMBOLSADO' ? null : 'REEMBOLSADO' })} />
-        <TarjetaKpi etiqueta="Anulados" valor={c.ANULADO ?? 0} icono={Ban} tono="gris" detalle="por cancelación" activa={filtros.estado === 'ANULADO'} alPulsar={() => f.poner({ estado: filtros.estado === 'ANULADO' ? null : 'ANULADO' })} />
+        <TarjetaKpi etiqueta="En revisión" valor={c.PENDIENTE ?? 0} icono={Hourglass} tono="gol" detalle={conBusqueda ? CON_FILTRO : 'por validar'} activa={filtros.estado === 'PENDIENTE'} alPulsar={() => f.poner({ estado: filtros.estado === 'PENDIENTE' ? null : 'PENDIENTE' })} />
+        <TarjetaKpi etiqueta="Validados" valor={c.VALIDADO ?? 0} icono={BadgeCheck} tono="verde" detalle={conBusqueda ? CON_FILTRO : 'con comprobante'} activa={filtros.estado === 'VALIDADO'} alPulsar={() => f.poner({ estado: filtros.estado === 'VALIDADO' ? null : 'VALIDADO' })} />
+        <TarjetaKpi etiqueta="Rechazados" valor={c.RECHAZADO ?? 0} icono={TriangleAlert} tono="rojo" detalle={conBusqueda ? CON_FILTRO : 'observados'} activa={filtros.estado === 'RECHAZADO'} alPulsar={() => f.poner({ estado: filtros.estado === 'RECHAZADO' ? null : 'RECHAZADO' })} />
+        <TarjetaKpi etiqueta="Reembolsados" valor={c.REEMBOLSADO ?? 0} icono={History} tono="gris" detalle={conBusqueda ? CON_FILTRO : 'con nota de crédito'} activa={filtros.estado === 'REEMBOLSADO'} alPulsar={() => f.poner({ estado: filtros.estado === 'REEMBOLSADO' ? null : 'REEMBOLSADO' })} />
+        <TarjetaKpi etiqueta="Anulados" valor={c.ANULADO ?? 0} icono={Ban} tono="gris" detalle={conBusqueda ? CON_FILTRO : 'por cancelación'} activa={filtros.estado === 'ANULADO'} alPulsar={() => f.poner({ estado: filtros.estado === 'ANULADO' ? null : 'ANULADO' })} />
       </div>
       <BarraBusqueda
         valor={busqueda}
         alCambiar={setBusqueda}
-        placeholder="Código de reserva, DNI, nombre u operación"
+        placeholder="Código, DNI u operación"
         filtrosActivos={activos.length}
         alAbrirFiltros={() => setAbierto(true)}
         conteo={lista.datos ? `${lista.datos.totalElementos} pagos` : ''}
@@ -178,7 +181,7 @@ function ListaPagos() {
               titulo: 'Reserva',
               celda: (p) => (
                 <div>
-                  <button type="button" className="enlace bg-transparent border-0 p-0 cursor-pointer tnum font-semibold" onClick={() => navigate(`/admin/reservas/${p.codigoReserva}`)}>
+                  <button type="button" className="enlace bg-transparent border-0 p-0 cursor-pointer tnum font-semibold whitespace-nowrap" onClick={() => navigate(`/admin/reservas/${p.codigoReserva}`)}>
                     {p.codigoReserva}
                   </button>
                   <span className="sub t-sec block">{`${p.cliente.nombres} ${p.cliente.apellidos}`}</span>
@@ -202,7 +205,7 @@ function ListaPagos() {
               titulo: 'Comprobante',
               celda: (p) =>
                 p.comprobante ? (
-                  <button type="button" className="enlace bg-transparent border-0 p-0 cursor-pointer tnum" onClick={() => p.comprobante && void abrirArchivo(p.comprobante.urlPdf)}>
+                  <button type="button" className="enlace bg-transparent border-0 p-0 cursor-pointer tnum whitespace-nowrap" onClick={() => p.comprobante && void abrirArchivo(p.comprobante.urlPdf)}>
                     {p.comprobante.serieNumero}
                   </button>
                 ) : (
@@ -212,13 +215,18 @@ function ListaPagos() {
           ]}
           acciones={(p) => (
             <MenuFila
+              contexto={{
+                titulo: p.codigoReserva,
+                subtitulo: `${p.cliente.nombres.split(' ')[0]} ${p.cliente.apellidos.split(' ')[0]} · ${fmtSoles(p.monto)} · ${TEXTO_METODO[p.metodo] ?? p.metodo}`,
+                detalle: <Estado dominio="pago" estado={p.estado} tamano="sm" />,
+              }}
               acciones={[
                 { texto: 'Validar', icono: CircleCheck, alPulsar: () => setModal({ tipo: 'validar', pago: p }), oculta: p.estado !== 'PENDIENTE' },
-                { texto: 'Rechazar', icono: X, peligro: true, alPulsar: () => setModal({ tipo: 'rechazar', pago: p }), oculta: p.estado !== 'PENDIENTE' },
                 { texto: 'Ver imagen', icono: IconoImagen, alPulsar: () => setModal({ tipo: 'imagen', pago: p }), oculta: !p.tieneArchivo },
                 { texto: 'Ver reserva', icono: Eye, alPulsar: () => navigate(`/admin/reservas/${p.codigoReserva}`) },
-                { texto: 'PDF', icono: FileText, alPulsar: () => p.comprobante && void abrirArchivo(p.comprobante.urlPdf), oculta: !p.comprobante },
-                { texto: 'XML', icono: FileCode, alPulsar: () => p.comprobante && void descargarArchivo(p.comprobante.urlXml, `${p.comprobante.serieNumero}.xml`), oculta: !p.comprobante },
+                { texto: 'Ver PDF', icono: FileText, alPulsar: () => p.comprobante && void abrirArchivo(p.comprobante.urlPdf), oculta: !p.comprobante },
+                { texto: 'Descargar XML', icono: FileCode, alPulsar: () => p.comprobante && void descargarArchivo(p.comprobante.urlXml, `${p.comprobante.serieNumero}.xml`), oculta: !p.comprobante },
+                { texto: 'Rechazar', icono: X, peligro: true, alPulsar: () => setModal({ tipo: 'rechazar', pago: p }), oculta: p.estado !== 'PENDIENTE' },
               ]}
             />
           )}
@@ -273,10 +281,11 @@ function ListaComprobantes() {
       <BarraBusqueda
         valor={busqueda}
         alCambiar={setBusqueda}
-        placeholder="Serie y número, reserva, DNI, RUC o nombre"
+        placeholder="Serie, reserva, DNI o RUC"
         filtrosActivos={activos.length}
         alAbrirFiltros={() => setAbierto(true)}
         conteo={lista.datos ? `${lista.datos.totalElementos} comprobantes` : ''}
+        extra={<Boton variante="secundario" icono={RefreshCw} etiqueta="Actualizar" onClick={() => setVersion((v) => v + 1)} />}
       />
       <FiltrosActivos items={activos} alLimpiar={() => f.limpiar(['q', 'pestana'])} />
       {lista.error ? (
@@ -298,7 +307,7 @@ function ListaComprobantes() {
             {
               clave: 'serie',
               titulo: 'Comprobante',
-              celda: (c) => <CeldaDoc icono={c.tipo === 'NOTA_CREDITO' ? Receipt : ReceiptText} titulo={<span className="tnum">{c.serieNumero}</span>} sub={c.serieNumeroReferencia ? `${TEXTO_TIPO_COMP[c.tipo]} de ${c.serieNumeroReferencia}` : TEXTO_TIPO_COMP[c.tipo]} />,
+              celda: (c) => <CeldaDoc icono={c.tipo === 'NOTA_CREDITO' ? Receipt : ReceiptText} titulo={<span className="tnum whitespace-nowrap">{c.serieNumero}</span>} sub={c.serieNumeroReferencia ? <>{TEXTO_TIPO_COMP[c.tipo]} de <span className="tnum whitespace-nowrap">{c.serieNumeroReferencia}</span></> : TEXTO_TIPO_COMP[c.tipo]} />,
             },
             { clave: 'fecha', titulo: 'Emisión', celda: (c) => <span className="tnum">{fmtFechaHora(c.fechaEmision, { h24: true })}</span> },
             {
@@ -315,7 +324,7 @@ function ListaComprobantes() {
               clave: 'reserva',
               titulo: 'Reserva',
               celda: (c) => (
-                <button type="button" className="enlace bg-transparent border-0 p-0 cursor-pointer tnum" onClick={() => navigate(`/admin/reservas/${c.codigoReserva}`)}>
+                <button type="button" className="enlace bg-transparent border-0 p-0 cursor-pointer tnum whitespace-nowrap" onClick={() => navigate(`/admin/reservas/${c.codigoReserva}`)}>
                   {c.codigoReserva}
                 </button>
               ),
@@ -334,13 +343,25 @@ function ListaComprobantes() {
             { clave: 'estado', titulo: 'Estado', enTarjeta: false, celda: (c) => <Estado dominio="comprobante" estado={c.estado} /> },
           ]}
           acciones={(c) => (
-            <div className="flex items-center gap-1 justify-end">
-              <Boton variante="fantasma" tamano="sm" icono={FileText} etiqueta={`PDF ${c.serieNumero}`} onClick={() => void abrirArchivo(c.urlPdf)} />
-              <Boton variante="fantasma" tamano="sm" icono={FileCode} etiqueta={`XML ${c.serieNumero}`} onClick={() => void descargarArchivo(c.urlXml, `${c.serieNumero}.xml`)} />
-              {tieneRol('ADMIN') && c.estado === 'EMITIDO' && c.tipo !== 'NOTA_CREDITO' && (
-                <MenuFila acciones={[{ texto: 'Anular con nota de crédito', icono: Ban, peligro: true, alPulsar: () => setAnular(c) }]} />
-              )}
-            </div>
+            <MenuFila
+              etiqueta={`Acciones de ${c.serieNumero}`}
+              contexto={{
+                titulo: c.serieNumero,
+                subtitulo: `${c.clienteNombre} · ${fmtSoles(c.total)} · ${c.codigoReserva}`,
+                detalle: (
+                  <>
+                    <Estado dominio="tipoComprobante" estado={c.tipo} tamano="sm" />
+                    <Estado dominio="comprobante" estado={c.estado} tamano="sm" />
+                  </>
+                ),
+              }}
+              acciones={[
+                { texto: 'Ver PDF', icono: FileText, alPulsar: () => void abrirArchivo(c.urlPdf) },
+                { texto: 'Descargar XML', icono: FileCode, alPulsar: () => void descargarArchivo(c.urlXml, `${c.serieNumero}.xml`) },
+                { texto: 'Ver reserva', icono: Eye, alPulsar: () => navigate(`/admin/reservas/${c.codigoReserva}`) },
+                { texto: 'Anular con nota de crédito', icono: Ban, peligro: true, alPulsar: () => setAnular(c), oculta: !(tieneRol('ADMIN') && c.estado === 'EMITIDO' && c.tipo !== 'NOTA_CREDITO') },
+              ]}
+            />
           )}
           pie={lista.datos && <Paginacion pagina={lista.datos.pagina} totalPaginas={lista.datos.totalPaginas} totalElementos={lista.datos.totalElementos} tamanio={lista.datos.tamanio} alCambiar={(p) => f.poner({ page: p || null })} etiqueta="comprobantes" />}
         />

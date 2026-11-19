@@ -54,7 +54,8 @@ async function elegirTurno(page, { cancha, dia, hora } = {}) {
   if (dia !== undefined) await page.locator('.dia').nth(dia).click();
   await page.waitForSelector('.chip-turno');
   await pausa(300);
-  if (hora) await page.locator(`.chip-turno[aria-label^="${hora}"]`).first().click();
+  // fmtHora12 usa espacio duro (U+00A0) en el aria-label del chip: el selector también.
+  if (hora) await page.locator(`.chip-turno[aria-label^="${hora.replace(/ /g, String.fromCharCode(160))}"]`).first().click();
   else await page.locator('.chip-turno.ct-disponible').first().click();
 }
 

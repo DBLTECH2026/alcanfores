@@ -7,9 +7,9 @@ import { Boton } from '@/componentes/ui/Boton';
 import { Avatar, Cargando, Vacio } from '@/componentes/ui/Datos';
 import { Alerta } from '@/componentes/ui/Estados';
 import { Modal } from '@/componentes/ui/Modal';
-import { fmtFecha, fmtHace, fmtRango24 } from '@/utilidades/fecha';
+import { fmtFecha, fmtHace } from '@/utilidades/fecha';
 import { fmtSoles } from '@/utilidades/formato';
-import { ModalValidar, TEXTO_METODO } from './ModalesReserva';
+import { HorarioTramos, ModalValidar, TEXTO_METODO } from './ModalesReserva';
 
 interface Aviso {
   pago: FilaPago;
@@ -99,7 +99,7 @@ export function ModalAvisos({ abierto, alCerrar, alCambiar }: { abierto: boolean
                           </span>
                           <span className="tnum">
                             <Clock className="ico" aria-hidden />
-                            {r.horarioTexto ?? fmtRango24(r.horaInicio, r.horaFin)}
+                            <HorarioTramos reserva={r} />
                           </span>
                         </>
                       ) : (

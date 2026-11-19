@@ -33,7 +33,7 @@ import { SubidaImagen } from '@/componentes/ui/SubidaImagen';
 import { calcularAdelanto } from '@/componentes/portal/Asistente';
 import { esquemaPago, type DatosPago, type PagoEntrada } from '@/esquemas/reserva';
 import { erroresPorCampo } from '@/hooks/useErroresServidor';
-import { fmtSoles } from '@/utilidades/formato';
+import { fmtCelular, fmtSoles } from '@/utilidades/formato';
 import { cx } from '@/utilidades/cx';
 import { CabezaPaso } from './CabezaPaso';
 
@@ -51,7 +51,7 @@ function DatosPago({ metodo, numero, titular, monto }: { metodo: 'YAPE' | 'PLIN'
   const toast = useToast();
   const copiar = async () => {
     try {
-      await navigator.clipboard.writeText(numero.replace(/\s/g, ''));
+      await navigator.clipboard.writeText(numero.replace(/\D/g, '').slice(-9));
       toast.exito('Número copiado');
     } catch {
       toast.info(numero);
@@ -65,7 +65,8 @@ function DatosPago({ metodo, numero, titular, monto }: { metodo: 'YAPE' | 'PLIN'
         </span>
         <div className="grid gap-1 min-w-0">
           <span className="kicker inline-flex items-center gap-1.5">{metodo === 'YAPE' ? 'Yape' : 'Plin'}</span>
-          <span className="datos-pago-num">{numero}</span>
+          {/* «900 111 222» a la vista; «Copiar» copia solo los dígitos */}
+          <span className="datos-pago-num">{/\d/.test(numero) ? fmtCelular(numero) : numero}</span>
           <span className="t-sec">{titular}</span>
           <span className="mt-1">
             <Boton variante="secundario" tamano="sm" icono={Copy} onClick={copiar} etiqueta="Copiar número">

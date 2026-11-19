@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import type { z } from 'zod';
@@ -38,8 +38,9 @@ import { Cargando, Segmentado } from '@/componentes/ui/Datos';
 import { Alerta, InsigniaEstado } from '@/componentes/ui/Estados';
 import { Modal } from '@/componentes/ui/Modal';
 import { comprobanteDe, crearEsquemaCaja, esquemaCancelarAdmin, esquemaRechazo } from '@/paginas/panel/esquemasPanel';
-import { ahoraLima, deLima, fmtFecha, fmtFechaHora, fmtRango24 } from '@/utilidades/fecha';
-import { fmtSoles } from '@/utilidades/formato';
+import { ahoraLima, deLima, fmtFecha, fmtFechaHora, fmtRango24, textoHorario } from '@/utilidades/fecha';
+import { fmtSoles, plural } from '@/utilidades/formato';
+import { cx } from '@/utilidades/cx';
 import { abrirArchivo } from './archivos';
 import { BloqueComprobante } from './BloqueComprobante';
 import { SubidaImagen } from '@/componentes/ui/SubidaImagen';
@@ -65,6 +66,84 @@ export const ICONO_ORIGEN: Record<string, LucideIcon> = { WEB: Globe, PRESENCIAL
 export const TEXTO_ORIGEN: Record<string, string> = { WEB: 'Web', PRESENCIAL: 'Presencial', TELEFONICA: 'Teléfono' };
 export const TEXTO_TIPO_PAGO: Record<string, string> = { ADELANTO: 'Adelanto', TOTAL: 'Pago total', SALDO: 'Saldo' };
 const nombre = (c: { nombres: string; apellidos: string }) => `${c.nombres} ${c.apellidos}`.trim();
+
+// ------------------------------ horario en 24 h (el panel nunca usa 12 h) ------------------------------
+const RE_TRAMO = /^(\d{1,2}):(\d{2})(?:\s*([ap])\.?\s*m\.?)?\s*[–-]\s*(\d{1,2}):(\d{2})\s*([ap])\.?\s*m\.?$/i;
+const a24 = (h: string, m: string, s: string, fin: boolean) => {
+  let H = Number(h) % 12;
+  if (s.toLowerCase() === 'p') H += 12;
+  if (fin && H === 0 && m === '00') return '24:00';
+  return `${String(H).padStart(2, '0')}:${m}`;
+};
+/**
+ * `horarioTexto` del back (12 h, turnos seguidos ya unidos): «9:00–10:00 a. m. y 7:00–8:00 p. m.» →
+ * [['09:00','10:00'], ['19:00','20:00']]. null si no se entiende.
+ */
+export function tramosDeTexto(texto: string | null | undefined): Array<[string, string]> | null {
+  if (!texto) return null;
+  const tramos: Array<[string, string]> = [];
+  for (const parte of texto.trim().split(/\s*,\s*|\s+y\s+/)) {
+    const x = RE_TRAMO.exec(parte.trim());
+    if (!x) return null;
+    const [, h1 = '', m1 = '', s1, h2 = '', m2 = '', s2 = ''] = x;
+    tramos.push([a24(h1, m1, s1 ?? s2, false), a24(h2, m2, s2, true)]);
+  }
+  return tramos.length ? tramos : null;
+}
+/**
+ * Texto del back para el panel: horas de 12 h («antes de las 3:37 p. m.», «8:00–9:00 p. m.») → 24 h
+ * («antes de las 15:37», «20:00–21:00») y el monto pegado a «S/» con espacio duro, para que no se parta.
+ */
+export function horasA24(texto: string): string {
+  return texto
+    .replace(/S\/\s+(?=\d)/g, 'S/ ')
+    .replace(/(\d{1,2}):(\d{2})(?:[\s⁠]*([ap])\.[\s⁠]*m\.)?[\s⁠]*[–-][\s⁠]*(\d{1,2}):(\d{2})[\s⁠]*([ap])\.[\s⁠]*m\./gi, (_t, h1: string, m1: string, s1: string | undefined, h2: string, m2: string, s2: string) =>
+      fmtRango24(a24(h1, m1, s1 ?? s2, false), a24(h2, m2, s2, true)),
+    )
+    .replace(/(\d{1,2}):(\d{2})[\s⁠]*([ap])\.[\s⁠]*m\./gi, (_t, h: string, m: string, s: string) => a24(h, m, s, false));
+}
+/** Texto plano del horario en 24 h («08:00–09:00, 10:00–11:00»), para títulos y lectores de pantalla. */
+export function horario24(r: { horarioTexto?: string | null; horaInicio: string; horaFin: string; cantidadTurnos?: number | null }): string {
+  const tramos = (r.cantidadTurnos ?? 1) > 1 ? tramosDeTexto(r.horarioTexto) : null;
+  if (tramos) return tramos.map(([a, b]) => fmtRango24(a, b)).join(', ');
+  return (r.cantidadTurnos ?? 1) > 1 && r.horarioTexto ? r.horarioTexto : fmtRango24(r.horaInicio, r.horaFin);
+}
+/**
+ * Horario de una reserva en el panel, siempre en 24 h. Varios turnos = un tramo por bloque seguido
+ * («08:00–09:00, 10:00–11:00»), cada tramo sin partirse; con más de 2 tramos, el primero y «+N».
+ * Nunca «inicio del primero–fin del último»: los turnos pueden no ser seguidos.
+ */
+export function HorarioTramos({ reserva: r, className }: { reserva: { horarioTexto?: string | null; horaInicio: string; horaFin: string; cantidadTurnos?: number | null }; className?: string }) {
+  const n = r.cantidadTurnos ?? 1;
+  const tramos = n > 1 ? tramosDeTexto(r.horarioTexto) : null;
+  if (n > 1 && !tramos && r.horarioTexto) return <span className={className}>{r.horarioTexto}</span>;
+  const textos = (tramos ?? [[r.horaInicio, r.horaFin] as [string, string]]).map(([a, b]) => fmtRango24(a, b));
+  const vistos = textos.length > 2 ? textos.slice(0, 1) : textos;
+  const resto = textos.length - vistos.length;
+  return (
+    <span className={cx('tnum', className)} title={n > 1 ? `${textos.join(', ')} · ${plural(n, 'turno', 'turnos')}` : undefined}>
+      {/* La coma va pegada a su tramo y los espacios son nodos sueltos: se ve igual dentro de un contenedor flex (avisos) o en línea (tabla). */}
+      {vistos.map((t, i) => (
+        <Fragment key={t}>
+          {i > 0 && ' '}
+          <span className="whitespace-nowrap">{i < vistos.length - 1 ? `${t},` : t}</span>
+        </Fragment>
+      ))}
+      {resto > 0 && (
+        <>
+          {' '}
+          <span className="whitespace-nowrap">{`+${resto}`}</span>
+        </>
+      )}
+      {textos.length === 1 && n > 1 && (
+        <>
+          {' '}
+          <span className="whitespace-nowrap">{`· ${plural(n, 'turno', 'turnos')}`}</span>
+        </>
+      )}
+    </span>
+  );
+}
 
 /** Carga el pago y su reserva (para los montos de la franja). */
 function usePagoYReserva(idPago: number | null) {
@@ -402,24 +481,30 @@ export function ModalCobrar({ reserva, alCerrar, alHecho }: { reserva: ReservaAd
         </div>
       ) : (
         <form className="grid gap-3" onSubmit={enviar} noValidate>
-          <Segmentado
-            etiqueta="Tipo de cobro"
-            bloque
-            pequeno
-            valor={watch('tipoPago') ?? null}
-            alCambiar={(v) => {
-              setValue('tipoPago', v);
-              setValue('monto', (v === 'ADELANTO' && reserva ? Math.min(reserva.montoAdelanto, saldo) : saldo).toFixed(2), { shouldValidate: true });
-            }}
-            opciones={
-              reserva && reserva.montoPagado > 0
-                ? [{ valor: 'SALDO', texto: 'Saldo', icono: HandCoins }]
-                : [
-                    { valor: 'TOTAL', texto: 'Total', icono: HandCoins },
-                    { valor: 'ADELANTO', texto: 'Adelanto', icono: HandCoins },
-                  ]
-            }
-          />
+          {reserva && reserva.montoPagado > 0 ? (
+            // Con adelanto ya pagado solo queda el saldo: una línea, no un segmentado de una sola opción.
+            <span className="dato-ico">
+              <HandCoins className="ico" aria-hidden />
+              <span>
+                Cobras el saldo: <b className="tnum whitespace-nowrap">{fmtSoles(saldo)}</b>
+              </span>
+            </span>
+          ) : (
+            <Segmentado
+              etiqueta="Tipo de cobro"
+              bloque
+              pequeno
+              valor={watch('tipoPago') ?? null}
+              alCambiar={(v) => {
+                setValue('tipoPago', v);
+                setValue('monto', (v === 'ADELANTO' && reserva ? Math.min(reserva.montoAdelanto, saldo) : saldo).toFixed(2), { shouldValidate: true });
+              }}
+              opciones={[
+                { valor: 'TOTAL', texto: 'Total', icono: HandCoins },
+                { valor: 'ADELANTO', texto: 'Adelanto', icono: HandCoins },
+              ]}
+            />
+          )}
           <Segmentado
             etiqueta="Método"
             bloque
@@ -590,7 +675,7 @@ export function ModalCancelar({
           <div className="caja-aviso">
             <div>
               <LockOpen className="ico" aria-hidden />
-              {fmtFecha(reserva.fecha, 'corta')} · {fmtRango24(reserva.horaInicio, reserva.horaFin)} queda libre
+              {fmtFecha(reserva.fecha, 'corta')} · {reserva.turnos && reserva.turnos.length > 1 ? textoHorario(reserva.turnos, true) : fmtRango24(reserva.horaInicio, reserva.horaFin)} queda libre
             </div>
             <div>
               <Eye className="ico" aria-hidden />

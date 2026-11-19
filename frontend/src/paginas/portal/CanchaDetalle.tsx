@@ -192,7 +192,7 @@ export default function CanchaDetalle() {
                   setOrden(e.target.value as OrdenResenas);
                   setPagina(0);
                 }}
-                className="!text-[14px]"
+                className="text-[16px] md:!text-[14px]"
               >
                 <option value="recientes">Más recientes</option>
                 <option value="mejor">Mejor calificadas</option>

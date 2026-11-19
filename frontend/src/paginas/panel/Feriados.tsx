@@ -38,9 +38,22 @@ function efecto(d: Pick<DiaEspecialAdmin, 'tipo' | 'canchas'>, canchas: CanchaAd
   return { cierran: activas.filter((c) => c.feriado?.modo === 'CERRADA'), abren: activas.filter((c) => c.feriado?.modo !== 'CERRADA') };
 }
 
+/** < 640 px: el título largo se partía en 2 líneas junto al busto; ahí basta «Feriados» (el botón dice «Día no laborable»). */
+function useCelular() {
+  const [m, setM] = useState(() => window.matchMedia('(max-width: 639px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 639px)');
+    const alCambiar = () => setM(mq.matches);
+    mq.addEventListener('change', alCambiar);
+    return () => mq.removeEventListener('change', alCambiar);
+  }, []);
+  return m;
+}
+
 /** /admin/configuracion/feriados — calendario anual con feriados de Perú y días no laborables (SPEC_V2 §B). */
 export default function Feriados() {
   useTituloPagina('Feriados y días no laborables');
+  const celular = useCelular();
   const toast = useToast();
   const [anio, setAnio] = useState(Number(hoyLima().slice(0, 4)));
   const [version, setVersion] = useState(0);
@@ -70,7 +83,7 @@ export default function Feriados() {
   return (
     <>
       <CabeceraPagina
-        titulo="Feriados y días no laborables"
+        titulo={celular ? 'Feriados' : 'Feriados y días no laborables'}
         subtitulo="Cierra o cobra adicional en feriados; cierra días puntuales"
         busto="BU-rosa-agenda"
         volver="/admin/configuracion"
@@ -130,7 +143,8 @@ export default function Feriados() {
                 ))}
               </div>
             </section>
-            <section className="pc">
+            {/* En celular «Próximos» va primero: es lo más consultado y el calendario de 12 meses es largo. */}
+            <section className="pc order-first md:order-none">
               <div className="pc-cab">
                 <h2>
                   <Flag className="ico" aria-hidden />
@@ -153,7 +167,7 @@ export default function Feriados() {
                             <small>{fmtFecha(d.fecha, 'dia-mes').split(' ')[1]}</small>
                           </span>
                           <span className="grid gap-1 min-w-0 text-left">
-                            <b className="truncar">{d.nombre}</b>
+                            <b className="line-clamp-2 [overflow-wrap:anywhere]">{d.nombre}</b>
                             <span className="flex flex-wrap gap-x-3 gap-y-1">
                               {ef.abren.length > 0 && (
                                 <span className="dato-ico">
@@ -179,7 +193,7 @@ export default function Feriados() {
                 </ul>
               )}
               <details className="mas-opciones">
-                <summary>Más opciones</summary>
+                <summary className="py-[9px]">Más opciones</summary>
                 <div className="grid gap-2">
                   <span className="t-sec text-[13px]">Vuelve a cargar los feriados oficiales del año (no duplica los que ya están).</span>
                   <Boton variante="secundario" tamano="sm" icono={Download} cargando={cargando} textoCargando="Cargando…" onClick={cargarPeru}>

@@ -12,7 +12,8 @@ import { Boton } from '@/componentes/ui/Boton';
 import { CampoTexto, Casilla } from '@/componentes/ui/Campo';
 import { Alerta, Insignia } from '@/componentes/ui/Estados';
 import { Ilustracion } from '@/componentes/ui/Marca';
-import { esquemaRegistroCliente, MSJ_CLAVE_CLIENTE, type RegistroClienteEntrada } from '@/esquemas/otros';
+import { ReglasClave, errorClave } from '@/componentes/cuenta/ReglasClave';
+import { esquemaRegistroCliente, type RegistroClienteEntrada } from '@/esquemas/otros';
 import { RE_DNI, normalizarCelular } from '@/utilidades/documentos';
 import { aTitulo } from '@/utilidades/formato';
 import { destinoSeguro } from '@/utilidades/navegacion';
@@ -47,6 +48,8 @@ export default function CrearCuenta() {
     defaultValues: { dni: '', nombres: '', apellidos: '', telefono: '', correo: '', contrasena: '', confirmacion: '', aceptaTerminos: false, aceptaPrivacidad: false },
   });
   const dni = watch('dni') ?? '';
+  const contrasena = watch('contrasena') ?? '';
+  const reglas = errorClave(errors.contrasena?.message);
 
   const consultar = async (valor: string) => {
     if (!RE_DNI.test(valor)) {
@@ -121,7 +124,7 @@ export default function CrearCuenta() {
   return (
     <div className="contenedor py-8 lg:py-14">
       <div className="cuenta-caja ancha">
-        <div className="cuenta-il solo-tablet-arriba" aria-hidden>
+        <div className="cuenta-il" aria-hidden>
           <Ilustracion id="IL-12-confirmada" carga="eager" />
         </div>
         <form className="cuenta-form" onSubmit={enviar} noValidate>
@@ -159,7 +162,8 @@ export default function CrearCuenta() {
             }
             {...register('dni', { setValueAs: (v: string) => String(v ?? '').replace(/\D/g, '').slice(0, 8) })}
           />
-          <div className="form-grid dos">
+          {/* Celular: Contraseña, reglas y Repite. Desde 768: las dos contraseñas lado a lado y las reglas debajo (flujo dense). */}
+          <div className="form-grid dos md:grid-flow-row-dense">
             <CampoTexto label="Nombres" requerido icono={UserRound} maxLength={60} lectura={verificado} valido={verificado} error={errors.nombres?.message} {...register('nombres')} />
             <CampoTexto label="Apellidos" requerido icono={UsersRound} maxLength={60} lectura={verificado} valido={verificado} error={errors.apellidos?.message} {...register('apellidos')} />
             <CampoTexto label="Celular" requerido prefijo={<><Smartphone className="ico ico-16" aria-hidden />+51</>} type="tel" inputMode="tel" autoComplete="tel-national" maxLength={15} placeholder="987 654 321" error={errors.telefono?.message} {...register('telefono')} />
@@ -171,8 +175,7 @@ export default function CrearCuenta() {
               type={ver ? 'text' : 'password'}
               autoComplete="new-password"
               maxLength={64}
-              ayuda={errors.contrasena ? undefined : MSJ_CLAVE_CLIENTE}
-              error={errors.contrasena?.message}
+              error={reglas.error}
               accion={
                 <button type="button" className="control-boton" aria-label={ver ? 'Ocultar contraseña' : 'Ver contraseña'} onClick={() => setVer((v) => !v)}>
                   {ver ? <EyeOff className="ico ico-18" aria-hidden /> : <Eye className="ico ico-18" aria-hidden />}
@@ -180,6 +183,7 @@ export default function CrearCuenta() {
               }
               {...register('contrasena')}
             />
+            <ReglasClave valor={contrasena} conError={reglas.conError} className="md:col-span-2" />
             <CampoTexto label="Repite la contraseña" requerido icono={KeyRound} type={ver ? 'text' : 'password'} autoComplete="new-password" maxLength={64} error={errors.confirmacion?.message} {...register('confirmacion')} />
           </div>
           <div className="grid gap-2">
@@ -189,13 +193,13 @@ export default function CrearCuenta() {
             </p>
             <Casilla {...register('aceptaTerminos')} aria-invalid={errors.aceptaTerminos ? true : undefined}>
               Acepto los{' '}
-              <a href="/terminos" target="_blank" rel="noopener">
+              <a href="/terminos" target="_blank" rel="noopener" className="enlace">
                 términos y condiciones
               </a>
             </Casilla>
             <Casilla {...register('aceptaPrivacidad')} aria-invalid={errors.aceptaPrivacidad ? true : undefined}>
               Acepto la{' '}
-              <a href="/privacidad" target="_blank" rel="noopener">
+              <a href="/privacidad" target="_blank" rel="noopener" className="enlace">
                 política de privacidad
               </a>
             </Casilla>
@@ -209,14 +213,21 @@ export default function CrearCuenta() {
           {aviso && (
             <Alerta tipo={aviso.ingresar ? 'advertencia' : 'error'}>
               {aviso.texto}{' '}
-              {aviso.ingresar && <Link to={`/ingresar?volver=${encodeURIComponent(volver)}`}>Ingresa aquí</Link>}
+              {aviso.ingresar && (
+                <Link to={`/ingresar?volver=${encodeURIComponent(volver)}`} className="enlace">
+                  Ingresa aquí
+                </Link>
+              )}
             </Alerta>
           )}
           <Boton type="submit" tamano="lg" bloque icono={UserPlus} cargando={isSubmitting} textoCargando="Creando…">
             Crear cuenta
           </Boton>
           <p className="t-mini text-center">
-            ¿Ya tienes cuenta? <Link to={`/ingresar${sp.get('volver') ? `?volver=${encodeURIComponent(volver)}` : ''}`}>Ingresa</Link>
+            ¿Ya tienes cuenta?{' '}
+            <Link to={`/ingresar${sp.get('volver') ? `?volver=${encodeURIComponent(volver)}` : ''}`} className="enlace">
+              Ingresa
+            </Link>
           </p>
         </form>
       </div>

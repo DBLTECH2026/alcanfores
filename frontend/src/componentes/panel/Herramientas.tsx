@@ -1,11 +1,12 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { useSearchParams } from 'react-router-dom';
-import { Ellipsis, RefreshCw, Search, SlidersHorizontal, X, type LucideIcon } from 'lucide-react';
+import { Ellipsis, RefreshCw, RotateCcw, Search, SlidersHorizontal, X, type LucideIcon } from 'lucide-react';
 import { Boton } from '@/componentes/ui/Boton';
 import { Vacio } from '@/componentes/ui/Datos';
 import { Insignia, InsigniaEstado, type TonoInsignia } from '@/componentes/ui/Estados';
 import { Modal, type PropsModal } from '@/componentes/ui/Modal';
+import { PanelLateral } from '@/componentes/ui/PanelLateral';
 import { cx } from '@/utilidades/cx';
 import {
   BadgeCheck,
@@ -184,7 +185,10 @@ export function FiltrosActivos({ items, alLimpiar }: { items: Array<{ clave: str
   );
 }
 
-/** Panel lateral de filtros (entra desde la derecha; prototipo panelFiltros). Los filtros se aplican al tocarlos. */
+/**
+ * Panel lateral de filtros (entra de derecha a izquierda; prototipo panelFiltros). Los filtros se aplican al tocarlos.
+ * Usa PanelLateral: en celular min(86vw, 360px) y desde 641 px 380 px; cuerpo con scroll y pie fijo con «Limpiar» y «Ver resultados».
+ */
 export function PanelFiltros({
   abierto,
   alCerrar,
@@ -202,47 +206,34 @@ export function PanelFiltros({
   alLimpiar?: () => void;
   resultados?: number;
 }) {
-  const caja = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!abierto) return undefined;
-    const esc = (e: KeyboardEvent) => e.key === 'Escape' && alCerrar();
-    document.addEventListener('keydown', esc);
-    const t = window.setTimeout(() => caja.current?.querySelector<HTMLElement>('button, input, select')?.focus(), 30);
-    return () => {
-      document.removeEventListener('keydown', esc);
-      window.clearTimeout(t);
-    };
-  }, [abierto, alCerrar]);
-  if (!abierto) return null;
-  return createPortal(
-    <div className="panel-filtros-capa" onMouseDown={(e) => e.target === e.currentTarget && alCerrar()}>
-      <aside ref={caja} className="panel-filtros animate-entrar-der" role="dialog" aria-modal="true" aria-label={titulo}>
-        <div className="pf-cab">
-          <span className="td-ico">
-            <SlidersHorizontal className="ico" aria-hidden />
-          </span>
-          <div>
-            <h2>{titulo}</h2>
-            {subtitulo && <small>{subtitulo}</small>}
-          </div>
-          <button type="button" className="pf-x" aria-label="Cerrar filtros" onClick={alCerrar}>
-            <X className="ico ico-18" aria-hidden />
-          </button>
-        </div>
-        <div className="pf-cuerpo">{children}</div>
-        <div className="pf-pie">
+  const ver =
+    resultados === undefined ? 'Ver resultados' : `Ver ${resultados.toLocaleString('es-PE')}\u00a0${resultados === 1 ? 'resultado' : 'resultados'}`;
+  return (
+    <PanelLateral
+      abierto={abierto}
+      alCerrar={alCerrar}
+      titulo={titulo}
+      subtitulo={subtitulo}
+      icono={SlidersHorizontal}
+      etiquetaCerrar="Cerrar filtros"
+      ancho="amplio"
+      className="panel-filtros"
+      claseCuerpo="pf-cuerpo"
+      pie={
+        <>
           {alLimpiar && (
-            <Boton variante="secundario" onClick={alLimpiar}>
+            <Boton variante="secundario" icono={RotateCcw} onClick={alLimpiar}>
               Limpiar
             </Boton>
           )}
           <Boton variante="oscuro" onClick={alCerrar}>
-            {resultados !== undefined ? `Ver ${resultados}` : 'Listo'}
+            {ver}
           </Boton>
-        </div>
-      </aside>
-    </div>,
-    document.body,
+        </>
+      }
+    >
+      {children}
+    </PanelLateral>
   );
 }
 
@@ -301,20 +292,100 @@ export interface AccionFila {
   texto: string;
   icono: LucideIcon;
   alPulsar: () => void;
+  /** Acción que borra o anula: va al final, separada y en rojo. */
   peligro?: boolean;
   oculta?: boolean;
+  /** Se ve pero no se puede pulsar (p. ej. asistencia antes de hora). */
+  deshabilitada?: boolean;
+  /** Por qué está deshabilitada (se muestra debajo del texto, en gris). */
+  motivo?: string;
 }
-/** Botón ⋯ con menú de acciones (se dibuja fuera de la tabla para que no lo corte el scroll). */
-export function MenuFila({ acciones, etiqueta = 'Más acciones' }: { acciones: AccionFila[]; etiqueta?: string }) {
+
+/** De qué fila es el menú: en celular encabeza el panel lateral (p. ej. «ALC-7K2M9Q» · «Lucía Mendoza · Cancha 1 · 19:00»). */
+export interface ContextoMenu {
+  titulo: string;
+  subtitulo?: string;
+  /** Fila opcional bajo el título (p. ej. insignias de estado). */
+  detalle?: ReactNode;
+}
+
+/** Hasta este ancho el menú ⋯ y los filtros se abren como panel lateral. */
+const CONSULTA_CELULAR = '(max-width: 640px)';
+const suscribirCelular = (avisar: () => void) => {
+  const mq = window.matchMedia(CONSULTA_CELULAR);
+  mq.addEventListener('change', avisar);
+  return () => mq.removeEventListener('change', avisar);
+};
+/** true en pantallas de hasta 640 px (se actualiza al girar o cambiar el tamaño). */
+export function useCelular(): boolean {
+  return useSyncExternalStore(
+    suscribirCelular,
+    () => window.matchMedia(CONSULTA_CELULAR).matches,
+    () => false,
+  );
+}
+
+/** Peligrosas siempre al final (separadas por un divisor). */
+function separarAcciones(acciones: AccionFila[]) {
   const visibles = acciones.filter((a) => !a.oculta);
+  return { visibles, seguras: visibles.filter((a) => !a.peligro), peligrosas: visibles.filter((a) => a.peligro) };
+}
+
+/**
+ * Botón ⋯ con las acciones de una fila.
+ * - Desde 641 px: menú desplegable anclado al botón, que nunca se sale de la pantalla (se dibuja fuera de la tabla para que no lo corte el scroll).
+ * - Hasta 640 px: panel lateral que entra de derecha a izquierda, con el contexto de la fila arriba, acciones grandes
+ *   y las de peligro separadas al fondo.
+ */
+export function MenuFila({ acciones, etiqueta = 'Más acciones', contexto }: { acciones: AccionFila[]; etiqueta?: string; contexto?: ContextoMenu }) {
+  const { visibles, seguras, peligrosas } = separarAcciones(acciones);
+  const celular = useCelular();
   const boton = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLDivElement>(null);
-  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+  const [abierto, setAbierto] = useState(false);
+  // null = recién abierto y aún sin medir (se dibuja oculto para medirlo).
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  // Posición del botón al abrir: un scroll de verdad (> 4 px) cierra; el rebote del toque no.
+  const ancla = useRef<{ top: number; left: number } | null>(null);
+  const desplegable = abierto && !celular;
 
-  const cerrar = useCallback(() => setPos(null), []);
+  const cerrar = useCallback(() => {
+    setAbierto(false);
+    setPos(null);
+  }, []);
+
+  /** Coloca el menú SIEMPRE dentro de la pantalla (8 px de margen): por la izquierda del botón si cabe, si no por la derecha; abajo o arriba según el espacio. */
+  const colocar = useCallback(() => {
+    const b = boton.current?.getBoundingClientRect();
+    const m = menu.current?.getBoundingClientRect();
+    if (!b || !m) return;
+    const M = 8;
+    const vw = document.documentElement.clientWidth || window.innerWidth;
+    const vh = window.innerHeight;
+    let left = b.left + m.width <= vw - M ? b.left : b.right - m.width;
+    left = Math.min(Math.max(M, left), Math.max(M, vw - m.width - M));
+    let top: number;
+    if (b.bottom + 6 + m.height <= vh - M) top = b.bottom + 6;
+    else if (b.top - 6 - m.height >= M) top = b.top - 6 - m.height;
+    else top = Math.max(M, vh - m.height - M);
+    ancla.current = { top: b.top, left: b.left };
+    setPos({ top, left });
+  }, []);
+
+  // Al abrir el desplegable: medir y colocar antes de pintar.
   useLayoutEffect(() => {
-    if (!pos) return undefined;
-    const fuera = (e: MouseEvent) => {
+    if (desplegable) colocar();
+  }, [desplegable, colocar]);
+
+  // Ya colocado: foco en la primera acción disponible.
+  const colocado = desplegable && pos !== null;
+  useEffect(() => {
+    if (colocado) menu.current?.querySelector<HTMLElement>('button:not(:disabled)')?.focus();
+  }, [colocado]);
+
+  useEffect(() => {
+    if (!desplegable) return undefined;
+    const fuera = (e: PointerEvent) => {
       if (!menu.current?.contains(e.target as Node) && !boton.current?.contains(e.target as Node)) cerrar();
     };
     const esc = (e: KeyboardEvent) => {
@@ -323,63 +394,117 @@ export function MenuFila({ acciones, etiqueta = 'Más acciones' }: { acciones: A
         boton.current?.focus();
       }
     };
-    document.addEventListener('mousedown', fuera);
-    document.addEventListener('keydown', esc);
-    window.addEventListener('scroll', cerrar, true);
-    window.addEventListener('resize', cerrar);
-    menu.current?.querySelector<HTMLElement>('button')?.focus();
-    return () => {
-      document.removeEventListener('mousedown', fuera);
-      document.removeEventListener('keydown', esc);
-      window.removeEventListener('scroll', cerrar, true);
-      window.removeEventListener('resize', cerrar);
+    const alDesplazar = () => {
+      const b = boton.current?.getBoundingClientRect();
+      const a = ancla.current;
+      if (!b || !a) return;
+      if (Math.abs(b.top - a.top) > 4 || Math.abs(b.left - a.left) > 4) cerrar();
     };
-  }, [pos, cerrar]);
+    document.addEventListener('pointerdown', fuera);
+    document.addEventListener('keydown', esc);
+    window.addEventListener('scroll', alDesplazar, true);
+    window.addEventListener('resize', colocar);
+    return () => {
+      document.removeEventListener('pointerdown', fuera);
+      document.removeEventListener('keydown', esc);
+      window.removeEventListener('scroll', alDesplazar, true);
+      window.removeEventListener('resize', colocar);
+    };
+  }, [desplegable, cerrar, colocar]);
 
   if (!visibles.length) return null;
-  const abrir = () => {
-    const r = boton.current?.getBoundingClientRect();
-    if (!r) return;
-    const alto = visibles.length * 40 + 14;
-    const top = r.bottom + 6 + alto > window.innerHeight ? Math.max(8, r.top - alto - 6) : r.bottom + 6;
-    setPos({ top, right: Math.max(8, window.innerWidth - r.right) });
+
+  const elegir = (a: AccionFila) => {
+    cerrar();
+    a.alPulsar();
   };
+  /** Fila grande del panel lateral: ícono en cuadro, texto y, si está deshabilitada, su motivo. */
+  const filaPanel = (a: AccionFila) => (
+    <button key={a.texto} type="button" role="menuitem" className={cx('pl-accion', a.peligro && 'peligro')} disabled={a.deshabilitada} onClick={() => elegir(a)}>
+      <span className="pl-accion-ico" aria-hidden>
+        <a.icono className="ico" />
+      </span>
+      <span className="pl-accion-txt">
+        {a.texto}
+        {a.deshabilitada && a.motivo && <small>{a.motivo}</small>}
+      </span>
+    </button>
+  );
+  const filaMenu = (a: AccionFila) => (
+    <button
+      key={a.texto}
+      type="button"
+      role="menuitem"
+      className={cx(a.peligro && 'peligro')}
+      disabled={a.deshabilitada}
+      title={a.deshabilitada ? a.motivo : undefined}
+      onClick={(e) => {
+        e.stopPropagation();
+        // El foco pasa al ⋯ antes de cerrar: si la acción abre un modal, al cerrarlo vuelve aquí (no al <body>).
+        boton.current?.focus({ preventScroll: true });
+        elegir(a);
+      }}
+    >
+      <a.icono className="ico" aria-hidden />
+      <span className="menu-fila-txt">
+        {a.texto}
+        {a.deshabilitada && a.motivo && <small>{a.motivo}</small>}
+      </span>
+    </button>
+  );
+
   return (
     <>
       <button
         ref={boton}
         type="button"
         className="td-mas"
-        aria-label={etiqueta}
-        aria-haspopup="menu"
-        aria-expanded={Boolean(pos)}
+        aria-label={contexto ? `${etiqueta}: ${contexto.titulo}` : etiqueta}
+        aria-haspopup={celular ? 'dialog' : 'menu'}
+        aria-expanded={abierto}
         onClick={(e) => {
           e.stopPropagation();
-          if (pos) cerrar();
-          else abrir();
+          if (abierto) cerrar();
+          else setAbierto(true);
         }}
       >
         <Ellipsis className="ico" aria-hidden />
       </button>
-      {pos &&
+      {celular && (
+        <PanelLateral
+          abierto={abierto}
+          alCerrar={cerrar}
+          titulo={contexto?.titulo ?? etiqueta}
+          subtitulo={contexto?.subtitulo}
+          detalle={contexto?.detalle}
+          etiquetaCerrar="Cerrar acciones"
+          devolverFoco={boton}
+          className="pl-menu"
+          pie={
+            peligrosas.length > 0 && (
+              <div className="pl-acciones" role="menu" aria-label="Acciones que no se pueden deshacer">
+                {peligrosas.map(filaPanel)}
+              </div>
+            )
+          }
+        >
+          <div className="pl-acciones" role="menu" aria-label={etiqueta}>
+            {seguras.map(filaPanel)}
+          </div>
+        </PanelLateral>
+      )}
+      {desplegable &&
         createPortal(
-          <div ref={menu} className="menu-fila animate-entrar" role="menu" style={{ top: pos.top, right: pos.right }}>
-            {visibles.map((a) => (
-              <button
-                key={a.texto}
-                type="button"
-                role="menuitem"
-                className={cx(a.peligro && 'peligro')}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  cerrar();
-                  a.alPulsar();
-                }}
-              >
-                <a.icono className="ico" aria-hidden />
-                {a.texto}
-              </button>
-            ))}
+          <div
+            ref={menu}
+            className={cx('menu-fila', pos && 'animate-entrar')}
+            role="menu"
+            aria-label={contexto ? `${etiqueta}: ${contexto.titulo}` : etiqueta}
+            style={pos ? { top: pos.top, left: pos.left } : { top: 0, left: 0, visibility: 'hidden' }}
+          >
+            {seguras.map(filaMenu)}
+            {seguras.length > 0 && peligrosas.length > 0 && <hr className="menu-fila-div" />}
+            {peligrosas.map(filaMenu)}
           </div>,
           document.body,
         )}

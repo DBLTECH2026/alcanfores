@@ -4,8 +4,9 @@ import {
   esquemaAcepta,
   esquemaCelular,
   esquemaCorreo,
+  esquemaApellidos,
   esquemaDni,
-  esquemaNombre,
+  esquemaNombres,
   esquemaOperacion,
 } from './comunes';
 import { rucValido } from '@/utilidades/documentos';
@@ -14,8 +15,8 @@ import { rucValido } from '@/utilidades/documentos';
 export const esquemaDatosCliente = z
   .object({
     dni: esquemaDni,
-    nombres: esquemaNombre,
-    apellidos: esquemaNombre,
+    nombres: esquemaNombres,
+    apellidos: esquemaApellidos,
     telefono: esquemaCelular,
     correo: esquemaCorreo,
     tipoComprobante: z.enum(['BOLETA', 'FACTURA']),
