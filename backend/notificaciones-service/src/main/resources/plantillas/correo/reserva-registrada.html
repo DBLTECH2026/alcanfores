@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{base :: correo('Reserva registrada', ${conPlazo} ? 'Completa tu pago para confirmar' : 'Tu turno está separado', |Tu turno ${codigo} está separado. Paga el adelanto de ${montoAdelanto} para confirmarlo.|, ~{::contenido})}">
+<body>
+<th:block th:fragment="contenido">
+    <p style="margin:0 0 12px 0;" th:text="|${saludo}:|">Hola:</p>
+    <p style="margin:0;">
+        Separamos tu turno en <strong th:text="${canchaTexto}">la cancha</strong>.
+        Para confirmarlo, paga el adelanto de <strong th:text="${montoAdelanto}">S/ 0.00</strong>.
+    </p>
+
+    <table th:replace="~{componentes :: tarjeta(true, false)}"></table>
+
+    <th:block th:if="${conPlazo}">
+        <table th:replace="~{componentes :: nota(|Plazo para pagar: ${plazo}|, 'Si no recibimos tu pago a tiempo, el turno se libera automáticamente para otra persona.')}"></table>
+    </th:block>
+    <th:block th:unless="${conPlazo}">
+        <table th:replace="~{componentes :: notaVerde('Paga el adelanto cuando prefieras', 'Puedes pagarlo en el complejo o desde tu reserva en línea con Yape, Plin o tarjeta.')}"></table>
+    </th:block>
+
+    <table th:replace="~{componentes :: boton(${urlMiReserva}, 'Ver mi reserva y pagar')}"></table>
+
+    <p style="margin:0 0 18px 0;font-size:14px;line-height:22px;color:#4A5A68;">
+        Te adjuntamos la constancia de tu reserva en PDF. ¿Ya pagaste? Sube tu comprobante desde la misma página.
+        También puedes <a th:href="${urlListo}" href="#" target="_blank" style="color:#27811F;font-weight:700;">ver la constancia en línea</a>.
+    </p>
+</th:block>
+</body>
+</html>

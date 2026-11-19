@@ -1,0 +1,17 @@
+*Reserva cancelada*
+
+[(${saludo})]. [# th:if="${porSistema}"]No recibimos el pago del adelanto a tiempo, así que la reserva *[(${codigo})]* se canceló y el turno quedó libre.[/][# th:unless="${porSistema}"]La reserva *[(${codigo})]* fue cancelada por [(${canceladoPor})].[/]
+
+*Cancha:* [(${canchaTexto})]
+*Fecha:* [(${fecha})]
+*Hora:* [(${horario})]
+[# th:if="${!#strings.isEmpty(motivo)}"]*Motivo:* [(${motivo})]
+[/][# th:if="${devolucion}"]
+*Devolución:* [(${montoDevolucion})]. La registramos por el mismo medio con el que pagaste.
+[/][# th:if="${sinDevolucion}"]
+Según nuestras condiciones, las cancelaciones con menos de [(${devolucionHoras})] horas de anticipación no tienen devolución.
+[/]
+¿Quieres jugar otro día? Reserva aquí:
+[(${urlReservar})]
+
+[(${nombreComplejo})]

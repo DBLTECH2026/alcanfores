@@ -1,0 +1,115 @@
+# CI/CD de Alcanfores: pruebas del back-end (JUnit + JaCoCo con MySQL real), compilación del front-end
+# y despliegue automático al VPS por SSH cuando todo pasa en la rama main.
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-cd-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  backend:
+    name: Back-end · pruebas de los microservicios
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          TZ: America/Lima
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 --silent"
+          --health-interval=10s --health-timeout=5s --health-retries=10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+      - name: Crear bases de datos de prueba
+        run: |
+          for s in auth catalogo reservas pagos notificaciones; do
+            mysql -h 127.0.0.1 -uroot -e "CREATE DATABASE IF NOT EXISTS alcanfores_${s}_test CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE DATABASE IF NOT EXISTS alcanfores_${s} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;"
+          done
+      - name: Compilar y probar (mvn verify)
+        working-directory: backend
+        env:
+          TZ: America/Lima
+        run: mvn -B -ntp verify
+      - name: Resumen de pruebas y cobertura
+        if: always()
+        working-directory: backend
+        run: |
+          echo "## Pruebas del back-end" >> "$GITHUB_STEP_SUMMARY"
+          echo "| Módulo | Pruebas | Fallos | Errores | Cobertura de instrucciones |" >> "$GITHUB_STEP_SUMMARY"
+          echo "|---|---|---|---|---|" >> "$GITHUB_STEP_SUMMARY"
+          for m in */; do
+            m=${m%/}
+            [ -d "$m/target/surefire-reports" ] || continue
+            t=$(cat $m/target/surefire-reports/*.xml | grep -o 'tests="[0-9]*"' | grep -o '[0-9]*' | paste -sd+ | bc)
+            f=$(cat $m/target/surefire-reports/*.xml | grep -o 'failures="[0-9]*"' | grep -o '[0-9]*' | paste -sd+ | bc)
+            e=$(cat $m/target/surefire-reports/*.xml | grep -o 'errors="[0-9]*"' | grep -o '[0-9]*' | paste -sd+ | bc)
+            cov="—"
+            if [ -f "$m/target/site/jacoco/jacoco.csv" ]; then
+              cov=$(awk -F, 'NR>1{m+=$4;c+=$5} END{if(m+c>0) printf "%.1f %%", 100*c/(m+c)}' $m/target/site/jacoco/jacoco.csv)
+            fi
+            echo "| $m | $t | $f | $e | $cov |" >> "$GITHUB_STEP_SUMMARY"
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reportes-backend
+          path: |
+            backend/*/target/surefire-reports
+            backend/*/target/site/jacoco
+          retention-days: 14
+
+  frontend:
+    name: Front-end · lint y compilación
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run build
+
+  desplegar:
+    name: Despliegue al VPS (Docker)
+    needs: [backend, frontend]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment:
+      name: produccion
+      url: https://alcanfores.dbltech.tech
+    steps:
+      - name: Desplegar por SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ vars.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 30m
+          script: cd /opt/alcanfores && ./deploy/desplegar.sh
+      - name: Verificar el sitio en línea
+        run: |
+          for i in $(seq 1 12); do
+            if curl -fsS https://alcanfores.dbltech.tech/api/estado; then exit 0; fi
+            sleep 10
+          done
+          exit 1

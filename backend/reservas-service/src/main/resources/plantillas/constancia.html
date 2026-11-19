@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <title th:text="'Constancia de reserva ' + ${codigo}">Constancia de reserva</title>
+    <style>
+        @page { size: A4; margin: 0; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'Inter', sans-serif; font-size: 9.5pt; color: #091A2A; background: #FFFFFF; }
+        .franja-superior { height: 7mm; background: #091A2A; }
+        .franja-verde { height: 1.6mm; background: #27811F; }
+        .contenido { padding: 8mm 14mm 0 14mm; }
+        table { border-collapse: collapse; width: 100%; }
+        td { vertical-align: top; }
+        .titulo { font-family: 'BarlowSC'; font-weight: 700; font-size: 17pt; letter-spacing: 0.5pt; text-transform: uppercase; color: #091A2A; text-align: right; }
+        .subtitulo { font-size: 8.5pt; color: #4A5A6A; text-align: right; margin-top: 1mm; }
+        .estado { display: inline-block; white-space: nowrap; margin-top: 2.5mm; padding: 1.4mm 4mm; border-radius: 10pt; font-family: 'BarlowSC'; font-weight: 600; font-size: 10.5pt; letter-spacing: 0.4pt; text-transform: uppercase; }
+        .estado.confirmada { background: #27811F; color: #FFFFFF; }
+        .estado.pendiente { background: #F2B705; color: #091A2A; }
+        .estado.cancelada { background: #B42318; color: #FFFFFF; }
+        .tarjeta-codigo { margin-top: 5mm; background: #E8F3EC; border-radius: 9pt; padding: 6mm 7mm; }
+        .etiqueta { font-size: 7.5pt; text-transform: uppercase; letter-spacing: 0.8pt; color: #0B5D33; font-weight: 600; }
+        .codigo { font-family: 'BarlowSC'; font-weight: 700; font-size: 44pt; letter-spacing: 2pt; color: #091A2A; line-height: 1.05; margin-top: 1mm; }
+        .cancha-grande { font-family: 'BarlowSC'; font-weight: 600; font-size: 16pt; color: #27811F; margin-top: 2mm; }
+        .fecha-grande { font-size: 11pt; font-weight: 600; margin-top: 1.5mm; }
+        .hora-grande { font-size: 11pt; margin-top: 0.8mm; color: #0B5D33; }
+        .qr { width: 36mm; height: 36mm; }
+        .qr-texto { font-size: 7pt; color: #4A5A6A; text-align: center; margin-top: 1mm; }
+        .seccion { margin-top: 4.5mm; }
+        .seccion-titulo { font-family: 'BarlowSC'; font-weight: 700; font-size: 12pt; text-transform: uppercase; letter-spacing: 0.6pt; color: #091A2A; border-bottom: 1.2pt solid #B9DCC6; padding-bottom: 1.2mm; margin-bottom: 2.5mm; }
+        .dato td { padding: 1.1mm 0; border-bottom: 0.6pt solid #E3EBE6; }
+        .dato .k { width: 32%; color: #4A5A6A; }
+        .dato .v { font-weight: 600; }
+        .montos td { padding: 1.8mm 3mm; }
+        .montos .k { color: #4A5A6A; }
+        .montos .v { text-align: right; font-weight: 600; font-size: 10.5pt; }
+        .montos .total td { border-top: 0.6pt solid #E3EBE6; }
+        .montos .saldo td { background: #091A2A; color: #FFFFFF; }
+        .montos .saldo .k { color: #B9DCC6; }
+        .montos .saldo .v { font-family: 'BarlowSC'; font-weight: 700; font-size: 15pt; color: #FFFFFF; }
+        .aviso { margin-top: 4mm; padding: 3.5mm 4.5mm; border-left: 3pt solid #F2B705; background: #FFF8E1; font-size: 9pt; }
+        .cancelacion { margin-top: 4mm; padding: 3.5mm 4.5mm; border-left: 3pt solid #B42318; background: #FDECEA; font-size: 9pt; }
+        .condiciones { margin: 0; padding-left: 4.5mm; }
+        .condiciones li { margin-bottom: 1.4mm; font-size: 8.8pt; color: #1F2E3C; }
+        .llegar td { padding: 0.9mm 0; font-size: 9pt; }
+        .llegar .k { width: 22%; color: #4A5A6A; }
+        a { color: #27811F; text-decoration: none; }
+        .pie { position: fixed; bottom: 0; left: 0; right: 0; background: #091A2A; color: #B9DCC6; padding: 4mm 14mm; font-size: 7.6pt; }
+        .pie b { color: #FFFFFF; }
+    </style>
+</head>
+<body>
+<div class="franja-superior"></div>
+<div class="franja-verde"></div>
+<div class="contenido">
+    <table>
+        <tr>
+            <td style="width: 55%;"><img th:src="${logo}" src="" alt="Los Alcanfores" style="width: 72mm;" /></td>
+            <td>
+                <div class="titulo">Constancia de reserva</div>
+                <div class="subtitulo" th:text="'Registrada el ' + ${registrada} + ' · ' + ${origen}">Registrada</div>
+                <div style="text-align: right;"><span class="estado" th:classappend="${claseEstado}" th:text="${estado}">Estado</span></div>
+            </td>
+        </tr>
+    </table>
+
+    <div class="tarjeta-codigo">
+        <table>
+            <tr>
+                <td>
+                    <div class="etiqueta">Código de reserva</div>
+                    <div class="codigo" th:text="${codigo}">ALC-XXXXXX</div>
+                    <div class="cancha-grande" th:text="${canchaDeporte}">Cancha</div>
+                    <div class="fecha-grande" th:text="${fecha}">Fecha</div>
+                    <div class="hora-grande" th:text="${hora} + ' · ' + ${franja}">Hora</div>
+                </td>
+                <td style="width: 40mm; text-align: center;">
+                    <img class="qr" th:src="${qr}" src="" alt="QR" />
+                    <div class="qr-texto">Escanéalo para ver tu reserva</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    <div th:if="${aviso != null}" class="aviso" th:text="${aviso}">Aviso</div>
+    <div th:if="${cancelada}" class="cancelacion">
+        <b>Reserva cancelada</b> el <span th:text="${fechaCancelacion}">fecha</span>.
+        Motivo: <span th:text="${motivoCancelacion}">motivo</span>. <span th:text="${devolucion}">devolución</span>
+    </div>
+
+    <table class="seccion">
+        <tr>
+            <td style="width: 54%; padding-right: 6mm;">
+                <div class="seccion-titulo">Datos del cliente</div>
+                <table class="dato">
+                    <tr><td class="k">Nombre</td><td class="v" th:text="${cliente}">Cliente</td></tr>
+                    <tr><td class="k">DNI</td><td class="v" th:text="${dni}">DNI</td></tr>
+                    <tr><td class="k">Celular</td><td class="v" th:text="${telefono}">Celular</td></tr>
+                    <tr><td class="k">Correo</td><td class="v" th:text="${correo}">Correo</td></tr>
+                </table>
+            </td>
+            <td>
+                <div class="seccion-titulo">Montos</div>
+                <table class="montos">
+                    <tr class="total"><td class="k">Total del turno</td><td class="v" th:text="${total}">S/ 0.00</td></tr>
+                    <tr><td class="k" th:text="'Adelanto (' + ${adelantoPct} + ' %)'">Adelanto</td><td class="v" th:text="${adelanto}">S/ 0.00</td></tr>
+                    <tr><td class="k">Pagado</td><td class="v" th:text="${pagado}">S/ 0.00</td></tr>
+                    <tr class="saldo"><td class="k">Saldo por pagar</td><td class="v" th:text="${saldo}">S/ 0.00</td></tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    <div class="seccion">
+        <div class="seccion-titulo">Condiciones</div>
+        <ul class="condiciones">
+            <li th:each="c : ${condiciones}" th:text="${c}">Condición</li>
+        </ul>
+    </div>
+
+    <div class="seccion">
+        <div class="seccion-titulo">Cómo llegar</div>
+        <table class="llegar">
+            <tr><td class="k">Dirección</td><td th:text="${direccion}">Dirección</td></tr>
+            <tr><td class="k">Referencia</td><td th:text="${referencia}">Referencia</td></tr>
+            <tr><td class="k">Mapa</td><td><a th:href="${mapaUrl}" href="#">Abrir la ubicación en Google Maps</a></td></tr>
+            <tr><td class="k">WhatsApp</td><td th:text="${whatsapp}">WhatsApp</td></tr>
+            <tr><td class="k">Correo</td><td th:text="${correoComplejo}">Correo</td></tr>
+        </table>
+    </div>
+</div>
+<div class="pie">
+    <b th:text="${complejo}">Complejo Deportivo Los Alcanfores</b> · <span th:text="${direccion}">dirección</span><br />
+    Constancia generada el <span th:text="${generado}">fecha</span>. No es un comprobante de pago: tu boleta o factura llega por separado.
+</div>
+</body>
+</html>

@@ -1,0 +1,39 @@
+spring:
+  main:
+    banner-mode: off
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/alcanfores_notificaciones_test?serverTimezone=America/Lima&useUnicode=true&characterEncoding=UTF-8
+    username: ${DB_USUARIO:root}
+    password: ${DB_CLAVE:}
+  rabbitmq:
+    listener:
+      simple:
+        auto-startup: false
+  mail:
+    host: ""
+  cloud:
+    discovery:
+      enabled: false
+
+eureka:
+  client:
+    enabled: false
+
+management:
+  health:
+    rabbit:
+      enabled: false
+
+alcanfores:
+  front-url: http://localhost:5186
+  notificaciones:
+    tareas-habilitadas: false
+    datos-demo: false
+    evolution:
+      url: ""
+      apikey: ""
+
+logging:
+  level:
+    root: WARN
+    pe.alcanfores: INFO

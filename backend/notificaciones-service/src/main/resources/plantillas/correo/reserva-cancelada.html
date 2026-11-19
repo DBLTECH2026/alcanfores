@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{base :: correo('Reserva cancelada', ${porSistema} ? 'Venció el plazo para pagar' : 'Tu reserva fue cancelada', |La reserva ${codigo} del ${fechaTexto} quedó cancelada.|, ~{::contenido})}">
+<body>
+<th:block th:fragment="contenido">
+    <p style="margin:0 0 12px 0;" th:text="|${saludo}:|">Hola:</p>
+    <p style="margin:0 0 18px 0;" th:if="${porSistema}">
+        No recibimos el pago del adelanto a tiempo, así que la reserva <strong th:text="${codigo}">ALC-XXXXXX</strong>
+        se canceló y el turno quedó libre.
+    </p>
+    <p style="margin:0 0 18px 0;" th:unless="${porSistema}">
+        La reserva <strong th:text="${codigo}">ALC-XXXXXX</strong> fue cancelada por
+        <span th:text="${canceladoPor}">el complejo</span>.
+    </p>
+
+    <th:block th:if="${!#strings.isEmpty(motivo)}">
+        <table th:replace="~{componentes :: nota('Motivo', ${motivo})}"></table>
+    </th:block>
+
+    <table th:replace="~{componentes :: tarjeta(false, false)}"></table>
+
+    <th:block th:if="${devolucion}">
+        <table th:replace="~{componentes :: notaVerde(|Devolución de ${montoDevolucion}|, 'La registramos por el mismo medio con el que pagaste. Te enviaremos la nota de crédito por este medio.')}"></table>
+    </th:block>
+    <th:block th:if="${sinDevolucion}">
+        <table th:replace="~{componentes :: nota('Sin devolución', |Según nuestras condiciones, las cancelaciones con menos de ${devolucionHoras} horas de anticipación no tienen devolución. Si tienes dudas, escríbenos por WhatsApp.|)}"></table>
+    </th:block>
+
+    <p style="margin:0 0 4px 0;">¿Quieres jugar otro día? Elige un nuevo horario en segundos.</p>
+    <table th:replace="~{componentes :: boton(${urlReservar}, 'Reservar otro turno')}"></table>
+</th:block>
+</body>
+</html>

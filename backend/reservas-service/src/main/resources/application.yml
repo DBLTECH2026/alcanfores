@@ -1,0 +1,103 @@
+spring:
+  application:
+    name: reservas-service
+  profiles:
+    default: local
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NOMBRE:alcanfores_reservas}?serverTimezone=America/Lima&useUnicode=true&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${DB_USUARIO:root}
+    password: ${DB_CLAVE:}
+    hikari:
+      maximum-pool-size: ${DB_POOL:10}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: America/Lima
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jackson:
+    time-zone: America/Lima
+    default-property-inclusion: always
+    serialization:
+      write-dates-as-timestamps: false
+  rabbitmq:
+    host: ${RABBIT_HOST:localhost}
+    port: ${RABBIT_PORT:5672}
+    username: ${RABBIT_USUARIO:guest}
+    password: ${RABBIT_CLAVE:guest}
+    listener:
+      simple:
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
+          multiplier: 2
+  cloud:
+    circuitbreaker:
+      resilience4j:
+        # El timeout lo ponen los clientes HTTP (3 s); así la llamada corre en el mismo hilo (MDC y X-Request-Id intactos).
+        disable-time-limiter: true
+
+server:
+  port: ${PUERTO:8093}
+  error:
+    include-message: never
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+  info:
+    env:
+      enabled: true
+
+info:
+  servicio: reservas-service
+  descripcion: Reservas, turnos, disponibilidad, constancias y reportes del Complejo Deportivo Los Alcanfores
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+alcanfores:
+  jwt:
+    secreto: ${JWT_SECRETO:secreto-de-desarrollo-local-alcanfores-2026-cambiar-en-produccion}
+    horas: ${JWT_HORAS:8}
+  interno-token: ${INTERNO_TOKEN:token-interno-solo-para-desarrollo-local}
+  front-url: ${FRONT_URL:http://localhost:5186}
+  public-api-url: ${PUBLIC_API_URL:http://localhost:8086}
+  reservas:
+    tareas-habilitadas: ${TAREAS_HABILITADAS:true}
+    semilla:
+      habilitada: ${SEMILLA_HABILITADA:true}
+    catalogo-url: ${CATALOGO_URL:http://catalogo-service}
+    pagos-url: ${PAGOS_URL:http://pagos-service}
+    factiliza:
+      token: ${FACTILIZA_TOKEN:}
+      url: ${FACTILIZA_URL:https://api.factiliza.com/v1}
+
+logging:
+  pattern:
+    level: "%5p [%X{idSolicitud:-}]"
+
+# Perfil «local» (por defecto): MariaDB/MySQL en localhost:3306, root sin clave (valores por defecto de arriba).
+# Perfil «docker»: las mismas claves, tomadas de las variables de entorno del docker-compose.

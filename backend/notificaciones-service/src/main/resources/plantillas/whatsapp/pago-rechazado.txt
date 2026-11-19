@@ -1,0 +1,14 @@
+*Revisa tu comprobante de pago*
+
+[(${saludo})]. No pudimos validar el comprobante de la reserva *[(${codigo})]*.
+
+*Motivo:* [(${observacion})]
+[# th:if="${conPlazo}"]
+Tu turno sigue separado. Tienes plazo hasta *[(${plazo})]* para enviar uno nuevo.
+[/]
+Reenvía tu comprobante aquí:
+[(${urlMiReserva})]
+
+Si crees que es un error, escríbenos al +51 [(${whatsappTexto})] con tu código de reserva.
+
+[(${nombreComplejo})]

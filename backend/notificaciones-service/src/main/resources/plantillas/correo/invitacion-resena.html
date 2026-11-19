@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{base :: correo('Gracias por jugar', '¿Qué tal estuvo la cancha?', |Califica ${canchaTexto}: solo te toma un minuto.|, ~{::contenido})}">
+<body>
+<th:block th:fragment="contenido">
+    <p style="margin:0 0 12px 0;" th:text="|${saludo}:|">Hola:</p>
+    <p style="margin:0 0 12px 0;">
+        Gracias por jugar en <strong th:text="${canchaTexto}">la cancha</strong> el
+        <span th:text="${fechaTexto}">día</span>. Tu opinión ayuda a otros equipos a elegir y a nosotros a mejorar.
+    </p>
+    <p style="margin:0 0 18px 0;">
+        Califícala del 1 al 5 y cuéntanos tu experiencia. Tu reseña aparecerá como
+        <strong style="color:#27811F;">verificada</strong> porque viene de una reserva real.
+    </p>
+
+    <table th:replace="~{componentes :: boton(${urlResena}, 'Calificar la cancha')}"></table>
+
+    <p style="margin:0 0 18px 0;font-size:14px;line-height:22px;color:#4A5A68;">
+        Te pediremos tu código <strong th:text="${codigo}">ALC-XXXXXX</strong> y tu DNI para publicarla.
+        ¿Listo para el próximo partido? <a th:href="${urlReservar}" href="#" target="_blank" style="color:#27811F;font-weight:700;">Reserva de nuevo</a>.
+    </p>
+</th:block>
+</body>
+</html>

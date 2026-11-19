@@ -1,0 +1,86 @@
+server:
+  port: ${PORT:8092}
+
+spring:
+  application:
+    name: catalogo-service
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NOMBRE:alcanfores_catalogo}?serverTimezone=America/Lima&useUnicode=true&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${DB_USUARIO:root}
+    password: ${DB_CLAVE:}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: America/Lima
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jackson:
+    time-zone: America/Lima
+    serialization:
+      write-dates-as-timestamps: false
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+  rabbitmq:
+    host: ${RABBIT_HOST:localhost}
+    port: ${RABBIT_PORT:5672}
+    username: ${RABBIT_USUARIO:guest}
+    password: ${RABBIT_CLAVE:guest}
+    listener:
+      simple:
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
+          multiplier: 2
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+alcanfores:
+  jwt:
+    secreto: ${JWT_SECRETO:secreto-de-desarrollo-local-alcanfores-2026-cambiar-en-produccion}
+    horas: ${JWT_HORAS:8}
+  interno-token: ${INTERNO_TOKEN:token-interno-solo-para-desarrollo-local}
+  front-url: ${FRONT_URL:http://localhost:5186}
+  public-api-url: ${PUBLIC_API_URL:http://localhost:8086}
+  catalogo:
+    # Carpeta donde se guardan las fotos subidas (en Docker se monta un volumen aquí).
+    uploads-dir: ${UPLOADS_DIR:./uploads}
+    # Copia las fotos de src/main/resources/semilla/fotos a las canchas que aún no tienen fotos.
+    semilla-fotos: ${SEMILLA_FOTOS:true}
+    reservas-url: ${RESERVAS_URL:http://reservas-service}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  info:
+    env:
+      enabled: true
+
+info:
+  servicio: catalogo-service
+  descripcion: Canchas, fotos, reseñas verificadas y configuración del complejo
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  pattern:
+    level: "%5p [%X{idSolicitud:-}]"

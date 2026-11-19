@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org" th:fragment="correo(etiqueta, titulo, preencabezado, contenido)">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="x-apple-disable-message-reformatting">
+    <meta name="color-scheme" content="light">
+    <meta name="supported-color-schemes" content="light">
+    <title th:text="${asunto}">Complejo Deportivo Los Alcanfores</title>
+    <link href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@600;700&amp;family=Inter:wght@400;600;700&amp;display=swap" rel="stylesheet">
+    <style>
+        body { margin: 0; padding: 0; -webkit-text-size-adjust: 100%; }
+        table { border-collapse: collapse; }
+        img { border: 0; outline: none; text-decoration: none; }
+        a { color: #27811F; }
+        @media only screen and (max-width: 620px) {
+            .contenedor { width: 100% !important; border-radius: 0 !important; }
+            .exterior { padding: 0 !important; }
+            .px { padding-left: 20px !important; padding-right: 20px !important; }
+            .titulo { font-size: 26px !important; line-height: 30px !important; }
+            .codigo { font-size: 26px !important; }
+            .boton { width: 100% !important; }
+            .boton a { display: block !important; }
+        }
+    </style>
+</head>
+<body style="margin:0;padding:0;background-color:#E8F3EC;">
+<div style="display:none;max-height:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:#E8F3EC;opacity:0;"
+     th:text="${preencabezado}">Resumen del mensaje</div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background-color:#E8F3EC;">
+    <tr>
+        <td align="center" class="exterior" style="padding:24px 12px;">
+            <table role="presentation" class="contenedor" width="600" cellpadding="0" cellspacing="0" border="0"
+                   style="width:600px;max-width:600px;background-color:#FFFFFF;border-radius:16px;overflow:hidden;">
+                <!-- Franja de marca -->
+                <tr>
+                    <td style="height:6px;line-height:6px;font-size:0;background-color:#27811F;">&nbsp;</td>
+                </tr>
+                <!-- Logo (embebido como CID) -->
+                <tr>
+                    <td class="px" align="left" style="padding:22px 32px 18px 32px;">
+                        <a th:href="${urlInicio}" href="#" target="_blank" style="text-decoration:none;">
+                            <img th:src="${logoSrc}" src="cid:logo-alcanfores" width="240" alt="Alcanfores · Reserva tu cancha"
+                                 style="display:block;width:240px;max-width:240px;height:auto;">
+                        </a>
+                    </td>
+                </tr>
+                <!-- Encabezado -->
+                <tr>
+                    <td class="px" style="padding:28px 32px;background-color:#091A2A;">
+                        <p style="margin:0 0 8px 0;font-family:'Inter',Arial,Helvetica,sans-serif;font-size:12px;line-height:16px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;color:#B9DCC6;"
+                           th:text="${etiqueta}">Etiqueta</p>
+                        <h1 class="titulo" style="margin:0;font-family:'Barlow Semi Condensed',Arial,Helvetica,sans-serif;font-size:30px;line-height:34px;font-weight:700;color:#FFFFFF;"
+                            th:text="${titulo}">Título</h1>
+                    </td>
+                </tr>
+                <!-- Contenido de cada aviso -->
+                <tr>
+                    <td class="px" style="padding:28px 32px 4px 32px;font-family:'Inter',Arial,Helvetica,sans-serif;font-size:15px;line-height:24px;color:#091A2A;">
+                        <th:block th:replace="${contenido}">Contenido</th:block>
+                    </td>
+                </tr>
+                <!-- Despedida -->
+                <tr>
+                    <td class="px" style="padding:4px 32px 28px 32px;font-family:'Inter',Arial,Helvetica,sans-serif;font-size:14px;line-height:22px;color:#4A5A68;">
+                        Nos vemos en la cancha.<br>
+                        <strong style="color:#091A2A;" th:text="${nombreComplejo}">Complejo Deportivo Los Alcanfores</strong>
+                    </td>
+                </tr>
+                <!-- Pie: dirección y contacto -->
+                <tr>
+                    <td class="px" style="padding:24px 32px 18px 32px;background-color:#091A2A;font-family:'Inter',Arial,Helvetica,sans-serif;font-size:13px;line-height:20px;color:#D6E4DB;">
+                        <p style="margin:0 0 4px 0;font-weight:700;color:#FFFFFF;" th:text="${nombreComplejo}">Complejo</p>
+                        <p style="margin:0;" th:text="${direccion}">Dirección</p>
+                        <p style="margin:0 0 12px 0;color:#B9DCC6;" th:text="${referencia}">Referencia</p>
+                        <p style="margin:0;">
+                            WhatsApp <a th:href="${whatsappUrl}" href="#" target="_blank" style="color:#FFFFFF;font-weight:700;text-decoration:none;"
+                                        th:text="|+51 ${whatsappTexto}|">+51 914 995 187</a>
+                            &nbsp;·&nbsp;
+                            <a th:href="|mailto:${correoComplejo}|" href="#" style="color:#FFFFFF;text-decoration:none;"
+                               th:text="${correoComplejo}">correo</a>
+                        </p>
+                    </td>
+                </tr>
+                <!-- Aviso de privacidad (Ley 29733) -->
+                <tr>
+                    <td class="px" style="padding:14px 32px 24px 32px;background-color:#091A2A;border-top:1px solid #1E3346;font-family:'Inter',Arial,Helvetica,sans-serif;font-size:11px;line-height:17px;color:#8FA3B3;">
+                        Recibes este mensaje porque registraste una reserva en el <span th:text="${nombreComplejo}">complejo</span>.
+                        Usamos tus datos solo para gestionar tu reserva, conforme a la Ley N.° 29733 de Protección de Datos Personales.
+                        <a th:href="${urlPrivacidad}" href="#" target="_blank" style="color:#B9DCC6;">Política de privacidad</a>.
+                        Este correo se envía automáticamente; si tienes dudas, escríbenos por WhatsApp.
+                    </td>
+                </tr>
+            </table>
+            <p style="margin:16px 0 0 0;font-family:Arial,Helvetica,sans-serif;font-size:11px;line-height:16px;color:#5E7A69;"
+               th:text="|© ${anio} ${nombreComplejo}|">© Complejo Deportivo Los Alcanfores</p>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

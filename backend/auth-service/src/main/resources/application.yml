@@ -1,0 +1,89 @@
+spring:
+  application:
+    name: auth-service
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NOMBRE:alcanfores_auth}?serverTimezone=America/Lima&useUnicode=true&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${DB_USUARIO:root}
+    password: ${DB_CLAVE:}
+    hikari:
+      maximum-pool-size: ${DB_POOL:5}
+      minimum-idle: 1
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: America/Lima
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jackson:
+    time-zone: America/Lima
+    serialization:
+      write-dates-as-timestamps: false
+  rabbitmq:
+    host: ${RABBIT_HOST:localhost}
+    port: ${RABBIT_PORT:5672}
+    username: ${RABBIT_USUARIO:guest}
+    password: ${RABBIT_CLAVE:guest}
+    listener:
+      simple:
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 1s
+          multiplier: 2
+          max-interval: 10s
+
+server:
+  port: ${PORT:8091}
+  error:
+    include-message: never
+    include-stacktrace: never
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+alcanfores:
+  jwt:
+    secreto: ${JWT_SECRETO:secreto-de-desarrollo-local-alcanfores-2026-cambiar-en-produccion}
+    horas: ${JWT_HORAS:8}
+  interno-token: ${INTERNO_TOKEN:token-interno-solo-para-desarrollo-local}
+  front-url: ${FRONT_URL:http://localhost:5186}
+  public-api-url: ${PUBLIC_API_URL:http://localhost:8086}
+  auth:
+    bcrypt-fuerza: 12
+    intentos-maximos: 5
+    minutos-bloqueo: 15
+    semilla:
+      habilitada: ${SEED_HABILITADA:true}
+      clave-admin: ${SEED_CLAVE_ADMIN:Alcanfores2026}
+      clave-recepcion: ${SEED_CLAVE_RECEPCION:Recepcion2026}
+      clave-docente: ${SEED_CLAVE_DOCENTE:UTP2026}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+info:
+  servicio:
+    nombre: auth-service
+    descripcion: Administradores, login JWT, roles y bitácora del sistema de reservas Alcanfores
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html

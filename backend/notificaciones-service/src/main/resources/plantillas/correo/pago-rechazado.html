@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{base :: correo('Pago observado', 'Revisa tu comprobante de pago', |No pudimos validar el pago de la reserva ${codigo}. Envía uno nuevo.|, ~{::contenido})}">
+<body>
+<th:block th:fragment="contenido">
+    <p style="margin:0 0 12px 0;" th:text="|${saludo}:|">Hola:</p>
+    <p style="margin:0 0 18px 0;">
+        No pudimos validar el comprobante que enviaste para la reserva <strong th:text="${codigo}">ALC-XXXXXX</strong>.
+        Revisa el motivo y envía uno nuevo.
+    </p>
+
+    <table th:replace="~{componentes :: nota('Motivo de la observación', ${observacion})}"></table>
+
+    <th:block th:if="${conPlazo}">
+        <p style="margin:0;">
+            Tu turno sigue separado. Tienes plazo hasta <strong th:text="${plazo}">el plazo</strong> para reenviar el comprobante.
+        </p>
+    </th:block>
+
+    <table th:replace="~{componentes :: tarjeta(true, false)}"></table>
+
+    <table th:replace="~{componentes :: boton(${urlMiReserva}, 'Reenviar comprobante')}"></table>
+
+    <p style="margin:0 0 18px 0;font-size:14px;line-height:22px;color:#4A5A68;">
+        Si crees que es un error, escríbenos por WhatsApp al
+        <a th:href="${whatsappUrl}" href="#" target="_blank" style="color:#27811F;font-weight:700;" th:text="|+51 ${whatsappTexto}|">+51</a>
+        con tu código de reserva.
+    </p>
+</th:block>
+</body>
+</html>

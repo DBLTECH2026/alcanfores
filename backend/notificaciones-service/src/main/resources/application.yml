@@ -1,0 +1,138 @@
+server:
+  port: ${PORT:8095}
+  shutdown: graceful
+
+spring:
+  application:
+    name: notificaciones-service
+  profiles:
+    default: local
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NOMBRE:alcanfores_notificaciones}?serverTimezone=America/Lima&useUnicode=true&characterEncoding=UTF-8
+    username: ${DB_USUARIO:root}
+    password: ${DB_CLAVE:}
+    hikari:
+      maximum-pool-size: ${DB_POOL:5}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect_resolvers: pe.alcanfores.notificaciones.config.ResolutorDialecto
+        jdbc:
+          time_zone: America/Lima
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  jackson:
+    time-zone: America/Lima
+    serialization:
+      write-dates-as-timestamps: false
+  rabbitmq:
+    host: ${RABBIT_HOST:localhost}
+    port: ${RABBIT_PORT:5672}
+    username: ${RABBIT_USUARIO:guest}
+    password: ${RABBIT_CLAVE:guest}
+    listener:
+      simple:
+        auto-startup: ${RABBIT_ESCUCHAR:true}
+        default-requeue-rejected: false
+        retry:
+          enabled: true
+          max-attempts: 3
+          initial-interval: 2s
+          multiplier: 2
+  # Correo: si MAIL_HOST está vacío, los correos quedan SIMULADOS (se guarda el HTML para verlo en el panel).
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USUARIO:}
+    password: ${MAIL_CLAVE:}
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: ${MAIL_AUTH:true}
+          starttls:
+            enable: ${MAIL_STARTTLS:true}
+            required: ${MAIL_STARTTLS:true}
+          connectiontimeout: 10000
+          timeout: 15000
+          writetimeout: 15000
+  cloud:
+    circuitbreaker:
+      resilience4j:
+        # El tiempo límite lo ponen los timeouts del RestClient (3 s conexión; 3 s consultas, 10 s PDFs).
+        disable-time-limiter: true
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+alcanfores:
+  jwt:
+    secreto: ${JWT_SECRETO:secreto-de-desarrollo-local-alcanfores-2026-cambiar-en-produccion}
+    horas: ${JWT_HORAS:8}
+  interno-token: ${INTERNO_TOKEN:token-interno-solo-para-desarrollo-local}
+  front-url: ${FRONT_URL:http://localhost:5186}
+  public-api-url: ${PUBLIC_API_URL:http://localhost:8086}
+  notificaciones:
+    max-intentos: 3
+    tareas-habilitadas: ${NOTIF_TAREAS:true}
+    datos-demo: ${NOTIF_DATOS_DEMO:false}
+    correo:
+      remitente: ${MAIL_REMITENTE:informes.alcanfores@gmail.com}
+      nombre-remitente: ${MAIL_NOMBRE_REMITENTE:Complejo Deportivo Los Alcanfores}
+    evolution:
+      url: ${EVOLUTION_URL:}
+      apikey: ${EVOLUTION_APIKEY:}
+      instancia: ${EVOLUTION_INSTANCIA:alcanfores}
+      timeout-segundos: ${EVOLUTION_TIMEOUT:20}
+    recordatorio:
+      horas-por-defecto: 2
+      minutos-minimos: 30
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  health:
+    mail:
+      enabled: false
+  info:
+    env:
+      enabled: true
+
+info:
+  servicio: notificaciones-service
+  descripcion: Correo, WhatsApp (Evolution API), PDFs adjuntos y recordatorios
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  pattern:
+    level: "%5p [%X{idSolicitud:-}]"
+
+---
+# Perfil docker: mismos ajustes, con los nombres de host de docker-compose como valores por defecto.
+spring:
+  config:
+    activate:
+      on-profile: docker
+  datasource:
+    url: jdbc:mysql://${DB_HOST:mysql}:${DB_PORT:3306}/${DB_NOMBRE:alcanfores_notificaciones}?serverTimezone=America/Lima&useUnicode=true&characterEncoding=UTF-8
+  rabbitmq:
+    host: ${RABBIT_HOST:rabbitmq}
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://discovery-server:8761/eureka}

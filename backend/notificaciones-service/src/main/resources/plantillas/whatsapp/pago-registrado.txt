@@ -1,0 +1,14 @@
+*Recibimos tu comprobante*
+
+[(${saludo})]. Recibimos tu pago con [(${metodo})] por *[(${montoPago})]* ([(${tipoPago})]) de la reserva *[(${codigo})]*.
+
+Lo validamos en minutos. Cuando esté listo te enviaremos la confirmación y tu comprobante electrónico.
+
+*Cancha:* [(${canchaTexto})]
+*Fecha:* [(${fecha})]
+*Hora:* [(${horario})]
+
+Revisa el estado de tu reserva:
+[(${urlMiReserva})]
+
+[(${nombreComplejo})]

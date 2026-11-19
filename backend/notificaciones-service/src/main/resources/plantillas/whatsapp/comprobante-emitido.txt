@@ -1,0 +1,12 @@
+[# th:if="${notaCredito}"]*Nota de crédito [(${serieNumero})]*
+
+[(${saludo})]. Emitimos la nota de crédito *[(${serieNumero})]* por *[(${total})]* por la devolución registrada.[/][# th:unless="${notaCredito}"]*Tu [(${tipoComprobante})]*
+
+[(${saludo})]. Gracias por tu pago. Te enviamos tu [(${tipoComprobante})] *[(${serieNumero})]* por *[(${total})]*.[/]
+[# th:if="${conReserva}"]
+*Reserva:* [(${codigo})]
+Ver tu reserva y tus comprobantes: [(${urlMiReserva})]
+[/]
+_Comprobante simulado con fines académicos, sin validez tributaria._
+
+[(${nombreComplejo})]

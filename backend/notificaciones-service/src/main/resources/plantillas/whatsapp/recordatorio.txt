@@ -1,0 +1,16 @@
+*Tu partido es en [(${falta})]*
+
+[(${saludo})]. Te recordamos tu reserva [(${cuando})].
+
+*Código:* [(${codigo})]
+*Cancha:* [(${canchaTexto})]
+*Hora:* [(${horario})]
+[# th:if="${haySaldo}"]*Saldo a pagar:* [(${saldo})] (en recepción, antes de empezar)
+[/]
+*Llega 10 minutos antes* para cambiarte y empezar a la hora.
+
+*Dirección:* [(${direccion})]
+*Referencia:* [(${referencia})]
+Mapa: [(${mapaUrl})]
+
+[(${nombreComplejo})]

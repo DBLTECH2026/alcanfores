@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es" xmlns:th="http://www.thymeleaf.org">
+<body>
+
+<!-- Fila etiqueta / valor de una tarjeta -->
+<table>
+    <tr th:fragment="fila(etiqueta, valor)">
+        <td style="padding:8px 0;border-top:1px solid #CFE6D7;font-family:'Inter',Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;color:#4A5A68;"
+            th:text="${etiqueta}">Etiqueta</td>
+        <td align="right" style="padding:8px 0 8px 12px;border-top:1px solid #CFE6D7;font-family:'Inter',Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;font-weight:700;color:#091A2A;text-align:right;"
+            th:text="${valor}">Valor</td>
+    </tr>
+</table>
+
+<!-- Tarjeta con los datos de la reserva -->
+<table th:fragment="tarjeta(mostrarAdelanto, mostrarPagos)" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+       style="width:100%;margin:20px 0;background-color:#E8F3EC;border:1px solid #B9DCC6;border-radius:12px;">
+    <tr>
+        <td style="padding:18px 22px 4px 22px;">
+            <p style="margin:0;font-family:'Inter',Arial,Helvetica,sans-serif;font-size:11px;line-height:16px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;color:#0B5D33;">
+                Código de reserva</p>
+            <p class="codigo" style="margin:2px 0 0 0;font-family:'Barlow Semi Condensed',Arial,Helvetica,sans-serif;font-size:30px;line-height:36px;font-weight:700;letter-spacing:2px;color:#091A2A;"
+               th:text="${codigo}">ALC-XXXXXX</p>
+        </td>
+    </tr>
+    <tr>
+        <td style="padding:8px 22px 14px 22px;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+                <tr th:replace="~{componentes :: fila('Cancha', ${canchaTexto})}"></tr>
+                <tr th:replace="~{componentes :: fila('Fecha', ${fecha})}"></tr>
+                <tr th:replace="~{componentes :: fila('Hora', ${horario})}"></tr>
+                <tr th:replace="~{componentes :: fila('Total', ${montoTotal})}"></tr>
+                <th:block th:if="${mostrarAdelanto}">
+                    <tr th:replace="~{componentes :: fila('Adelanto para confirmar', ${montoAdelanto})}"></tr>
+                </th:block>
+                <th:block th:if="${mostrarPagos and hayPago}">
+                    <tr th:replace="~{componentes :: fila('Pagado', ${montoPagado})}"></tr>
+                </th:block>
+                <th:block th:if="${mostrarPagos and haySaldo}">
+                    <tr th:replace="~{componentes :: fila('Saldo a pagar en el complejo', ${saldo})}"></tr>
+                </th:block>
+            </table>
+        </td>
+    </tr>
+</table>
+
+<!-- Botón principal (verde Alcanfores) -->
+<table th:fragment="boton(url, texto)" role="presentation" class="boton" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 22px 0;">
+    <tr>
+        <td align="center" bgcolor="#27811F" style="border-radius:10px;background-color:#27811F;">
+            <a th:href="${url}" href="#" target="_blank" th:text="${texto}"
+               style="display:inline-block;padding:14px 28px;font-family:'Inter',Arial,Helvetica,sans-serif;font-size:15px;line-height:20px;font-weight:700;color:#FFFFFF;text-decoration:none;border-radius:10px;">Botón</a>
+        </td>
+    </tr>
+</table>
+
+<!-- Botón secundario (contorno azul noche) -->
+<table th:fragment="botonSecundario(url, texto)" role="presentation" class="boton" cellpadding="0" cellspacing="0" border="0" style="margin:4px 0 4px 0;">
+    <tr>
+        <td align="center" style="border-radius:10px;border:2px solid #091A2A;">
+            <a th:href="${url}" href="#" target="_blank" th:text="${texto}"
+               style="display:inline-block;padding:11px 22px;font-family:'Inter',Arial,Helvetica,sans-serif;font-size:14px;line-height:20px;font-weight:700;color:#091A2A;text-decoration:none;border-radius:10px;">Botón</a>
+        </td>
+    </tr>
+</table>
+
+<!-- Nota de atención (acento amarillo gol) -->
+<table th:fragment="nota(titulo, texto)" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+       style="width:100%;margin:0 0 20px 0;background-color:#FFF8E1;border-left:4px solid #F2B705;border-radius:8px;">
+    <tr>
+        <td style="padding:14px 18px;font-family:'Inter',Arial,Helvetica,sans-serif;font-size:14px;line-height:21px;color:#091A2A;">
+            <strong th:text="${titulo}">Título</strong><br>
+            <span th:text="${texto}">Texto</span>
+        </td>
+    </tr>
+</table>
+
+<!-- Nota positiva (verde) -->
+<table th:fragment="notaVerde(titulo, texto)" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+       style="width:100%;margin:0 0 20px 0;background-color:#E8F3EC;border-left:4px solid #27811F;border-radius:8px;">
+    <tr>
+        <td style="padding:14px 18px;font-family:'Inter',Arial,Helvetica,sans-serif;font-size:14px;line-height:21px;color:#091A2A;">
+            <strong style="color:#0B5D33;" th:text="${titulo}">Título</strong><br>
+            <span th:text="${texto}">Texto</span>
+        </td>
+    </tr>
+</table>
+
+<!-- Cómo llegar: dirección, referencia y enlace a Google Maps -->
+<table th:fragment="comoLlegar" role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+       style="width:100%;margin:0 0 22px 0;border:1px solid #DDE7E1;border-radius:12px;">
+    <tr>
+        <td style="padding:16px 20px;font-family:'Inter',Arial,Helvetica,sans-serif;font-size:14px;line-height:21px;color:#091A2A;">
+            <p style="margin:0 0 6px 0;font-family:'Barlow Semi Condensed',Arial,Helvetica,sans-serif;font-size:19px;line-height:24px;font-weight:700;color:#091A2A;">
+                Cómo llegar</p>
+            <p style="margin:0;" th:text="${direccion}">Dirección</p>
+            <p style="margin:0 0 12px 0;font-size:13px;color:#4A5A68;" th:text="${referencia}">Referencia</p>
+            <table th:replace="~{componentes :: botonSecundario(${mapaUrl}, 'Abrir en Google Maps')}"></table>
+        </td>
+    </tr>
+</table>
+
+</body>
+</html>

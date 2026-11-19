@@ -1,0 +1,36 @@
+spring:
+  datasource:
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/alcanfores_reservas_test?serverTimezone=America/Lima&useUnicode=true&characterEncoding=UTF-8&allowPublicKeyRetrieval=true&useSSL=false
+    username: ${DB_USUARIO:root}
+    password: ${DB_CLAVE:}
+  flyway:
+    clean-disabled: false
+  rabbitmq:
+    listener:
+      simple:
+        auto-startup: false
+  cloud:
+    discovery:
+      enabled: false
+
+management:
+  health:
+    rabbit:
+      enabled: false
+
+eureka:
+  client:
+    enabled: false
+
+alcanfores:
+  reservas:
+    tareas-habilitadas: false
+    semilla:
+      habilitada: false
+    factiliza:
+      token: ""
+
+logging:
+  level:
+    root: WARN
+    pe.alcanfores: INFO

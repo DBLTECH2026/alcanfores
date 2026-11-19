@@ -1,0 +1,12 @@
+eureka:
+  client:
+    enabled: false
+    service-url:
+      # Puerto cerrado: en las pruebas Eureka siempre figura DOWN en /api/estado.
+      defaultZone: http://localhost:1/eureka
+
+alcanfores:
+  front-url: http://localhost:5186, https://alcanfores.pe/
+  gateway:
+    # Tiempos cortos para probar el fallback por demora sin alargar la suite.
+    timeout: 1s

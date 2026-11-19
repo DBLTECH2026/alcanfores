@@ -1,0 +1,37 @@
+# Java / Maven
+target/
+*.class
+*.log
+hs_err_pid*
+
+# Archivos subidos y datos locales
+uploads/
+**/uploads/
+
+# Node / Vite
+node_modules/
+dist/
+.vite/
+coverage/
+playwright-report/
+test-results/
+
+# Entornos y secretos (NUNCA al repo: es público)
+.env
+.env.*
+!.env.example
+deploy/.env
+
+# IDE / SO
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Fotos originales pesadas (las JPG optimizadas sí van en el repo)
+docs/fotos-canchas/*.png
+
+# Capturas (van al escritorio y al informe, no al repositorio)
+docs/capturas-front/
+docs/capturas-reales/

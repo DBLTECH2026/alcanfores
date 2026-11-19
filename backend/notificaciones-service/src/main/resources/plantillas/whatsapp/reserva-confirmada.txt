@@ -1,0 +1,18 @@
+*Reserva confirmada*
+
+[(${saludo})]. Validamos tu pago: tu cancha está asegurada.
+
+*Código:* [(${codigo})]
+*Cancha:* [(${canchaTexto})]
+*Fecha:* [(${fecha})]
+*Hora:* [(${horario})]
+*Pagado:* [(${montoPagado})]
+[# th:if="${haySaldo}"]*Saldo a pagar en el complejo:* [(${saldo})][/][# th:unless="${haySaldo}"]Pagaste el total: solo llega y juega.[/]
+
+*Cómo llegar:* [(${direccion})] ([(${referencia})]).
+Mapa: [(${mapaUrl})]
+
+Te adjuntamos la constancia y te enviaremos un recordatorio antes del partido.
+Ver tu reserva: [(${urlMiReserva})]
+
+[(${nombreComplejo})]

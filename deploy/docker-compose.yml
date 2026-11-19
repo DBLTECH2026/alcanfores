@@ -1,0 +1,227 @@
+# Alcanfores · sistema de reservas con microservicios (producción en el VPS).
+# Red «interna»: todos los servicios. Solo «alcanfores-web» se une además a la red del Caddy (sirac_default),
+# que publica https://alcanfores.dbltech.tech con SSL automático. notificaciones-service también se une para
+# hablar con el servidor de Evolution API (WhatsApp) que ya corre en el VPS.
+name: alcanfores
+
+x-java: &java
+  restart: unless-stopped
+  networks: [interna]
+  depends_on:
+    discovery-server: { condition: service_healthy }
+    mysql: { condition: service_healthy }
+    rabbitmq: { condition: service_healthy }
+  logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+
+x-entorno-comun: &entorno-comun
+  TZ: America/Lima
+  DB_HOST: mysql
+  DB_PORT: "3306"
+  EUREKA_URL: http://discovery-server:8761/eureka
+  EUREKA_INSTANCE_PREFER_IP_ADDRESS: "false"
+  RABBIT_HOST: rabbitmq
+  RABBIT_PORT: "5672"
+  RABBIT_USUARIO: ${RABBIT_USUARIO}
+  RABBIT_CLAVE: ${RABBIT_CLAVE}
+  JWT_SECRETO: ${JWT_SECRETO}
+  JWT_HORAS: "8"
+  INTERNO_TOKEN: ${INTERNO_TOKEN}
+  FRONT_URL: ${FRONT_URL}
+  PUBLIC_API_URL: ${PUBLIC_API_URL}
+
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    command: ["--innodb-buffer-pool-size=256M", "--max-connections=200", "--default-time-zone=-05:00"]
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_CLAVE}
+      TZ: America/Lima
+      DB_CLAVE_AUTH: ${DB_CLAVE_AUTH}
+      DB_CLAVE_CATALOGO: ${DB_CLAVE_CATALOGO}
+      DB_CLAVE_RESERVAS: ${DB_CLAVE_RESERVAS}
+      DB_CLAVE_PAGOS: ${DB_CLAVE_PAGOS}
+      DB_CLAVE_NOTIFICACIONES: ${DB_CLAVE_NOTIFICACIONES}
+    volumes:
+      - mysql_datos:/var/lib/mysql
+      - ./mysql:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "127.0.0.1:3307:3306"   # solo dentro del VPS (Workbench entra por túnel SSH)
+    networks: [interna]
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+    deploy: { resources: { limits: { memory: 640m } } }
+
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    restart: unless-stopped
+    hostname: alcanfores-rabbit
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBIT_USUARIO}
+      RABBITMQ_DEFAULT_PASS: ${RABBIT_CLAVE}
+    volumes:
+      - rabbit_datos:/var/lib/rabbitmq
+    ports:
+      - "127.0.0.1:5673:5672"     # AMQP solo dentro del VPS (túnel SSH para desarrollo)
+      - "127.0.0.1:15673:15672"   # consola de administración solo por túnel SSH
+    networks: [interna]
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+    deploy: { resources: { limits: { memory: 384m } } }
+
+  discovery-server:
+    build: { context: ../backend, args: { MODULO: discovery-server } }
+    image: alcanfores/discovery-server:${VERSION:-local}
+    restart: unless-stopped
+    environment:
+      TZ: America/Lima
+      EUREKA_INSTANCE_HOSTNAME: discovery-server
+    ports:
+      - "127.0.0.1:8761:8761"     # panel de Eureka solo por túnel SSH
+    networks: [interna]
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8761/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+    deploy: { resources: { limits: { memory: 320m } } }
+
+  api-gateway:
+    <<: *java
+    build: { context: ../backend, args: { MODULO: api-gateway } }
+    image: alcanfores/api-gateway:${VERSION:-local}
+    depends_on:
+      discovery-server: { condition: service_healthy }
+    environment:
+      <<: *entorno-comun
+      EUREKA_INSTANCE_HOSTNAME: api-gateway
+    healthcheck:
+      test: ["CMD", "curl", "-fs", "http://localhost:8086/actuator/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 60s
+    deploy: { resources: { limits: { memory: 384m } } }
+
+  auth-service:
+    <<: *java
+    build: { context: ../backend, args: { MODULO: auth-service } }
+    image: alcanfores/auth-service:${VERSION:-local}
+    environment:
+      <<: *entorno-comun
+      EUREKA_INSTANCE_HOSTNAME: auth-service
+      SERVER_PORT: "8091"
+      DB_USUARIO: auth_svc
+      DB_CLAVE: ${DB_CLAVE_AUTH}
+      SEED_CLAVE_ADMIN: ${SEED_CLAVE_ADMIN}
+      SEED_CLAVE_RECEPCION: ${SEED_CLAVE_RECEPCION}
+      SEED_CLAVE_DOCENTE: ${SEED_CLAVE_DOCENTE}
+    healthcheck: &salud
+      test: ["CMD-SHELL", "curl -fs http://localhost:$${SERVER_PORT}/actuator/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 90s
+    deploy: { resources: { limits: { memory: 384m } } }
+
+  catalogo-service:
+    <<: *java
+    build: { context: ../backend, args: { MODULO: catalogo-service } }
+    image: alcanfores/catalogo-service:${VERSION:-local}
+    environment:
+      <<: *entorno-comun
+      EUREKA_INSTANCE_HOSTNAME: catalogo-service
+      SERVER_PORT: "8092"
+      DB_USUARIO: catalogo_svc
+      DB_CLAVE: ${DB_CLAVE_CATALOGO}
+      UPLOADS_DIR: /app/uploads
+    volumes:
+      - catalogo_archivos:/app/uploads
+    healthcheck: *salud
+    deploy: { resources: { limits: { memory: 384m } } }
+
+  reservas-service:
+    <<: *java
+    build: { context: ../backend, args: { MODULO: reservas-service } }
+    image: alcanfores/reservas-service:${VERSION:-local}
+    environment:
+      <<: *entorno-comun
+      EUREKA_INSTANCE_HOSTNAME: reservas-service
+      SERVER_PORT: "8093"
+      DB_USUARIO: reservas_svc
+      DB_CLAVE: ${DB_CLAVE_RESERVAS}
+      FACTILIZA_TOKEN: ${FACTILIZA_TOKEN:-}
+    healthcheck: *salud
+    deploy: { resources: { limits: { memory: 448m } } }
+
+  pagos-service:
+    <<: *java
+    build: { context: ../backend, args: { MODULO: pagos-service } }
+    image: alcanfores/pagos-service:${VERSION:-local}
+    environment:
+      <<: *entorno-comun
+      EUREKA_INSTANCE_HOSTNAME: pagos-service
+      SERVER_PORT: "8094"
+      DB_USUARIO: pagos_svc
+      DB_CLAVE: ${DB_CLAVE_PAGOS}
+      UPLOADS_DIR: /app/uploads
+      PASARELA_BETA_SECRETO: ${PASARELA_BETA_SECRETO}
+      MP_ACCESS_TOKEN: ${MP_ACCESS_TOKEN:-}
+      MP_WEBHOOK_SECRETO: ${MP_WEBHOOK_SECRETO:-}
+    volumes:
+      - pagos_archivos:/app/uploads
+    healthcheck: *salud
+    deploy: { resources: { limits: { memory: 448m } } }
+
+  notificaciones-service:
+    <<: *java
+    build: { context: ../backend, args: { MODULO: notificaciones-service } }
+    image: alcanfores/notificaciones-service:${VERSION:-local}
+    environment:
+      <<: *entorno-comun
+      EUREKA_INSTANCE_HOSTNAME: notificaciones-service
+      SERVER_PORT: "8095"
+      DB_USUARIO: notificaciones_svc
+      DB_CLAVE: ${DB_CLAVE_NOTIFICACIONES}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USUARIO: ${MAIL_USUARIO:-}
+      MAIL_CLAVE: ${MAIL_CLAVE:-}
+      MAIL_REMITENTE: ${MAIL_REMITENTE:-}
+      EVOLUTION_URL: ${EVOLUTION_URL:-}
+      EVOLUTION_APIKEY: ${EVOLUTION_APIKEY:-}
+      EVOLUTION_INSTANCIA: ${EVOLUTION_INSTANCIA:-alcanfores}
+    networks: [interna, sirac_default]
+    healthcheck: *salud
+    deploy: { resources: { limits: { memory: 384m } } }
+
+  alcanfores-web:
+    build: { context: .., dockerfile: deploy/web/Dockerfile }
+    image: alcanfores/web:${VERSION:-local}
+    restart: unless-stopped
+    depends_on: [api-gateway]
+    networks: [interna, sirac_default]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/salud"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    deploy: { resources: { limits: { memory: 64m } } }
+
+volumes:
+  mysql_datos:
+  rabbit_datos:
+  catalogo_archivos:
+  pagos_archivos:
+
+networks:
+  interna: {}
+  sirac_default:
+    external: true

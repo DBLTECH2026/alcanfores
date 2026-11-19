@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{base :: correo('Reserva confirmada', 'Tu cancha está asegurada', |Te esperamos el ${fechaTexto} a las ${horaInicio} · Reserva ${codigo}|, ~{::contenido})}">
+<body>
+<th:block th:fragment="contenido">
+    <p style="margin:0 0 12px 0;" th:text="|${saludo}:|">Hola:</p>
+    <p style="margin:0;">
+        Validamos tu pago y tu reserva quedó <strong style="color:#27811F;">confirmada</strong>.
+        Te esperamos el <strong th:text="${fechaTexto}">día</strong> a las <strong th:text="${horaInicio}">hora</strong>
+    </p>
+
+    <table th:replace="~{componentes :: tarjeta(false, true)}"></table>
+
+    <th:block th:if="${haySaldo}">
+        <table th:replace="~{componentes :: notaVerde(|Saldo a pagar en el complejo: ${saldo}|, 'Págalo en recepción antes de empezar: efectivo, Yape, Plin o tarjeta.')}"></table>
+    </th:block>
+    <th:block th:unless="${haySaldo}">
+        <table th:replace="~{componentes :: notaVerde('Pagaste el total', 'No tienes saldo pendiente: solo llega y juega.')}"></table>
+    </th:block>
+
+    <table th:replace="~{componentes :: comoLlegar}"></table>
+
+    <table th:replace="~{componentes :: boton(${urlMiReserva}, 'Ver mi reserva')}"></table>
+
+    <p style="margin:0 0 18px 0;font-size:14px;line-height:22px;color:#4A5A68;">
+        Te adjuntamos la constancia en PDF. Te enviaremos un recordatorio
+        <span th:text="${recordatorioHoras == 1 ? '1 hora' : recordatorioHoras + ' horas'}">2 horas</span> antes del partido.
+        Si necesitas cancelar, hazlo desde «Mi reserva»: con al menos
+        <span th:text="${devolucionHoras}">24</span> horas de anticipación te devolvemos lo pagado.
+    </p>
+</th:block>
+</body>
+</html>

@@ -1,0 +1,18 @@
+*Reserva confirmada*
+
+Hola, Diego. Validamos tu pago: tu cancha está asegurada.
+
+*Código:* ALC-7K3M9P
+*Cancha:* Cancha 1 · Fútbol 5
+*Fecha:* Jueves 19 de noviembre de 2026
+*Hora:* 12:00 a. m. a 1:00 a. m.
+*Pagado:* S/ 40.00
+*Saldo a pagar en el complejo:* S/ 40.00
+
+*Cómo llegar:* Carretera Central km 11.5, Santa Clara, Ate (Paradero Caseta, a dos cuadras de la UTP Santa Clara).
+Mapa: https://www.google.com/maps/search/?api=1&query=Complejo+Deportivo+Los+Alcanfores+Santa+Clara+Ate
+
+Te adjuntamos la constancia y te enviaremos un recordatorio antes del partido.
+Ver tu reserva: http://localhost:5186/mi-reserva?codigo=ALC-7K3M9P
+
+Complejo Deportivo Los Alcanfores

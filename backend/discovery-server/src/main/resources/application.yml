@@ -1,0 +1,49 @@
+spring:
+  application:
+    name: discovery-server
+  jackson:
+    time-zone: America/Lima
+
+server:
+  port: ${PORT:8761}
+
+eureka:
+  instance:
+    hostname: ${EUREKA_HOSTNAME:localhost}
+    prefer-ip-address: true
+  client:
+    # El servidor no se registra a sí mismo ni descarga el registro (nodo único).
+    register-with-eureka: false
+    fetch-registry: false
+    service-url:
+      defaultZone: http://${eureka.instance.hostname}:${server.port}/eureka/
+  server:
+    # Autopreservación: en producción conviene dejarla activa; en local o en demo se apaga con
+    # EUREKA_AUTOPRESERVACION=false para que las instancias caídas desaparezcan rápido del registro.
+    enable-self-preservation: ${EUREKA_AUTOPRESERVACION:true}
+    eviction-interval-timer-in-ms: ${EUREKA_DESALOJO_MS:30000}
+    renewal-percent-threshold: 0.85
+    # Sin espera inicial: el registro responde apenas arranca (no hay réplicas de las que copiar).
+    wait-time-in-ms-when-sync-empty: 0
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+  info:
+    env:
+      enabled: true
+
+info:
+  servicio:
+    nombre: discovery-server
+    descripcion: Registro de servicios Eureka del sistema de reservas Alcanfores
+
+logging:
+  level:
+    com.netflix.eureka: WARN
+    com.netflix.discovery: WARN

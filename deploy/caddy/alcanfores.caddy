@@ -1,0 +1,10 @@
+# Sitio de Alcanfores en el Caddy del VPS (se copia a /opt/caddy-extra/alcanfores.caddy).
+# Caddy obtiene y renueva el certificado SSL de Let's Encrypt automáticamente.
+alcanfores.dbltech.tech {
+    encode zstd gzip
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        -Server
+    }
+    reverse_proxy alcanfores-web:80
+}

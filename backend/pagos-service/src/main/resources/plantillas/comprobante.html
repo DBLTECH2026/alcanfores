@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="es">
+<head>
+    <meta charset="UTF-8"/>
+    <title th:text="${tituloDocumento}">Comprobante</title>
+    <style>
+        @page {
+            size: A4;
+            margin: 15mm 14mm 24mm 14mm;
+            @bottom-center { content: element(pie); }
+        }
+        * { box-sizing: border-box; }
+        body { font-family: 'Inter', sans-serif; font-size: 8.6pt; color: #091A2A; margin: 0; line-height: 1.35; }
+        .titulo { font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 700; letter-spacing: 0.3pt; }
+
+        .marca-agua {
+            position: fixed; top: 372pt; left: -130pt; width: 820pt; z-index: -1;
+            transform: rotate(-36deg); text-align: center;
+            font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 700; font-size: 25pt;
+            color: #DDEBE1; letter-spacing: 1.5pt;
+        }
+        .pie { position: running(pie); font-size: 7pt; color: #5B6B78; text-align: center; border-top: 0.6pt solid #B9DCC6; padding-top: 5pt; }
+        .pie .pagina::after { content: "Página " counter(page) " de " counter(pages); }
+
+        table { border-collapse: collapse; width: 100%; }
+        .cabecera td { vertical-align: top; }
+        .logo { height: 44pt; }
+        .emisor-razon { font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 700; font-size: 11.5pt; margin-top: 7pt; text-transform: uppercase; }
+        .emisor-dato { color: #3D4F5E; font-size: 8pt; }
+
+        .recuadro { border: 1.4pt solid #0B5D33; border-radius: 6pt; text-align: center; overflow: hidden; }
+        .recuadro .ruc { font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 700; font-size: 12.5pt; padding: 9pt 6pt 6pt 6pt; }
+        .recuadro .tipo { background-color: #0B5D33; color: #FFFFFF; font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 700; font-size: 11pt; padding: 6pt 6pt; letter-spacing: 0.4pt; }
+        .recuadro .numero { font-family: 'Barlow Semi Condensed', sans-serif; font-weight: 700; font-size: 15pt; padding: 7pt 6pt 9pt 6pt; color: #091A2A; }
+        .simulado { margin-top: 5pt; text-align: center; font-size: 6.8pt; font-weight: 600; color: #7A5A00; background-color: #FDF3D0; border-radius: 3pt; padding: 2.5pt 4pt; }
+
+        .seccion { margin-top: 12pt; }
+        .tarjeta { border: 0.8pt solid #B9DCC6; border-radius: 5pt; padding: 7pt 9pt; }
+        .datos td { padding: 2.2pt 4pt 2.2pt 0; vertical-align: top; }
+        .etiqueta { color: #5B6B78; font-weight: 600; width: 74pt; white-space: nowrap; }
+        .valor { font-weight: 600; }
+        .modifica { margin-top: 8pt; border-left: 3pt solid #F2B705; background-color: #FFFBEA; padding: 6pt 9pt; border-radius: 3pt; }
+
+        .items { margin-top: 12pt; }
+        .items th { background-color: #091A2A; color: #FFFFFF; font-weight: 600; font-size: 7.6pt; padding: 6pt 6pt; text-align: left; }
+        .items th.num, .items td.num { text-align: right; }
+        .items th:first-child { border-top-left-radius: 4pt; }
+        .items th:last-child { border-top-right-radius: 4pt; }
+        .items td { padding: 8pt 6pt; border-bottom: 0.8pt solid #D7E6DC; vertical-align: top; }
+        .codigo-item { color: #5B6B78; font-size: 7pt; }
+
+        .resumen { margin-top: 10pt; }
+        .resumen td { vertical-align: top; }
+        .letras { border: 0.8pt solid #B9DCC6; border-radius: 5pt; padding: 7pt 9pt; background-color: #E8F3EC; }
+        .letras .son { font-weight: 700; color: #0B5D33; }
+        .totales td { padding: 3pt 6pt; }
+        .totales .t-etq { color: #3D4F5E; text-align: right; }
+        .totales .t-val { text-align: right; font-weight: 600; width: 68pt; }
+        .totales tr.total td { background-color: #27811F; color: #FFFFFF; font-weight: 700; font-size: 10.5pt; padding: 6pt 6pt; }
+        .totales tr.total td.t-etq { border-top-left-radius: 4pt; border-bottom-left-radius: 4pt; }
+        .totales tr.total td.t-val { border-top-right-radius: 4pt; border-bottom-right-radius: 4pt; }
+
+        .validacion { margin-top: 16pt; }
+        .validacion td { vertical-align: middle; }
+        .qr { width: 92pt; height: 92pt; }
+        .hash { font-family: 'Inter', monospace; font-weight: 600; letter-spacing: 0.2pt; }
+        .estado { display: inline-block; background-color: #E8F3EC; color: #0B5D33; font-weight: 700; border-radius: 8pt; padding: 2pt 7pt; font-size: 7.6pt; }
+        .nota-legal { color: #5B6B78; font-size: 7.4pt; margin-top: 4pt; }
+        .cancelado { color: #B3261E; font-weight: 700; }
+    </style>
+</head>
+<body>
+<div class="marca-agua">DOCUMENTO DE PRUEBA · SIN VALIDEZ TRIBUTARIA</div>
+
+<div class="pie">
+    <div th:text="${textoPie}">Representación impresa de la boleta de venta electrónica (simulada) · Proyecto académico UTP</div>
+    <div><span>Consulta tu reserva en el portal con el código </span><span th:text="${codigoReserva}">ALC-XXXXXX</span><span> · </span><span class="pagina"></span></div>
+</div>
+
+<table class="cabecera">
+    <tr>
+        <td style="width: 60%; padding-right: 14pt;">
+            <img class="logo" th:src="${logo}" src="" alt="Complejo Deportivo Los Alcanfores"/>
+            <div class="emisor-razon" th:text="${emisorRazonSocial}">Los Alcanfores Sport E.I.R.L. (ficticia)</div>
+            <div class="emisor-dato">Complejo Deportivo Los Alcanfores</div>
+            <div class="emisor-dato" th:text="${emisorDireccion}">Carretera Central km 11.5, Santa Clara, Ate, Lima</div>
+            <div class="emisor-dato" th:text="${emisorContacto}">WhatsApp +51 914 995 187 · informes.alcanfores@gmail.com</div>
+        </td>
+        <td style="width: 40%;">
+            <div class="recuadro">
+                <div class="ruc" th:text="${'R.U.C. N.° ' + emisorRuc}">R.U.C. N.° 20612345679</div>
+                <div class="tipo" th:text="${tituloTipo}">BOLETA DE VENTA ELECTRÓNICA</div>
+                <div class="numero" th:text="${serieNumero}">B001-00000001</div>
+            </div>
+            <div class="simulado">SIMULADO · NO ENVIADO A SUNAT</div>
+        </td>
+    </tr>
+</table>
+
+<div class="seccion tarjeta">
+    <table class="datos">
+        <tr>
+            <td class="etiqueta">Señor(es)</td>
+            <td class="valor" th:text="${clienteNombre}">Cliente</td>
+            <td class="etiqueta">Fecha de emisión</td>
+            <td class="valor" th:text="${fechaEmision}">18/11/2026</td>
+        </tr>
+        <tr>
+            <td class="etiqueta" th:text="${clienteEtiquetaDoc}">DNI</td>
+            <td class="valor" th:text="${clienteNumDoc}">00000000</td>
+            <td class="etiqueta">Hora de emisión</td>
+            <td class="valor" th:text="${horaEmision}">7:00 p. m.</td>
+        </tr>
+        <tr>
+            <td class="etiqueta">Dirección</td>
+            <td th:text="${clienteDireccion}">—</td>
+            <td class="etiqueta">Moneda</td>
+            <td>SOLES (PEN)</td>
+        </tr>
+        <tr>
+            <td class="etiqueta">Reserva</td>
+            <td class="valor" th:text="${codigoReserva}">ALC-XXXXXX</td>
+            <td class="etiqueta">Forma de pago</td>
+            <td th:text="${formaPago}">Contado</td>
+        </tr>
+    </table>
+    <div class="modifica" th:if="${esNota}">
+        <div><b>Documento que modifica: </b><span th:text="${referenciaTexto}">Boleta B001-00000001 del 18/11/2026</span></div>
+        <div><b>Tipo de nota de crédito: </b><span th:text="${tipoNota}">01 · Anulación de la operación</span></div>
+        <div><b>Sustento: </b><span th:text="${motivo}">Motivo</span></div>
+    </div>
+    <div class="modifica" th:if="${anulado}">
+        <span class="cancelado">COMPROBANTE ANULADO</span><span th:text="${anuladoPor}"> con nota de crédito</span>
+    </div>
+</div>
+
+<table class="items">
+    <thead>
+    <tr>
+        <th style="width: 34pt;" class="num">Cant.</th>
+        <th style="width: 40pt;">Unidad</th>
+        <th>Descripción</th>
+        <th style="width: 66pt;" class="num">Valor unitario</th>
+        <th style="width: 66pt;" class="num">Importe</th>
+    </tr>
+    </thead>
+    <tbody>
+    <tr class="fila">
+        <td class="num">1.00</td>
+        <td>ZZ</td>
+        <td>
+            <div th:utext="${descripcion}">Alquiler de cancha</div>
+            <div class="codigo-item">Código ALQ-CANCHA · Servicio (unidad ZZ) · Afecto al IGV</div>
+        </td>
+        <td class="num" th:text="${valorUnitario}">0.00</td>
+        <td class="num" th:text="${importe}">0.00</td>
+    </tr>
+    </tbody>
+</table>
+
+<table class="resumen">
+    <tr>
+        <td style="width: 56%; padding-right: 14pt;">
+            <div class="letras">
+                <span class="son">SON: </span><span th:text="${montoLetras}">CERO CON 00/100 SOLES</span>
+            </div>
+            <div class="nota-legal">Precio con IGV incluido (18 %). Operación gravada con el IGV.</div>
+        </td>
+        <td style="width: 44%;">
+            <table class="totales">
+                <tr><td class="t-etq">Op. gravada</td><td class="t-val" th:text="${'S/ ' + opGravada}">S/ 0.00</td></tr>
+                <tr><td class="t-etq">Op. exonerada</td><td class="t-val">S/ 0.00</td></tr>
+                <tr><td class="t-etq">Op. inafecta</td><td class="t-val">S/ 0.00</td></tr>
+                <tr><td class="t-etq">IGV (18 %)</td><td class="t-val" th:text="${'S/ ' + igv}">S/ 0.00</td></tr>
+                <tr class="total"><td class="t-etq" style="color: #FFFFFF;">Importe total</td><td class="t-val" th:text="${'S/ ' + total}">S/ 0.00</td></tr>
+            </table>
+        </td>
+    </tr>
+</table>
+
+<table class="validacion tarjeta">
+    <tr>
+        <td style="width: 104pt;"><img class="qr" th:src="${qr}" src="" alt="Código QR"/></td>
+        <td>
+            <div><span style="color: #5B6B78; font-weight: 600;">Valor resumen: </span><span class="hash" th:text="${valorResumen}">hash</span></div>
+            <div style="margin-top: 4pt;"><span style="color: #5B6B78; font-weight: 600;">Estado SUNAT: </span><span class="estado" th:text="${estadoSunat}">ACEPTADO (SIMULADO)</span></div>
+            <div class="nota-legal" th:text="${textoPie}">Representación impresa</div>
+            <div class="nota-legal">Documento generado por el sistema de reservas como ejemplo académico: no fue enviado a SUNAT, no tiene firma digital y no sustenta costo ni crédito fiscal.</div>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

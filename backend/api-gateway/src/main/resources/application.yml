@@ -1,0 +1,165 @@
+spring:
+  application:
+    name: api-gateway
+  main:
+    web-application-type: reactive
+  jackson:
+    time-zone: America/Lima
+    serialization:
+      write-dates-as-timestamps: false
+  cloud:
+    gateway:
+      server:
+        webflux:
+          discovery:
+            locator:
+              enabled: false
+          # Sin trusted-proxies el gateway borra todo X-Forwarded-* hacia los servicios y la bitácora perdería la IP
+          # del cliente. FiltroIpCliente deja primero un solo valor (la IP del cliente) y el gateway agrega la del salto.
+          # En producción el proxy inverso debe ESCRIBIR X-Forwarded-For con $remote_addr (no agregarlo).
+          trusted-proxies: ${GATEWAY_PROXIES_CONFIABLES:.*}
+          httpclient:
+            connect-timeout: 3000
+            response-timeout: ${alcanfores.gateway.timeout}
+          default-filters:
+            # Nadie de afuera puede hacerse pasar por otro microservicio.
+            - RemoveRequestHeader=X-Interno-Token
+            - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials Vary X-Request-Id, RETAIN_FIRST
+          routes:
+            # --- auth-service ---
+            - id: auth
+              uri: lb://auth-service
+              predicates:
+                - Path=/api/auth/**,/api/admin/usuarios/**,/api/admin/bitacora/**
+              filters:
+                - name: CircuitBreaker
+                  args: { name: auth, fallbackUri: "forward:/fallback/auth" }
+
+            # --- catalogo-service (las fotos tienen más tiempo) ---
+            - id: catalogo-archivos
+              order: -1
+              uri: lb://catalogo-service
+              predicates:
+                - Path=/api/admin/canchas/*/fotos,/api/admin/canchas/*/fotos/**,/api/catalogo/fotos/**
+              metadata:
+                response-timeout: ${alcanfores.gateway.timeout-archivos-ms}
+              filters:
+                - name: CircuitBreaker
+                  args: { name: catalogo-archivos, fallbackUri: "forward:/fallback/catalogo" }
+            - id: catalogo
+              uri: lb://catalogo-service
+              predicates:
+                - Path=/api/catalogo/**,/api/admin/canchas/**,/api/admin/resenas/**,/api/admin/configuracion/**
+              filters:
+                - name: CircuitBreaker
+                  args: { name: catalogo, fallbackUri: "forward:/fallback/catalogo" }
+
+            # --- reservas-service (constancia PDF y Excel tienen más tiempo) ---
+            - id: reservas-archivos
+              order: -1
+              uri: lb://reservas-service
+              predicates:
+                - Path=/api/reservas/*/constancia.pdf,/api/admin/reportes/reservas.xlsx
+              metadata:
+                response-timeout: ${alcanfores.gateway.timeout-archivos-ms}
+              filters:
+                - name: CircuitBreaker
+                  args: { name: reservas-archivos, fallbackUri: "forward:/fallback/reservas" }
+            - id: reservas
+              uri: lb://reservas-service
+              predicates:
+                - Path=/api/disponibilidad/**,/api/reservas/**,/api/documentos/**,/api/admin/reservas/**,/api/admin/turnos/**,/api/admin/clientes/**,/api/admin/dashboard/**,/api/admin/reportes/reservas/**
+              filters:
+                - name: CircuitBreaker
+                  args: { name: reservas, fallbackUri: "forward:/fallback/reservas" }
+
+            # --- pagos-service (subida del comprobante, PDF/XML y la imagen del pago tienen más tiempo) ---
+            - id: pagos-archivos
+              order: -1
+              uri: lb://pagos-service
+              predicates:
+                - Path=/api/pagos/comprobante,/api/comprobantes/**,/api/admin/pagos/*/archivo,/api/admin/comprobantes/*/pdf,/api/admin/comprobantes/*/xml,/api/admin/reportes/ingresos.xlsx
+              metadata:
+                response-timeout: ${alcanfores.gateway.timeout-archivos-ms}
+              filters:
+                - name: CircuitBreaker
+                  args: { name: pagos-archivos, fallbackUri: "forward:/fallback/pagos" }
+            - id: pagos
+              uri: lb://pagos-service
+              predicates:
+                - Path=/api/pagos/**,/api/pasarela/**,/api/webhooks/**,/api/admin/pagos/**,/api/admin/comprobantes/**,/api/admin/reportes/ingresos/**
+              filters:
+                - name: CircuitBreaker
+                  args: { name: pagos, fallbackUri: "forward:/fallback/pagos" }
+
+            # --- notificaciones-service (WhatsApp por Evolution y reenvíos con PDF tienen más tiempo) ---
+            - id: notificaciones-lentas
+              order: -1
+              uri: lb://notificaciones-service
+              predicates:
+                - Path=/api/admin/whatsapp/**,/api/admin/recordatorios/ejecutar,/api/admin/notificaciones/*/reintentar
+              metadata:
+                response-timeout: ${alcanfores.gateway.timeout-archivos-ms}
+              filters:
+                - name: CircuitBreaker
+                  args: { name: notificaciones-archivos, fallbackUri: "forward:/fallback/notificaciones" }
+            - id: notificaciones
+              uri: lb://notificaciones-service
+              predicates:
+                - Path=/api/admin/notificaciones/**,/api/admin/recordatorios/**
+              filters:
+                - name: CircuitBreaker
+                  args: { name: notificaciones, fallbackUri: "forward:/fallback/notificaciones" }
+
+server:
+  port: ${PORT:8086}
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+    registry-fetch-interval-seconds: 10
+  instance:
+    prefer-ip-address: true
+
+alcanfores:
+  jwt:
+    secreto: ${JWT_SECRETO:secreto-de-desarrollo-local-alcanfores-2026-cambiar-en-produccion}
+    horas: ${JWT_HORAS:8}
+  interno-token: ${INTERNO_TOKEN:token-interno-solo-para-desarrollo-local}
+  front-url: ${FRONT_URL:http://localhost:5186}
+  public-api-url: ${PUBLIC_API_URL:http://localhost:8086}
+  gateway:
+    tamanio-maximo-cuerpo: 6MB
+    timeout: 10s
+    timeout-archivos-ms: 20000
+    servicios:
+      - api-gateway
+      - auth-service
+      - catalogo-service
+      - reservas-service
+      - pagos-service
+      - notificaciones-service
+    limites:
+      - { nombre: login, metodo: POST, rutas: [ "/api/auth/login" ], por-minuto: 10 }
+      - { nombre: documentos, rutas: [ "/api/documentos/**" ], por-minuto: 20 }
+      - { nombre: reservas, metodo: POST, rutas: [ "/api/reservas" ], por-minuto: 10 }
+      - { nombre: pasarela, rutas: [ "/api/pasarela/**" ], por-minuto: 30 }
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+
+info:
+  servicio:
+    nombre: api-gateway
+    descripcion: Puerta de entrada única del sistema de reservas Alcanfores
+
+logging:
+  level:
+    pe.alcanfores.gateway.filtro.FiltroRegistroAcceso: INFO

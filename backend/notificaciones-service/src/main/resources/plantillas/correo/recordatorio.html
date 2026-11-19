@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{base :: correo('Recordatorio', |Tu partido es en ${falta}|, |Tu turno: ${horaInicio} en ${canchaTexto}. Llega 10 minutos antes.|, ~{::contenido})}">
+<body>
+<th:block th:fragment="contenido">
+    <p style="margin:0 0 12px 0;" th:text="|${saludo}:|">Hola:</p>
+    <p style="margin:0;">
+        Te recordamos tu reserva <span th:text="${cuando}">de hoy</span> a las <strong th:text="${horaInicio}">hora</strong> en
+        <strong th:text="${canchaTexto}">la cancha</strong>.
+    </p>
+
+    <table th:replace="~{componentes :: tarjeta(false, true)}"></table>
+
+    <table th:replace="~{componentes :: notaVerde('Llega 10 minutos antes', 'Así tienes tiempo para cambiarte y empezar a la hora: el turno termina puntual.')}"></table>
+
+    <th:block th:if="${haySaldo}">
+        <table th:replace="~{componentes :: nota(|Saldo a pagar: ${saldo}|, 'Págalo en recepción antes de empezar: efectivo, Yape, Plin o tarjeta.')}"></table>
+    </th:block>
+
+    <table th:replace="~{componentes :: comoLlegar}"></table>
+
+    <table th:replace="~{componentes :: boton(${urlMiReserva}, 'Ver mi reserva')}"></table>
+</th:block>
+</body>
+</html>

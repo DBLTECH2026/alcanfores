@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{base :: correo(${notaCredito} ? 'Nota de crédito' : 'Comprobante electrónico', ${notaCredito} ? |Nota de crédito ${serieNumero}| : |Tu ${tipoComprobante}|, |${serieNumero} por ${total}. Te adjuntamos el PDF.|, ~{::contenido})}">
+<body>
+<th:block th:fragment="contenido">
+    <p style="margin:0 0 12px 0;" th:text="|${saludo}:|">Hola:</p>
+    <p style="margin:0;" th:unless="${notaCredito}">
+        Gracias por tu pago. Te adjuntamos tu <span th:text="${tipoComprobante}">boleta electrónica</span>
+        <strong th:text="${serieNumero}">B001-00000001</strong> por <strong th:text="${total}">S/ 0.00</strong>.
+    </p>
+    <p style="margin:0;" th:if="${notaCredito}">
+        Emitimos la nota de crédito <strong th:text="${serieNumero}">BC01-00000001</strong> por
+        <strong th:text="${total}">S/ 0.00</strong>, que anula el comprobante de tu pago por la devolución registrada.
+        Te la adjuntamos en PDF.
+    </p>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="width:100%;margin:20px 0;background-color:#E8F3EC;border:1px solid #B9DCC6;border-radius:12px;">
+        <tr>
+            <td style="padding:18px 22px 4px 22px;">
+                <p style="margin:0;font-family:'Inter',Arial,Helvetica,sans-serif;font-size:11px;line-height:16px;letter-spacing:1.5px;text-transform:uppercase;font-weight:700;color:#0B5D33;"
+                   th:text="${tipoComprobante}">Comprobante</p>
+                <p class="codigo" style="margin:2px 0 0 0;font-family:'Barlow Semi Condensed',Arial,Helvetica,sans-serif;font-size:30px;line-height:36px;font-weight:700;letter-spacing:1px;color:#091A2A;"
+                   th:text="${serieNumero}">B001-00000001</p>
+            </td>
+        </tr>
+        <tr>
+            <td style="padding:8px 22px 14px 22px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+                    <tr th:replace="~{componentes :: fila('Total', ${total})}"></tr>
+                    <tr th:replace="~{componentes :: fila('Emisión', ${fechaEmision})}"></tr>
+                    <tr th:replace="~{componentes :: fila('Cliente', ${nombreCompleto})}"></tr>
+                    <th:block th:if="${conReserva}">
+                        <tr th:replace="~{componentes :: fila('Reserva', ${codigo})}"></tr>
+                    </th:block>
+                </table>
+            </td>
+        </tr>
+    </table>
+
+    <table th:replace="~{componentes :: nota('Comprobante de demostración', 'Este comprobante es simulado con fines académicos y no tiene validez tributaria ante SUNAT.')}"></table>
+
+    <th:block th:if="${conReserva}">
+        <table th:replace="~{componentes :: boton(${urlMiReserva}, 'Ver mi reserva y mis comprobantes')}"></table>
+    </th:block>
+</th:block>
+</body>
+</html>

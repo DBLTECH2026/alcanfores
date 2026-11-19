@@ -1,0 +1,12 @@
+*Gracias por jugar en Los Alcanfores*
+
+[(${saludo})]. ¿Qué tal estuvo *[(${canchaTexto})]*?
+
+Califícala del 1 al 5 y cuéntanos tu experiencia: solo te toma un minuto y tu reseña aparecerá como verificada.
+
+Califica aquí:
+[(${urlResena})]
+
+Te pediremos tu código *[(${codigo})]* y tu DNI.
+
+[(${nombreComplejo})]

@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{base :: correo('Pago en revisión', 'Recibimos tu comprobante', |Lo validamos en minutos. Reserva ${codigo}.|, ~{::contenido})}">
+<body>
+<th:block th:fragment="contenido">
+    <p style="margin:0 0 12px 0;" th:text="|${saludo}:|">Hola:</p>
+    <p style="margin:0;">
+        Recibimos tu comprobante de <strong th:text="${metodo}">Yape</strong> por
+        <strong th:text="${montoPago}">S/ 0.00</strong> (<span th:text="${tipoPago}">adelanto</span>)
+        de la reserva <strong th:text="${codigo}">ALC-XXXXXX</strong>. Lo validamos en minutos.
+    </p>
+
+    <table th:replace="~{componentes :: tarjeta(true, false)}"></table>
+
+    <table th:replace="~{componentes :: notaVerde('¿Qué sigue?', 'Cuando validemos tu pago te enviaremos la confirmación de la reserva y tu comprobante electrónico por correo y WhatsApp.')}"></table>
+
+    <table th:replace="~{componentes :: boton(${urlMiReserva}, 'Ver el estado de mi reserva')}"></table>
+</th:block>
+</body>
+</html>
