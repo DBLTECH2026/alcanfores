@@ -1,11 +1,13 @@
 package pe.alcanfores.notificaciones.evento;
 
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import pe.alcanfores.comun.error.NegocioExcepcion;
 import pe.alcanfores.comun.eventos.ReservaRegistradaEvento;
+import pe.alcanfores.comun.util.Tiempo;
 import pe.alcanfores.notificaciones.Datos;
 import pe.alcanfores.notificaciones.PruebaIntegracion;
 import pe.alcanfores.notificaciones.modelo.Adjunto;
@@ -17,6 +19,7 @@ import pe.alcanfores.notificaciones.modelo.Notificacion;
 import pe.alcanfores.notificaciones.modelo.Recordatorio;
 import pe.alcanfores.notificaciones.modelo.TipoAdjunto;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -39,8 +42,15 @@ class ConsumidorEventosTest extends PruebaIntegracion {
 
     @BeforeEach
     void pdfsDisponibles() {
+        // Reloj fijo: los textos dicen «de hoy» o la fecha completa según el día, y las reservas de Datos son del 19 y 20-nov
+        Tiempo.fijar(Clock.fixed(LocalDateTime.of(2026, 11, 18, 12, 0).atZone(Tiempo.ZONA).toInstant(), Tiempo.ZONA));
         when(reservasCliente.constanciaPdf(anyString())).thenReturn(Datos.PDF);
         when(pagosCliente.comprobantePdf(anyLong())).thenReturn(Datos.PDF);
+    }
+
+    @AfterEach
+    void relojReal() {
+        Tiempo.restablecer();
     }
 
     private Map<CanalNotificacion, Notificacion> porCanal() {
