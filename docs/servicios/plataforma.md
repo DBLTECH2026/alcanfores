@@ -39,6 +39,7 @@ Eureka y Resilience4j reactivo.
 ### 2.1 Rutas (SPEC §1.1)
 | Ruta (id) | Prefijos | Destino | Timeout |
 |---|---|---|---|
+| `auth-lentas` (v2.1) | `/api/auth/recuperar/**` (el código sale en el momento por WhatsApp o correo) | `lb://auth-service` | 20 s |
 | `auth` | `/api/auth/**`, `/api/admin/usuarios/**`, `/api/admin/bitacora/**` | `lb://auth-service` | 10 s |
 | `catalogo-archivos` | `/api/admin/canchas/*/fotos/**`, `/api/catalogo/fotos/**` | `lb://catalogo-service` | 20 s |
 | `catalogo` | `/api/catalogo/**`, `/api/admin/canchas/**`, `/api/admin/resenas/**`, `/api/admin/configuracion/**`, `/api/admin/calendario/**` (v2) | `lb://catalogo-service` | 10 s |
@@ -47,8 +48,9 @@ Eureka y Resilience4j reactivo.
 | `reservas` | `/api/disponibilidad/**`, `/api/reservas/**`, `/api/documentos/**`, `/api/admin/reservas/**`, `/api/admin/turnos/**`, `/api/admin/clientes/**`, `/api/admin/dashboard/**`, `/api/admin/reportes/reservas/**`, `/api/cliente/**` (v2, «Mis reservas») | `lb://reservas-service` | 10 s |
 | `pagos-archivos` | `/api/pagos/comprobante`, `/api/comprobantes/**`, `/api/admin/pagos/*/archivo`, `/api/admin/comprobantes/*/pdf`, `/api/admin/comprobantes/*/xml`, `/api/admin/reportes/ingresos.xlsx` | `lb://pagos-service` | 20 s |
 | `pagos` | `/api/pagos/**`, `/api/pasarela/**`, `/api/webhooks/**`, `/api/admin/pagos/**`, `/api/admin/comprobantes/**`, `/api/admin/reportes/ingresos/**` | `lb://pagos-service` | 10 s |
-| `notificaciones-lentas` | `/api/admin/whatsapp/**`, `/api/admin/recordatorios/ejecutar`, `/api/admin/notificaciones/*/reintentar` | `lb://notificaciones-service` | 20 s |
-| `notificaciones` | `/api/admin/notificaciones/**`, `/api/admin/recordatorios/**` | `lb://notificaciones-service` | 10 s |
+| `notificaciones-lentas` | `/api/admin/whatsapp/**`, `/api/admin/recordatorios/ejecutar`, `/api/admin/notificaciones/*/reintentar`, `/api/admin/correo/prueba` (v2.1) | `lb://notificaciones-service` | 20 s |
+| `notificaciones` | `/api/admin/notificaciones/**`, `/api/admin/recordatorios/**`, `/api/admin/correo/**` (v2.1) | `lb://notificaciones-service` | 10 s |
+| `asistente` (Canchita) | `/api/asistente/**` (chat web con SSE y panel de Canchita) | `${ASISTENTE_URL:http://localhost:8096}` (Node, sin Eureka; en Docker `http://asistente-service:8096`) | 60 s |
 | — | `GET /api/estado` | el propio gateway | — |
 
 Las rutas «de archivos» y `reservas-documentos` tienen `order: -1` (se evalúan primero) y `metadata.response-timeout: 20000` (`timeout-archivos-ms` / `timeout-documentos-ms`; su circuit breaker espera ese tiempo + 2 s). Conexión: 3 s.
@@ -78,9 +80,15 @@ Se hicieron como `WebFilter` y no como `GlobalFilter` para que también cubran r
 6. **`FiltroLimiteSolicitudes`**: token bucket en memoria por IP y por regla (la IP es la primera de `X-Forwarded-For`
    o la remota). Límites: `POST /api/auth/login` 10/min, `/api/documentos/**` 20/min, `POST /api/reservas` 10/min,
    `/api/pasarela/**` 30/min y, desde la v2, `POST /api/auth/clientes/registro` 5/min y `POST /api/auth/clientes/login`
-   10/min (cada regla con su propio cupo; configurables en `alcanfores.gateway.limites`). Al agotarse: **429**
+   10/min y, desde la v2.1, `/api/auth/recuperar/**` 5/min (cualquier método) y `POST /api/asistente/**` 20/min (Canchita;
+   las lecturas GET no cuentan) (cada regla con su propio cupo;
+   configurables en `alcanfores.gateway.limites`). Al agotarse: **429**
    `DEMASIADAS_SOLICITUDES` con `Retry-After`; las respuestas permitidas llevan `X-RateLimit-Limit` y
    `X-RateLimit-Remaining`. Una tarea cada 5 min descarta las cubetas llenas sin uso.
+   **Clave del cupo (`ClaveLimite`)**: la IP, salvo que la solicitud traiga un `X-Interno-Token` VÁLIDO y
+   `X-Canchita-Conversacion` (`[A-Za-z0-9_-]{1,80}`): entonces la clave es `canchita:<conversación>`. Canchita llama
+   al gateway desde una sola IP; así cada conversación tiene su propio cupo (p. ej. 10 reservas por minuto) en vez de
+   uno para todos sus clientes. Sin token válido la cabecera se ignora; el token se borra antes de reenviar al servicio.
 7. **`FiltroJwtAdmin`**: en `/api/admin/**` y (v2) `/api/cliente/**` exige un JWT válido (`JwtServicio` de `comun`).
    Sin token: 401 «Inicia sesión para continuar.»; vencido: 401 «Tu sesión venció. Vuelve a iniciar sesión.»; alterado o
    de otra firma: 401 «El token de sesión no es válido.». En `/api/admin/**` un token de cliente (rol `CLIENTE`) recibe
@@ -124,7 +132,12 @@ Solo se usan `JwtServicio`, `ErrorApi`, `AlcanforesPropiedades` y `Tiempo`. Las 
 `comun` son dependencias opcionales, así que no llegan al classpath (comprobado con `dependency:tree`: no hay
 `spring-webmvc` ni `jakarta.servlet`). Su autoconfiguración Servlet no se activa (`ContextoReactivoTest`).
 
-### 2.7 Pruebas (54 en el módulo, 34 de ellas con WebTestClient contra el puerto real; 19/11/2026)
+**Canchita** (`AsistenteGatewayTest`, 5 pruebas): enruta `/api/asistente/**` al asistente sin reenviarle el token interno
+y sin límite en los GET; 20 mensajes por minuto por IP (el 21.º → 429, otra IP pasa); 413 con 7 MB; cada conversación
+de Canchita con token interno tiene su cupo de reservas (la 11.ª de `c101` → 429 y `c102` pasa desde la misma IP); con
+un token falso la cabecera de conversación se ignora y cuenta la IP. El circuito `asistente` espera 60 s + 2 s.
+
+### 2.7 Pruebas (57 en el módulo desde la v2.1 —ruta `auth-lentas`, `/api/admin/correo/**` y 429 al sexto `recuperar` de una IP—; antes 54, 34 de ellas con WebTestClient contra el puerto real; 19/11/2026)
 Un «servicio simulado» (servidor Reactor Netty) se registra como instancia de `auth-service` con el
 `SimpleDiscoveryClient`; los demás servicios quedan sin instancias. Casos: enrutamiento y propagación de `X-Request-Id`, IP del cliente primera en `X-Forwarded-For`,
 id inválido regenerado, `X-Interno-Token` eliminado, login público, 404 y 405 con `ErrorApi`; CORS (preflight
@@ -147,12 +160,16 @@ token bucket con reloj falso (recarga de una ficha cada 6 s, limpieza), lista de
 restablecimiento de contraseña, **cuentas de clientes del portal** (v2: rol `CLIENTE`, «Mis reservas» por DNI) y
 **bitácora central** de auditoría de todos los microservicios.
 
-### 3.1 Tablas (Flyway `V1__esquema.sql` y `V2__cuenta_cliente.sql`, válidos en MariaDB 10.4 y MySQL 8.4)
-- `administrador(id_administrador PK, nombres, apellidos, usuario UQ, correo UQ, contrasena_hash, rol ENUM('ADMIN','RECEPCION'), estado ENUM('ACTIVO','INACTIVO'), intentos_fallidos (CHECK ≥ 0), bloqueado_hasta, ultimo_acceso, creado_en, actualizado_en)`
+### 3.1 Tablas (Flyway `V1__esquema.sql`, `V2__cuenta_cliente.sql` y `V3__recuperar_contrasena.sql`, válidos en MariaDB 10.4 y MySQL 8.4)
+- `administrador(id_administrador PK, nombres, apellidos, usuario UQ, correo UQ, telefono CHAR(9) NULL (V3), contrasena_hash, rol ENUM('ADMIN','RECEPCION'), estado ENUM('ACTIVO','INACTIVO'), intentos_fallidos (CHECK ≥ 0), bloqueado_hasta, ultimo_acceso, creado_en, actualizado_en)`
 - `bitacora(id_bitacora PK, servicio, id_actor, actor, rol, accion, entidad, id_entidad, detalle VARCHAR(500), ip, fecha)` con índices por fecha, servicio+fecha, acción+fecha y actor.
 - `evento_procesado(id_evento CHAR(36) PK, tipo, procesado_en)` para consumir sin duplicar.
 - **v2** `cuenta_cliente(id PK, dni CHAR(8) UQ, nombres, apellidos, correo UQ, telefono CHAR(9), contrasena_hash, estado ENUM('ACTIVO','INACTIVO'), intentos_fallidos (CHECK ≥ 0), bloqueado_hasta, creado_en, ultimo_acceso)`.
   La migración solo crea la tabla (no toca administradores ni bitácora); se probó sobre una copia de la BD local con datos.
+- **v2.1** `codigo_recuperacion(id PK, tipo_cuenta ENUM('CLIENTE','ADMIN'), id_cuenta, canal ENUM('CORREO','WHATSAPP'),
+  destino (enmascarado), codigo_hash CHAR(64), intentos, expira_en, estado ENUM('PENDIENTE','VERIFICADO','USADO','ANULADO'),
+  token_hash CHAR(64) UQ, token_expira_en, creado_en, usado_en, ip)` con índice `(tipo_cuenta, id_cuenta, creado_en)`.
+  Solo se guardan hashes: HMAC-SHA256 (llave `JWT_SECRETO`) del código y SHA-256 del permiso para restablecer.
 
 **Semilla** (`SemillaUsuarios`, `CommandLineRunner`, solo si la tabla está vacía; nunca en SQL): `rhuaman` Rosa Huamán
 ADMIN, `mtorres` Marco Torres RECEPCION, `docente` Docente UTP ADMIN. Claves por `SEED_CLAVE_ADMIN`,
@@ -176,6 +193,11 @@ puede apagar con `SEED_HABILITADA=false`.
 | POST | `/api/auth/clientes/registro` | público (5/min por IP) | `{dni, nombres, apellidos, correo, telefono, contrasena, confirmacion, aceptaTerminos, aceptaPrivacidad}` → **201** `{token, tipo:"Bearer", expiraEn, cliente:{id, dni, nombres, apellidos, correo, telefono}}` (sesión iniciada) · 409 `DNI_REGISTRADO` (campo `dni`) / `CORREO_REGISTRADO` (campo `correo`) |
 | POST | `/api/auth/clientes/login` | público (10/min por IP) | `{usuario (DNI o correo), contrasena}` → mismo cuerpo · 401 `CREDENCIALES_INVALIDAS` «DNI, correo o contraseña incorrectos.» · 423 `USUARIO_BLOQUEADO` · 403 `USUARIO_INACTIVO` |
 | GET / PUT | `/api/auth/clientes/yo` | CLIENTE | `cliente` / editar `{nombres, apellidos, correo, telefono}` (el DNI no se cambia) → `cliente` · 409 `CORREO_REGISTRADO` |
+| PUT | `/api/auth/yo` (v2.1) | ADMIN o RECEPCION | `{telefono (opcional, @Celular; vacío = quitar), correo}` → el usuario · 409 `CORREO_DUPLICADO` · bitácora `EDITAR_MIS_DATOS` |
+| POST | `/api/auth/recuperar/opciones` (v2.1) | público (5/min por IP) | `{tipoCuenta: CLIENTE o ADMIN, usuario}` → `{canales:[{canal, destino enmascarado}]}` · 404 `CUENTA_NO_ENCONTRADA` (también si está inactiva) |
+| POST | `/api/auth/recuperar/enviar` (v2.1) | público | `{tipoCuenta, usuario, canal}` → `{canal, destino, expiraEn, reenviarEn, reenviarEnSegundos, simulado[, codigoPrueba]}` · 422 `CANAL_NO_DISPONIBLE` · 429 `DEMASIADOS_ENVIOS` · 503 `ENVIO_FALLIDO`/`SERVICIO_NO_DISPONIBLE` |
+| POST | `/api/auth/recuperar/verificar` (v2.1) | público | `{tipoCuenta, usuario, codigo}` → `{tokenRestablecer, expiraEn}` · 422 `CODIGO_INCORRECTO` / `CODIGO_VENCIDO` / `DEMASIADOS_INTENTOS` |
+| POST | `/api/auth/recuperar/restablecer` (v2.1) | público | `{tokenRestablecer, nueva, confirmacion}` → `{mensaje}` · 422 `TOKEN_INVALIDO` |
 | POST | `/api/auth/clientes/cambiar-contrasena` | CLIENTE | `{actual, nueva, confirmacion}` → `{mensaje}` (igual que el de administradores) |
 
 Desde la v2 `/api/auth/yo`, `/api/auth/cambiar-contrasena` y `/api/admin/**` exigen rol ADMIN o RECEPCION (un token
@@ -216,6 +238,24 @@ OpenAPI en `/swagger-ui.html`; Actuator `/actuator/health` e `/actuator/info`.
   `/api/admin/**` ADMIN o RECEPCION y `@PreAuthorize("hasRole('ADMIN')")` en usuarios y bitácora (RECEPCION recibe
   403 `SIN_PERMISO`); todo lo demás cerrado. Sin el usuario por defecto de Spring Security.
 
+### 3.3 bis · Recuperar la contraseña (v2.1)
+- Para clientes del portal (DNI o correo) y usuarios del panel (usuario o correo), por correo o WhatsApp (si hay celular).
+- **Código:** 6 dígitos con `SecureRandom`; vence a los 10 min; 5 intentos (al 5.º error se anula); solo vale el último
+  (enviar uno nuevo anula los anteriores). **Envíos:** reenviar tras 60 s y máximo 3 cada 15 min por cuenta (429
+  `DEMASIADOS_ENVIOS` con los segundos o minutos que faltan); el gateway además limita 5 llamadas/min por IP.
+- **Envío:** llamada interna síncrona `POST http://notificaciones-service/interno/codigos` (`NotificacionesCliente`,
+  `RestClient` balanceado con `X-Interno-Token`, 3 s de conexión y 18 s de lectura; sin circuit breaker: es una acción
+  puntual del usuario y ante una falla responde 503 `SERVICIO_NO_DISPONIBLE`). Si notificaciones dice FALLIDO → 503
+  `ENVIO_FALLIDO`; si dice SIMULADO (canal sin configurar) → 200 con `simulado: true`.
+- **Permiso:** al verificar se emite un token aleatorio de 32 bytes (Base64 URL) de un solo uso, 10 min; se guarda su
+  SHA-256. **Restablecer:** misma política de contraseñas, desbloquea la cuenta, marca el código USADO, anula los demás,
+  bitácora `RECUPERAR_CONTRASENA` y, tras el commit, aviso «Tu contraseña se cambió» por el mismo canal (si el aviso falla,
+  la contraseña igual queda cambiada). También se anota `ENVIAR_CODIGO_RECUPERACION` con el destino enmascarado.
+- **Pruebas locales:** con `RECUPERAR_DEVOLVER_CODIGO=true` (vacío por defecto; NUNCA en producción) la respuesta de
+  `enviar` incluye `codigoPrueba`; el servicio lo advierte en el log al arrancar.
+- Decisión: la cuenta inexistente o inactiva responde 404 `CUENTA_NO_ENCONTRADA` (lo pidió el dueño para guiar al usuario);
+  el límite por IP del gateway y el de envíos por cuenta frenan el abuso.
+
 ### 3.4 Bitácora y eventos
 - **Consume** `auditoria.accion` (`AccionAuditadaEvento`) desde la cola durable `auth.auditoria` (con DLQ de `comun`),
   reintentos 3 veces y `default-requeue-rejected: false`. Es **idempotente**: guarda `evento_procesado` y la fila en la
@@ -229,7 +269,17 @@ OpenAPI en `/swagger-ui.html`; Actuator `/actuator/health` e `/actuator/info`.
   normales de clientes no se anotan, para no llenar la bitácora).
 - No publica eventos.
 
-### 3.5 Pruebas (86 al 19/11/2026; contra `alcanfores_auth_test` con Flyway, Rabbit y Eureka apagados)
+### 3.5 Pruebas (104 al 19/11/2026 con la v2.1; contra `alcanfores_auth_test` con Flyway, Rabbit y Eureka apagados)
+**v2.1 · `RecuperacionIntegracionTest` (12, con `NotificacionesCliente` simulado):** opciones enmascaradas (cliente con
+correo y WhatsApp, panel sin celular), 404 igual para inexistente, inactiva o del otro tipo, validaciones, envío que guarda
+solo el hash y el destino enmascarado (código real capturado en la llamada interna), WhatsApp solo con celular, reenvío
+antes de 60 s y 4.º envío en 15 min → 429 con el tiempo exacto (reloj fijado), 5 intentos y anulación, vencimiento a los
+10 min y solo vale el último código, flujo completo del cliente (desbloquea, login con la nueva y no con la vieja, permiso de
+un solo uso, aviso «contraseña cambiada» por el mismo canal, bitácora), administrador por WhatsApp con permiso vencido,
+notificaciones FALLIDO o caído → 503 y aviso de cambio que falla sin deshacer el cambio. `RecuperacionCodigoPruebaTest`:
+`codigoPrueba` solo con la propiedad activa. `TelefonoAdminIntegracionTest` (3): `/yo` y `PUT /yo` con celular, validación,
+correo ajeno 409, cliente 403, crear/editar usuarios con celular opcional. `NotificacionesClienteTest`
+(MockRestServiceServer): URL, token interno, JSON exacto y errores/tiempo agotado → 503.
 Login correcto (token válido, `ultimoAcceso`, bitácora), clave incorrecta, usuario inexistente con el mismo mensaje,
 bloqueo al 5.º intento, minutos restantes y desbloqueo con el reloj adelantado (`Tiempo.fijar`), bloqueo de usuario
 inexistente, validaciones y JSON mal formado, usuario inactivo; `/yo` con token, sin token, vencido, alterado y de

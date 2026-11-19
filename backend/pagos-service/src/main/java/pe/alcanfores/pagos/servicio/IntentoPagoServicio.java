@@ -21,7 +21,10 @@ public interface IntentoPagoServicio {
     /** Sondeo del resultado; si es de Mercado Pago y sigue pendiente, consulta a Mercado Pago por la referencia. */
     EstadoIntentoRespuesta estado(String referencia);
 
-    /** El proveedor beta pide autorizar un cobro: el intento debe existir, estar abierto y no haber expirado. */
+    /**
+     * El proveedor beta pide autorizar un cobro: el intento debe existir, estar abierto, no haber expirado y su monto
+     * debe caber todavía en el saldo vigente de la reserva (si no, se cierra: 409 {@code INTENTO_EXPIRADO} con el motivo).
+     */
     IntentoPago abiertoParaCobro(String referencia);
 
     void marcarRequiere3ds(String referencia);

@@ -1,6 +1,7 @@
 package pe.alcanfores.reservas.servicio;
 
 import pe.alcanfores.reservas.dto.InternoDtos.ElegibilidadResena;
+import pe.alcanfores.reservas.dto.InternoDtos.ReservaDelCliente;
 import pe.alcanfores.reservas.dto.InternoDtos.ReservaInterna;
 import pe.alcanfores.reservas.dto.InternoDtos.ReservaSemilla;
 import pe.alcanfores.reservas.dto.InternoDtos.ReservasVigentes;
@@ -14,6 +15,12 @@ import java.util.List;
 public interface InternoServicio {
 
     ReservaInterna reserva(String codigo);
+
+    /**
+     * Reservas de ese DNI (desde hace 30 días en adelante, por fecha y hora) SOLO si el celular registrado del cliente
+     * es {@code telefono} (ambos normalizados a 9 dígitos). Si el DNI no existe o el celular no calza: lista vacía.
+     */
+    List<ReservaDelCliente> porCliente(String dni, String telefono);
 
     /** ¿Puede este DNI reseñar esta cancha con esta reserva? (catalogo-service). */
     ElegibilidadResena elegibleResena(String codigo, String dni, Long idCancha);

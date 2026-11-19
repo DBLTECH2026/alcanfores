@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{base :: correo('Prueba de correo', '¡El correo funciona!', 'Mensaje de prueba enviado desde el panel.', ~{::contenido})}">
+<body>
+<th:block th:fragment="contenido">
+    <p style="margin:0 0 12px 0;">Hola:</p>
+    <p style="margin:0;">
+        Este es un mensaje de prueba enviado desde el panel de Alcanfores con el servidor
+        <strong th:text="${servidor}">smtp.hostinger.com:465</strong>.
+        Si lo estás leyendo, los avisos de reservas y los códigos para cambiar la contraseña ya salen por este correo.
+    </p>
+
+    <table th:replace="~{componentes :: notaVerde('Remitente', |${remitenteTexto}|)}"></table>
+</th:block>
+</body>
+</html>

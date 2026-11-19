@@ -5,6 +5,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import pe.alcanfores.comun.error.NegocioExcepcion;
+import pe.alcanfores.comun.eventos.ReservaConfirmadaEvento;
 import pe.alcanfores.notificaciones.Datos;
 import pe.alcanfores.notificaciones.PruebaIntegracion;
 import pe.alcanfores.notificaciones.dto.EjecucionRecordatoriosRespuesta;
@@ -17,6 +18,7 @@ import pe.alcanfores.notificaciones.modelo.Recordatorio;
 import pe.alcanfores.comun.util.PaginaRespuesta;
 
 import java.util.List;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -34,7 +36,7 @@ class RecordatorioServicioTest extends PruebaIntegracion {
     private RecordatorioServicio servicio;
 
     private Recordatorio recordatorio() {
-        return recordatorios.findByCodigoReserva(Datos.CODIGO).orElseThrow();
+        return recordatorios.findByCodigoReservaAndMinutosAntes(Datos.CODIGO, 120).orElseThrow();
     }
 
     private void confirmarReserva() {
@@ -43,15 +45,92 @@ class RecordatorioServicioTest extends PruebaIntegracion {
         notificaciones.deleteAll();
     }
 
+    private void conMinutos(Integer... minutos) {
+        DatosComplejo d = new DatosComplejo("Complejo Deportivo Los Alcanfores", "Dir", "Ref", "https://maps", "914995187",
+                "c@x.pe", List.of(minutos), 24);
+        when(complejoServicio.datos()).thenReturn(d);
+        when(complejoServicio.actualizados()).thenReturn(d);
+    }
+
     @Test
-    @DisplayName("Se programa al confirmar: enviar_en = inicio − horas de recordatorio (catálogo)")
-    void programaConHorasDelCatalogo() {
-        when(complejoServicio.datos()).thenReturn(new DatosComplejo("Complejo Deportivo Los Alcanfores", "Dir", "Ref",
-                "https://maps", "914995187", "c@x.pe", 3, 24));
+    @DisplayName("Se programa al confirmar: enviar_en = inicio − minutos de recordatorio (catálogo)")
+    void programaConMinutosDelCatalogo() {
+        conMinutos(180);
         confirmarReserva();
 
-        assertThat(recordatorio().getEstado()).isEqualTo(EstadoRecordatorio.PROGRAMADO);
-        assertThat(recordatorio().getEnviarEn()).isEqualTo(Datos.INICIO.minusHours(3));
+        Recordatorio r = recordatorios.findByCodigoReservaAndMinutosAntes(Datos.CODIGO, 180).orElseThrow();
+        assertThat(r.getEstado()).isEqualTo(EstadoRecordatorio.PROGRAMADO);
+        assertThat(r.getEnviarEn()).isEqualTo(Datos.INICIO.minusHours(3));
+    }
+
+    @Test
+    @DisplayName("Lista 120,15: dos recordatorios; cada uno sale a su hora con su texto y la cancelación anula los dos")
+    void variosRecordatorios() {
+        conMinutos(120, 15);
+        confirmarReserva();
+        when(reservasCliente.consultar(Datos.CODIGO)).thenReturn(Datos.reservaInterna("CONFIRMADA", "40.00", null));
+
+        assertThat(recordatorios.findByCodigoReservaOrderByMinutosAntesDesc(Datos.CODIGO))
+                .extracting(Recordatorio::getMinutosAntes, Recordatorio::getEnviarEn)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(120, Datos.INICIO.minusHours(2)),
+                        org.assertj.core.groups.Tuple.tuple(15, Datos.INICIO.minusMinutes(15)));
+
+        Datos.reloj(Datos.INICIO.minusHours(2));
+        assertThat(servicio.ejecutarPendientes()).isEqualTo(new EjecucionRecordatoriosRespuesta(1, 1, 0, 0));
+        Datos.reloj(Datos.INICIO.minusMinutes(30));
+        assertThat(servicio.ejecutarPendientes().revisados()).isZero();
+        Datos.reloj(Datos.INICIO.minusMinutes(15));
+        assertThat(servicio.ejecutarPendientes()).isEqualTo(new EjecucionRecordatoriosRespuesta(1, 1, 0, 0));
+
+        assertThat(notificaciones.findByCodigoReservaOrderByIdAsc(Datos.CODIGO)).extracting(Notificacion::getAsunto)
+                .containsExactly("Tu partido es en 2 horas · Cancha 1 · ALC-7K3M9P",
+                        "Tu partido es en 2 horas · Cancha 1 · ALC-7K3M9P",
+                        "Tu partido es en 15 minutos · Cancha 1 · ALC-7K3M9P",
+                        "Tu partido es en 15 minutos · Cancha 1 · ALC-7K3M9P");
+        assertThat(recordatorios.findByCodigoReservaOrderByMinutosAntesDesc(Datos.CODIGO))
+                .allSatisfy(r -> assertThat(r.getEstado()).isEqualTo(EstadoRecordatorio.ENVIADO));
+    }
+
+    @Test
+    @DisplayName("Cancelar la reserva cancela todos sus recordatorios programados")
+    void cancelaTodos() {
+        conMinutos(1440, 60, 15);
+        confirmarReserva();
+
+        servicio.cancelar(Datos.CODIGO, "Reserva cancelada (CLIENTE).");
+
+        assertThat(recordatorios.findByCodigoReservaOrderByMinutosAntesDesc(Datos.CODIGO)).hasSize(3)
+                .allSatisfy(r -> assertThat(r.getEstado()).isEqualTo(EstadoRecordatorio.CANCELADO));
+    }
+
+    @Test
+    @DisplayName("Reconfirmar con otra lista: los tiempos que ya no están se cancelan y los nuevos se programan")
+    void otraLista() {
+        conMinutos(120, 15);
+        confirmarReserva();
+        conMinutos(60);
+        // Una nueva confirmación ocurre después de la primera (los datos más viejos no reemplazan a los nuevos).
+        ReservaConfirmadaEvento primera = Datos.confirmada();
+        avisos.alConfirmarReserva(new ReservaConfirmadaEvento(UUID.randomUUID(), primera.ocurridoEn().plusMinutes(1),
+                primera.reserva(), primera.saldoPendiente()));
+
+        assertThat(recordatorios.findByCodigoReservaOrderByMinutosAntesDesc(Datos.CODIGO))
+                .extracting(Recordatorio::getMinutosAntes, Recordatorio::getEstado)
+                .containsExactly(org.assertj.core.groups.Tuple.tuple(120, EstadoRecordatorio.CANCELADO),
+                        org.assertj.core.groups.Tuple.tuple(60, EstadoRecordatorio.PROGRAMADO),
+                        org.assertj.core.groups.Tuple.tuple(15, EstadoRecordatorio.CANCELADO));
+    }
+
+    @Test
+    @DisplayName("Con 8 minutos de atraso (dentro de la tolerancia de 10) todavía se envía")
+    void dentroDeLaTolerancia() {
+        confirmarReserva();
+        when(reservasCliente.consultar(Datos.CODIGO)).thenReturn(Datos.reservaInterna("CONFIRMADA", "40.00", null));
+        Datos.reloj(Datos.INICIO.minusHours(2).plusMinutes(8));
+
+        assertThat(servicio.ejecutarPendientes().enviados()).isEqualTo(1);
+        assertThat(notificaciones.findByCodigoReservaOrderByIdAsc(Datos.CODIGO))
+                .allSatisfy(n -> assertThat(n.getAsunto()).startsWith("Tu partido es en 1 hora y 50 minutos"));
     }
 
     @Test
@@ -119,19 +198,19 @@ class RecordatorioServicioTest extends PruebaIntegracion {
     void reservasCaido() {
         confirmarReserva();
         when(reservasCliente.consultar(anyString())).thenThrow(NegocioExcepcion.noDisponible("SERVICIO_NO_DISPONIBLE", "caído"));
-        Datos.reloj(Datos.INICIO.minusHours(1).minusMinutes(30));
+        Datos.reloj(Datos.INICIO.minusHours(2).plusMinutes(5));
 
         EjecucionRecordatoriosRespuesta r = servicio.ejecutarPendientes();
 
         assertThat(r.enviados()).isEqualTo(1);
         assertThat(notificaciones.findByCodigoReservaOrderByIdAsc(Datos.CODIGO)).allSatisfy(n -> {
-            assertThat(n.getAsunto()).startsWith("Tu partido es en 1 hora y 30 minutos");
+            assertThat(n.getAsunto()).startsWith("Tu partido es en 1 hora y 55 minutos");
             assertThat(n.getCuerpo()).contains("S/ 40.00");
         });
     }
 
     @Test
-    @DisplayName("OMITIDO si al revisarlo faltan menos de 30 minutos para el inicio")
+    @DisplayName("OMITIDO si su hora de envío pasó hace más de 10 minutos (confirmada tarde)")
     void omitido() {
         confirmarReserva();
         Datos.reloj(Datos.INICIO.minusMinutes(20));
@@ -140,7 +219,7 @@ class RecordatorioServicioTest extends PruebaIntegracion {
 
         assertThat(r).isEqualTo(new EjecucionRecordatoriosRespuesta(1, 0, 1, 0));
         assertThat(recordatorio().getEstado()).isEqualTo(EstadoRecordatorio.OMITIDO);
-        assertThat(recordatorio().getDetalle()).contains("30 minutos");
+        assertThat(recordatorio().getDetalle()).contains("más de 10 minutos");
         assertThat(notificaciones.count()).isZero();
     }
 
@@ -193,14 +272,17 @@ class RecordatorioServicioTest extends PruebaIntegracion {
 
         assertThat(r.omitidos()).isEqualTo(1);
         verify(auditor).registrar(eq("EJECUTAR_RECORDATORIOS"), eq("recordatorio"), isNull(), contains("1 omitidos"));
-        PaginaRespuesta<RecordatorioRespuesta> pagina = servicio.listar(EstadoRecordatorio.OMITIDO, PageRequest.of(0, 10));
+        PaginaRespuesta<RecordatorioRespuesta> pagina = servicio.listar(EstadoRecordatorio.OMITIDO, null, PageRequest.of(0, 10));
         assertThat(pagina.contenido()).singleElement().satisfies(fila -> {
             assertThat(fila.codigoReserva()).isEqualTo(Datos.CODIGO);
             assertThat(fila.cliente()).isEqualTo("Diego Ramos Quispe");
             assertThat(fila.cancha()).isEqualTo("Cancha 1");
             assertThat(fila.estado()).isEqualTo("OMITIDO");
+            assertThat(fila.minutosAntes()).isEqualTo(120);
         });
-        assertThat(servicio.listar(EstadoRecordatorio.PROGRAMADO, PageRequest.of(0, 10)).totalElementos()).isZero();
-        assertThat(servicio.listar(null, PageRequest.of(0, 10)).totalElementos()).isEqualTo(1);
+        assertThat(servicio.listar(EstadoRecordatorio.PROGRAMADO, null, PageRequest.of(0, 10)).totalElementos()).isZero();
+        assertThat(servicio.listar(null, null, PageRequest.of(0, 10)).totalElementos()).isEqualTo(1);
+        assertThat(servicio.listar(null, "alc-7k3m9p", PageRequest.of(0, 10)).totalElementos()).isEqualTo(1);
+        assertThat(servicio.listar(EstadoRecordatorio.OMITIDO, "ALC-OTRO01", PageRequest.of(0, 10)).totalElementos()).isZero();
     }
 }

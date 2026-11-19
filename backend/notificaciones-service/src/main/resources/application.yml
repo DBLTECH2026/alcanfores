@@ -87,14 +87,16 @@ alcanfores:
     correo:
       remitente: ${MAIL_REMITENTE:informes.alcanfores@gmail.com}
       nombre-remitente: ${MAIL_NOMBRE_REMITENTE:Complejo Deportivo Los Alcanfores}
+      # Clave para cifrar la contraseña SMTP que se guarda desde el panel (si está vacía se deriva de JWT_SECRETO).
+      clave-cifrado: ${CORREO_CLAVE_CIFRADO:}
     evolution:
       url: ${EVOLUTION_URL:}
       apikey: ${EVOLUTION_APIKEY:}
       instancia: ${EVOLUTION_INSTANCIA:alcanfores}
       timeout-segundos: ${EVOLUTION_TIMEOUT:20}
     recordatorio:
-      horas-por-defecto: 2
-      minutos-minimos: 30
+      minutos-por-defecto: 120
+      tolerancia-minutos: 10
 
 management:
   endpoints:

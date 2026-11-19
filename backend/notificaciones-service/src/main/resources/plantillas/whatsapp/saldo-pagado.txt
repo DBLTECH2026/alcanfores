@@ -1,0 +1,12 @@
+*¡Terminaste de pagar tu cancha!*
+
+[(${saludo})]. Recibimos el pago del saldo de tu reserva *[(${codigo})]*.
+
+*Cancha:* [(${canchaTexto})]
+*Fecha:* [(${fecha})]
+*Hora:* [(${horario})]
+*Saldo:* S/ 0.00
+
+Solo llega y juega. Ver tu reserva: [(${urlMiReserva})]
+
+[(${nombreComplejo})]

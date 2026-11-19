@@ -37,6 +37,14 @@ public interface PagoRepositorio extends JpaRepository<Pago, Long>, JpaSpecifica
     @Query("select p from Pago p where p.id = :id")
     Optional<Pago> bloquear(@Param("id") Long id);
 
+    /**
+     * Todos los pagos de una reserva, bloqueados y en orden: un consumidor de eventos espera a una validación del panel
+     * en curso y no devuelve a PENDIENTE un pago que se acaba de validar.
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select p from Pago p where p.codigoReserva = :codigo order by p.id")
+    List<Pago> bloquearDeReserva(@Param("codigo") String codigoReserva);
+
     List<Pago> findByEstadoAndFechaValidacionBetween(EstadoValidacion estado, LocalDateTime desde, LocalDateTime hasta);
 
     @Query("select p.estado, count(p) from Pago p group by p.estado")

@@ -35,6 +35,14 @@ public interface PagoServicio {
     /** VALIDADO + comprobante + {@code pago.validado} y {@code comprobante.emitido}. */
     CobroRespuesta validar(Long id);
 
+    /**
+     * Validación automática de Canchita (IA), llamada interna de asistente-service: la misma validación del panel
+     * (comprobante, {@code pago.validado}, {@code comprobante.emitido}) con el actor indicado y la lectura guardada.
+     * Idempotente: un pago ya VALIDADO responde igual sin repetir nada. 422 {@code PAGO_NO_EN_REVISION} si el pago no
+     * es un comprobante Yape/Plin pendiente de revisión.
+     */
+    CobroRespuesta validarPorIa(Long id, String lectura, String validadoPor);
+
     /** RECHAZADO con observación + {@code pago.rechazado}. */
     PagoResumenRespuesta rechazar(Long id, String observacion);
 

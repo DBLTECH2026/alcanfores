@@ -11,6 +11,7 @@ import pe.alcanfores.comun.eventos.ReservaConfirmadaEvento;
 import pe.alcanfores.comun.eventos.ReservaRegistradaEvento;
 import pe.alcanfores.notificaciones.Datos;
 import pe.alcanfores.notificaciones.PruebaIntegracion;
+import pe.alcanfores.notificaciones.cliente.ReservaInterna;
 import pe.alcanfores.notificaciones.modelo.CanalNotificacion;
 import pe.alcanfores.notificaciones.modelo.Notificacion;
 import pe.alcanfores.notificaciones.modelo.Recordatorio;
@@ -84,12 +85,13 @@ class VariosTurnosTest extends PruebaIntegracion {
     void recordatorioAntesDelPrimerTurno() {
         consumidor.alConfirmarReserva(new ReservaConfirmadaEvento(UUID.randomUUID(), LocalDateTime.of(2026, 11, 18, 12, 0),
                 reserva("70.00"), new BigDecimal("70.00")));
-        Recordatorio r = recordatorios.findByCodigoReserva(CODIGO).orElseThrow();
+        Recordatorio r = recordatorios.findByCodigoReservaAndMinutosAntes(CODIGO, 120).orElseThrow();
         assertThat(r.getInicioReserva()).isEqualTo(PRIMER_TURNO);
         assertThat(r.getEnviarEn()).isEqualTo(PRIMER_TURNO.minusHours(2));
 
         Datos.reloj(PRIMER_TURNO.minusHours(2));
-        when(reservasCliente.consultar(CODIGO)).thenReturn(Datos.reservaInterna("CONFIRMADA", "70.00", null));
+        when(reservasCliente.consultar(CODIGO)).thenReturn(new ReservaInterna(reserva("70.00"), "CONFIRMADA",
+                "ADELANTO_PAGADO", new BigDecimal("70.00"), null));
         assertThat(servicio.ejecutarPendientes().enviados()).isEqualTo(1);
         assertThat(cuerpo(avisos("recordatorio"), CanalNotificacion.WHATSAPP))
                 .contains("*Hora:* " + HORARIO, "*Saldo a pagar:* S/ 70.00");

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{base :: correo('Cambio de horario', '¡Cambiamos tu horario!', |Tu nueva fecha: ${fechaTexto} a las ${horaInicio} · Reserva ${codigo}|, ~{::contenido})}">
+<body>
+<th:block th:fragment="contenido">
+    <p style="margin:0 0 12px 0;" th:text="|${saludo}:|">Hola:</p>
+    <p style="margin:0 0 18px 0;">
+        Tu reserva <strong th:text="${codigo}">ALC-XXXXXX</strong> cambió de horario.
+        Tu nueva fecha y hora ya están separadas: te esperamos el <strong th:text="${fechaTexto}">día</strong>
+        a las <strong th:text="${horaInicio}">hora</strong>.
+    </p>
+
+    <table th:replace="~{componentes :: nota('Horario anterior', ${antesTexto})}"></table>
+
+    <table th:replace="~{componentes :: tarjeta(false, true)}"></table>
+
+    <th:block th:if="${confirmada}">
+        <table th:replace="~{componentes :: notaVerde('Lo que ya pagaste se mantiene', |Pagado: ${montoPagado}. Saldo: ${saldo}. Te enviaremos el recordatorio antes del nuevo horario.|)}"></table>
+    </th:block>
+    <th:block th:if="${enRevision}">
+        <table th:replace="~{componentes :: nota('Comprobante en revisión', 'Estamos validando tu comprobante: te avisaremos cuando tu reserva quede confirmada.')}"></table>
+    </th:block>
+    <th:block th:if="${porPagar and conPlazo}">
+        <table th:replace="~{componentes :: nota(|Plazo para pagar: ${plazo}|, |Paga el adelanto de ${montoAdelanto} para confirmar tu nuevo horario.|)}"></table>
+    </th:block>
+    <th:block th:if="${porPagar and !conPlazo}">
+        <table th:replace="~{componentes :: nota('Pendiente de pago', |Paga el adelanto de ${montoAdelanto} en el complejo o desde tu reserva en línea para confirmarla.|)}"></table>
+    </th:block>
+
+    <table th:replace="~{componentes :: boton(${urlMiReserva}, 'Ver mi reserva')}"></table>
+
+    <p style="margin:0 0 18px 0;font-size:14px;line-height:22px;color:#4A5A68;">
+        Te adjuntamos la constancia actualizada en PDF. Si tienes dudas, escríbenos por WhatsApp.
+    </p>
+</th:block>
+</body>
+</html>

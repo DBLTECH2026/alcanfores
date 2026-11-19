@@ -13,6 +13,7 @@ import pe.alcanfores.notificaciones.modelo.CanalNotificacion;
 import pe.alcanfores.notificaciones.modelo.Notificacion;
 import pe.alcanfores.notificaciones.plantilla.MensajeRedactado;
 import pe.alcanfores.notificaciones.plantilla.RedactorMensajes;
+import pe.alcanfores.notificaciones.plantilla.Tarjetas;
 import pe.alcanfores.notificaciones.plantilla.TipoAviso;
 
 import java.util.ArrayList;
@@ -33,25 +34,43 @@ public class FabricaAvisos {
         this.redactor = redactor;
     }
 
+    /**
+     * Con la tarjeta ilustrada del aviso (según el deporte en el recordatorio) como primer adjunto: imagen del WhatsApp y
+     * cabecera del correo ({@code tarjetaSrc}).
+     */
     public List<Notificacion> crear(TipoAviso tipo, String asunto, Map<String, Object> modelo, String codigoReserva,
                                     ClienteContacto cliente, List<Adjunto> adjuntos) {
+        List<Adjunto> conTarjeta = conTarjeta(tipo, modelo, adjuntos);
         MensajeRedactado m = redactor.redactar(tipo, asunto, modelo);
         List<Notificacion> avisos = new ArrayList<>(2);
         String correo = cliente == null ? null : Texto.correo(cliente.correo());
         if (StringUtils.hasText(correo)) {
             avisos.add(new Notificacion(codigoReserva, tipo.evento(), CanalNotificacion.CORREO, correo, asunto, m.html(),
-                    adjuntos, Tiempo.ahora()));
+                    conTarjeta, Tiempo.ahora()));
         } else {
             log.warn("Aviso {} de {} sin correo del cliente: no se envía por correo", tipo.evento(), codigoReserva);
         }
         String whatsapp = numeroWhatsapp(cliente == null ? null : cliente.telefono());
         if (whatsapp != null) {
             avisos.add(new Notificacion(codigoReserva, tipo.evento(), CanalNotificacion.WHATSAPP, whatsapp, asunto, m.texto(),
-                    adjuntos, Tiempo.ahora()));
+                    conTarjeta, Tiempo.ahora()));
         } else {
             log.warn("Aviso {} de {} sin celular válido: no se envía por WhatsApp", tipo.evento(), codigoReserva);
         }
         return avisos;
+    }
+
+    /** Antepone la tarjeta del aviso a los adjuntos y deja su CID en el modelo para la cabecera del correo. */
+    public static List<Adjunto> conTarjeta(TipoAviso tipo, Map<String, Object> modelo, List<Adjunto> adjuntos) {
+        String tarjeta = tipo.tarjeta((String) modelo.get("deporteCodigo"));
+        if (tarjeta == null) {
+            return adjuntos;
+        }
+        modelo.put("tarjetaSrc", "cid:" + Tarjetas.CID);
+        List<Adjunto> todos = new ArrayList<>(adjuntos.size() + 1);
+        todos.add(Adjunto.tarjeta(tarjeta));
+        todos.addAll(adjuntos);
+        return todos;
     }
 
     /** «987 654 321» o «+51987654321» → «51987654321»; {@code null} si no es un celular peruano válido. */

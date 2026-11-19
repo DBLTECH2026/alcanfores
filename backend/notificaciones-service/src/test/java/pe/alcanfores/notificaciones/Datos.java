@@ -19,6 +19,7 @@ import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.List;
 import java.util.UUID;
 
 /** Datos de prueba: un cliente, una reserva y los eventos que la acompañan. */
@@ -55,7 +56,7 @@ public final class Datos {
     public static DatosComplejo complejo() {
         return new DatosComplejo("Complejo Deportivo Los Alcanfores", "Carretera Central km 11.5, Santa Clara, Ate",
                 "Paradero Caseta, a dos cuadras de la UTP Santa Clara", "https://maps.google.com/?q=alcanfores",
-                "914995187", "informes.alcanfores@gmail.com", 2, 24);
+                "914995187", "informes.alcanfores@gmail.com", List.of(120), 24);
     }
 
     public static ReservaRegistradaEvento registrada() {

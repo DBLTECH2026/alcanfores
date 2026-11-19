@@ -33,6 +33,13 @@ public class RedactorMensajes {
         return new MensajeRedactado(asunto, html, texto);
     }
 
+    /** Solo el HTML del correo (avisos que no van por WhatsApp, como la prueba de correo del panel). */
+    public String redactarCorreo(TipoAviso tipo, String asunto, Map<String, Object> modelo) {
+        Context ctx = new Context(Tiempo.ES_PE, modelo);
+        ctx.setVariable("asunto", asunto);
+        return motorCorreo.process(tipo.plantilla(), ctx);
+    }
+
     /** Las etiquetas de bloque de Thymeleaf TEXT dejan líneas en blanco de más: se dejan como máximo una. */
     static String limpiarTexto(String texto) {
         String t = texto.replace("\r\n", "\n");

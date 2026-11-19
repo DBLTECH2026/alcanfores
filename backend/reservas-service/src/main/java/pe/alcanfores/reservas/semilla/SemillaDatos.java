@@ -266,6 +266,7 @@ public class SemillaDatos implements CommandLineRunner {
         Reserva r = new Reserva();
         r.setCodigoReserva(ctx.codigo());
         r.setCliente(c);
+        r.setTelefonoContacto(c.getTelefono());
         r.setEstado(EstadoReserva.PENDIENTE);
         r.agregarTurno(t, Dinero.redondear(t.getPrecio()));
         r.setEstadoPago(EstadoPago.SIN_PAGO);

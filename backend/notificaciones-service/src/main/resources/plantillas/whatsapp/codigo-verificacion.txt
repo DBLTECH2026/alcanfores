@@ -1,0 +1,5 @@
+*Código de verificación*
+
+Tu código para cambiar tu contraseña de Alcanfores es *[(${codigoVerificacion})]*. Vence en 10 minutos. Si no fuiste tú, ignora este mensaje.
+
+[(${nombreComplejo})]

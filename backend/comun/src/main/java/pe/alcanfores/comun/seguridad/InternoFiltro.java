@@ -33,6 +33,16 @@ public class InternoFiltro extends OncePerRequestFilter {
         this.json = json;
     }
 
+    /**
+     * ¿Es el token interno correcto? (comparación en tiempo constante; sin token configurado nadie lo es). Lo usa este
+     * filtro en {@code /interno/**} y cualquier ruta pública que quiera reconocer a otro microservicio sin exigirlo
+     * (p. ej. reservas identifica a Canchita en la bitácora).
+     */
+    public boolean tokenValido(String recibido) {
+        return token.length > 0 && recibido != null
+                && MessageDigest.isEqual(token, recibido.getBytes(StandardCharsets.UTF_8));
+    }
+
     @Override
     protected boolean shouldNotFilter(HttpServletRequest req) {
         return !req.getRequestURI().startsWith(PREFIJO);
@@ -41,10 +51,7 @@ public class InternoFiltro extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest req, HttpServletResponse res, FilterChain chain)
             throws ServletException, IOException {
-        String recibido = req.getHeader(CABECERA);
-        boolean valido = token.length > 0 && recibido != null
-                && MessageDigest.isEqual(token, recibido.getBytes(StandardCharsets.UTF_8));
-        if (!valido) {
+        if (!tokenValido(req.getHeader(CABECERA))) {
             res.setStatus(403);
             res.setContentType(MediaType.APPLICATION_JSON_VALUE);
             res.setCharacterEncoding("UTF-8");

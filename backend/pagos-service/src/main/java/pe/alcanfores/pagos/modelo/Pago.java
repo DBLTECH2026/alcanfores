@@ -85,6 +85,10 @@ public class Pago {
     @Column(name = "validado_por", length = 60)
     private String validadoPor;
 
+    /** Lectura de la foto con la que Canchita (IA) validó el pago (JSON o texto); null si lo validó una persona. */
+    @Column(name = "lectura_ia", columnDefinition = "text")
+    private String lecturaIa;
+
     @Embedded
     private InstantaneaReserva reserva;
 

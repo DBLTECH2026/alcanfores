@@ -1,5 +1,6 @@
-# CI/CD de Alcanfores: pruebas del back-end (JUnit + JaCoCo con MySQL real), compilación del front-end
-# y despliegue automático al VPS por SSH cuando todo pasa en la rama main.
+# CI/CD de Alcanfores: pruebas del back-end (JUnit + JaCoCo con MySQL real), compilación del front-end, pruebas de
+# Canchita (asistente con IA, vitest con el cerebro simulado: no usa la suscripción ni MySQL) y despliegue automático
+# al VPS por SSH cuando todo pasa en la rama main.
 name: CI/CD
 
 on:
@@ -90,9 +91,29 @@ jobs:
       - run: npm run lint
       - run: npm run build
 
+  asistente:
+    name: Canchita · lint y pruebas (vitest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: asistente
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: asistente/package-lock.json
+      - run: npm ci --no-audit --no-fund
+      - run: npm run lint
+      - name: Pruebas (cerebro, API y WhatsApp simulados)
+        env:
+          TZ: America/Lima
+        run: npm test
+
   desplegar:
     name: Despliegue al VPS (Docker)
-    needs: [backend, frontend]
+    needs: [backend, frontend, asistente]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment:

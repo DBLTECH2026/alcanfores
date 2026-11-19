@@ -24,6 +24,8 @@ import pe.alcanfores.notificaciones.modelo.CanalNotificacion;
 import pe.alcanfores.notificaciones.modelo.EstadoAdjunto;
 import pe.alcanfores.notificaciones.modelo.EstadoNotificacion;
 import pe.alcanfores.notificaciones.modelo.Notificacion;
+import pe.alcanfores.notificaciones.modelo.TipoAdjunto;
+import pe.alcanfores.notificaciones.plantilla.Tarjetas;
 import pe.alcanfores.notificaciones.repositorio.NotificacionRepositorio;
 
 import java.nio.charset.StandardCharsets;
@@ -70,7 +72,7 @@ class EnvioServicioImplTest {
         pagos = mock(PagosCliente.class);
         NotificacionRepositorio repo = mock(NotificacionRepositorio.class);
         when(repo.save(any(Notificacion.class))).thenAnswer(i -> i.getArgument(0));
-        servicio = new EnvioServicioImpl(List.of(whatsapp, correo), reservas, pagos, repo);
+        servicio = new EnvioServicioImpl(List.of(whatsapp, correo), reservas, pagos, repo, new Tarjetas());
     }
 
     @AfterEach
@@ -100,14 +102,70 @@ class EnvioServicioImplTest {
     }
 
     @Test
-    @DisplayName("Con la constancia: un solo sendMedia con el PDF y el mensaje como leyenda")
-    void documentoConLeyenda() {
+    @DisplayName("Tarjeta + constancia: primero la IMAGEN con el texto como leyenda y después el PDF con leyenda breve")
+    void imagenYLuegoPdf() {
         when(reservas.constanciaPdf(Datos.CODIGO)).thenReturn(Datos.PDF);
         evolution.expect(ExpectedCount.once(), requestTo(URL + "/message/sendMedia/alcanfores"))
                 .andExpect(method(HttpMethod.POST))
-                .andExpect(jsonPath("$.mediatype").value("document"))
-                .andExpect(jsonPath("$.fileName").value("constancia-ALC-7K3M9P.pdf"))
+                .andExpect(jsonPath("$.number").value("51987654321"))
+                .andExpect(jsonPath("$.mediatype").value("image"))
+                .andExpect(jsonPath("$.mimetype").value("image/jpeg"))
+                .andExpect(jsonPath("$.fileName").value("reserva-confirmada.jpg"))
+                .andExpect(jsonPath("$.media").value(org.hamcrest.Matchers.startsWith("/9j/")))
                 .andExpect(jsonPath("$.caption").value("*Reserva confirmada*\n\nHola, Diego."))
+                .andRespond(withSuccess(OK, MediaType.APPLICATION_JSON));
+        evolution.expect(ExpectedCount.once(), requestTo(URL + "/message/sendMedia/alcanfores"))
+                .andExpect(jsonPath("$.mediatype").value("document"))
+                .andExpect(jsonPath("$.mimetype").value("application/pdf"))
+                .andExpect(jsonPath("$.fileName").value("constancia-ALC-7K3M9P.pdf"))
+                .andExpect(jsonPath("$.caption").value("Constancia ALC-7K3M9P"))
+                .andRespond(withSuccess(OK, MediaType.APPLICATION_JSON));
+
+        Notificacion n = servicio.enviar(whatsapp(List.of(Adjunto.tarjeta("reserva-confirmada"),
+                Adjunto.constancia(Datos.CODIGO))));
+
+        assertThat(n.getEstado()).isEqualTo(EstadoNotificacion.ENVIADO);
+        assertThat(n.getAdjuntos()).extracting(Adjunto::tipo, Adjunto::estado).containsExactly(
+                org.assertj.core.groups.Tuple.tuple(TipoAdjunto.IMAGEN, EstadoAdjunto.ADJUNTADO),
+                org.assertj.core.groups.Tuple.tuple(TipoAdjunto.CONSTANCIA, EstadoAdjunto.ADJUNTADO));
+        evolution.verify();
+    }
+
+    @Test
+    @DisplayName("Si la imagen falla, sale solo el texto (no se pierde el aviso) y luego el PDF; la tarjeta queda NO_DISPONIBLE")
+    void imagenFallaSaleTexto() {
+        when(pagos.comprobantePdf(12L)).thenReturn(Datos.PDF);
+        evolution.expect(requestTo(URL + "/message/sendMedia/alcanfores"))
+                .andExpect(jsonPath("$.mediatype").value("image"))
+                .andRespond(withServerError());
+        evolution.expect(requestTo(URL + "/message/sendText/alcanfores"))
+                .andExpect(jsonPath("$.text").value("*Reserva confirmada*\n\nHola, Diego."))
+                .andRespond(withSuccess(OK, MediaType.APPLICATION_JSON));
+        evolution.expect(requestTo(URL + "/message/sendMedia/alcanfores"))
+                .andExpect(jsonPath("$.mediatype").value("document"))
+                .andExpect(jsonPath("$.caption").value("Boleta B001-00000012"))
+                .andRespond(withSuccess(OK, MediaType.APPLICATION_JSON));
+
+        Notificacion n = servicio.enviar(whatsapp(List.of(Adjunto.tarjeta("comprobante-emitido"),
+                Adjunto.comprobante(12L, "B001-00000012"))));
+
+        assertThat(n.getEstado()).isEqualTo(EstadoNotificacion.ENVIADO);
+        assertThat(n.getAdjuntos().get(0)).satisfies(a -> {
+            assertThat(a.tipo()).isEqualTo(TipoAdjunto.IMAGEN);
+            assertThat(a.estado()).isEqualTo(EstadoAdjunto.NO_DISPONIBLE);
+            assertThat(a.detalle()).contains("salió solo con el texto");
+        });
+        evolution.verify();
+    }
+
+    @Test
+    @DisplayName("Sin tarjeta: el texto y después la constancia con leyenda breve")
+    void documentoConLeyenda() {
+        when(reservas.constanciaPdf(Datos.CODIGO)).thenReturn(Datos.PDF);
+        evolution.expect(requestTo(URL + "/message/sendText/alcanfores")).andRespond(withSuccess(OK, MediaType.APPLICATION_JSON));
+        evolution.expect(ExpectedCount.once(), requestTo(URL + "/message/sendMedia/alcanfores"))
+                .andExpect(jsonPath("$.mediatype").value("document"))
+                .andExpect(jsonPath("$.caption").value("Constancia ALC-7K3M9P"))
                 .andRespond(withSuccess(OK, MediaType.APPLICATION_JSON));
 
         Notificacion n = servicio.enviar(whatsapp(List.of(Adjunto.constancia(Datos.CODIGO))));
@@ -118,6 +176,16 @@ class EnvioServicioImplTest {
     }
 
     @Test
+    @DisplayName("Leyendas de los PDFs y tarjeta inexistente")
+    void leyendasYTarjetaInexistente() {
+        assertThat(Adjunto.comprobante(1L, "F001-00000003").leyenda()).isEqualTo("Factura F001-00000003");
+        assertThat(Adjunto.comprobante(1L, "BC01-00000001").leyenda()).isEqualTo("Nota de crédito BC01-00000001");
+        assertThat(new Tarjetas().leer("no-existe")).isEmpty();
+        assertThat(new Tarjetas().leer("../secreto")).isEmpty();
+        assertThat(new Tarjetas().dataUri("saldo-pagado")).get().asString().startsWith("data:image/jpeg;base64,/9j/");
+    }
+
+    @Test
     @DisplayName("Texto más largo que la leyenda: primero el texto y luego el PDF")
     void textoLargoYDocumento() {
         when(reservas.constanciaPdf(Datos.CODIGO)).thenReturn(Datos.PDF);
@@ -125,7 +193,7 @@ class EnvioServicioImplTest {
                 "Asunto", "x".repeat(1200), List.of(Adjunto.constancia(Datos.CODIGO)), Tiempo.ahora());
         evolution.expect(requestTo(URL + "/message/sendText/alcanfores")).andRespond(withSuccess(OK, MediaType.APPLICATION_JSON));
         evolution.expect(requestTo(URL + "/message/sendMedia/alcanfores"))
-                .andExpect(jsonPath("$.caption").value("constancia-ALC-7K3M9P.pdf"))
+                .andExpect(jsonPath("$.caption").value("Constancia ALC-7K3M9P"))
                 .andRespond(withSuccess(OK, MediaType.APPLICATION_JSON));
 
         assertThat(servicio.enviar(larga).getEstado()).isEqualTo(EstadoNotificacion.ENVIADO);
@@ -153,6 +221,7 @@ class EnvioServicioImplTest {
     @DisplayName("Error al enviar el documento → FALLIDO (no se pierde el mensaje: el reintento lo manda completo)")
     void errorDocumento() {
         when(reservas.constanciaPdf(Datos.CODIGO)).thenReturn(Datos.PDF);
+        evolution.expect(requestTo(URL + "/message/sendText/alcanfores")).andRespond(withSuccess(OK, MediaType.APPLICATION_JSON));
         evolution.expect(requestTo(URL + "/message/sendMedia/alcanfores")).andRespond(withServerError());
 
         Notificacion n = servicio.enviar(whatsapp(List.of(Adjunto.constancia(Datos.CODIGO))));
@@ -198,6 +267,7 @@ class EnvioServicioImplTest {
     void descargaUnaVez() {
         when(reservas.constanciaPdf(Datos.CODIGO)).thenReturn(Datos.PDF);
         when(correo.configurado()).thenReturn(true);
+        evolution.expect(requestTo(URL + "/message/sendText/alcanfores")).andRespond(withSuccess(OK, MediaType.APPLICATION_JSON));
         evolution.expect(requestTo(URL + "/message/sendMedia/alcanfores")).andRespond(withSuccess(OK, MediaType.APPLICATION_JSON));
         Notificacion mail = new Notificacion(Datos.CODIGO, "reserva.confirmada", CanalNotificacion.CORREO, "a@b.pe", "x",
                 "<p>x</p>", List.of(Adjunto.constancia(Datos.CODIGO)), Tiempo.ahora());
@@ -217,7 +287,7 @@ class EnvioServicioImplTest {
         NotificacionRepositorio repo = mock(NotificacionRepositorio.class);
         when(repo.save(any(Notificacion.class))).thenAnswer(i -> i.getArgument(0));
         EnvioServicioImpl simulado = new EnvioServicioImpl(List.of(new WhatsappCanal(new EvolutionCliente(b, sinEvolution))),
-                reservas, pagos, repo);
+                reservas, pagos, repo, new Tarjetas());
 
         Notificacion n = simulado.enviar(whatsapp(List.of()));
 

@@ -101,14 +101,16 @@ public class ConfiguracionServicioImpl implements ConfiguracionServicio {
         Map<String, String> c = todas();
         Function<ClaveConfiguracion, String> v = k -> c.get(k.clave());
         Function<ClaveConfiguracion, Integer> n = k -> Integer.valueOf(c.get(k.clave()));
+        List<Integer> recordatorios = ValidadorConfiguracion.minutos(v.apply(RECORDATORIO_MINUTOS));
         return new ComplejoRespuesta(v.apply(NOMBRE_COMPLEJO), v.apply(LEMA), v.apply(DIRECCION), v.apply(REFERENCIA),
                 v.apply(WHATSAPP), v.apply(CORREO), v.apply(MAPA_URL), new BigDecimal(v.apply(LATITUD)),
                 new BigDecimal(v.apply(LONGITUD)),
                 new ComplejoRespuesta.Horario(v.apply(PRIMER_TURNO), v.apply(ULTIMO_TURNO), n.apply(DURACION_MIN),
                         v.apply(INICIO_NOCHE), n.apply(DIAS_VISIBLES)),
                 new ComplejoRespuesta.Reglas(n.apply(ADELANTO_PCT), n.apply(DEVOLUCION_HORAS), n.apply(MINUTOS_PARA_PAGAR),
-                        n.apply(RECORDATORIO_HORAS)),
-                new ComplejoRespuesta.Pagos(v.apply(YAPE_NUMERO), v.apply(YAPE_TITULAR), v.apply(PLIN_NUMERO)));
+                        recordatorios.isEmpty() ? 0 : recordatorios.get(0) / 60, recordatorios, n.apply(ASISTENCIA_DESDE_MIN)),
+                new ComplejoRespuesta.Pagos(v.apply(YAPE_NUMERO), v.apply(YAPE_TITULAR), v.apply(PLIN_NUMERO)),
+                new ComplejoRespuesta.Asistente(Boolean.parseBoolean(v.apply(IA_WEB_ACTIVA))));
     }
 
     /** Acepta números o textos en el JSON ({@code "adelanto_pct": 40} o {@code "40"}). */

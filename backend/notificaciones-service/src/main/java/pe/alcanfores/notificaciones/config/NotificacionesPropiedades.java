@@ -5,6 +5,8 @@ import lombok.Setter;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.util.StringUtils;
 
+import java.util.List;
+
 /**
  * Propiedades propias del servicio ({@code alcanfores.notificaciones.*}). Todas tienen valor por defecto para local;
  * en producción llegan por variables de entorno (ver application.yml).
@@ -29,6 +31,8 @@ public class NotificacionesPropiedades {
         /** Dirección del remitente ({@code MAIL_REMITENTE}). */
         private String remitente = "informes.alcanfores@gmail.com";
         private String nombreRemitente = "Complejo Deportivo Los Alcanfores";
+        /** Clave para cifrar la contraseña SMTP guardada desde el panel ({@code CORREO_CLAVE_CIFRADO}; vacía = JWT_SECRETO). */
+        private String claveCifrado = "";
     }
 
     @Getter
@@ -49,10 +53,10 @@ public class NotificacionesPropiedades {
     @Getter
     @Setter
     public static class Recordatorio {
-        /** Horas antes del inicio si catalogo-service no responde ({@code recordatorio_horas}). */
-        private int horasPorDefecto = 2;
-        /** Si faltan menos de estos minutos para el inicio, el recordatorio ya no tiene sentido: OMITIDO. */
-        private int minutosMinimos = 30;
+        /** Minutos antes del inicio si catalogo-service no responde ({@code recordatorio_minutos}). */
+        private List<Integer> minutosPorDefecto = List.of(120);
+        /** Si la hora de envío pasó hace más que esto (p. ej. la reserva se confirmó tarde), el recordatorio se OMITE. */
+        private int toleranciaMinutos = 10;
     }
 
     /** Datos del complejo que se usan si catalogo-service no responde (los reales del cliente). */

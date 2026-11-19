@@ -14,6 +14,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import pe.alcanfores.pagos.dto.CobroRespuesta;
 import pe.alcanfores.pagos.dto.SolicitudCajaInterna;
+import pe.alcanfores.pagos.dto.SolicitudValidacionIa;
 import pe.alcanfores.pagos.servicio.ComprobanteServicio;
 import pe.alcanfores.pagos.servicio.PagoServicio;
 
@@ -36,6 +37,16 @@ public class InternoControlador {
     @ResponseStatus(HttpStatus.CREATED)
     public CobroRespuesta caja(@Valid @RequestBody SolicitudCajaInterna solicitud) {
         return pagos.cobrarEnCajaInterno(solicitud);
+    }
+
+    @Operation(summary = "Validación automática de Canchita (IA)",
+            description = "Lo usa asistente-service cuando la foto del comprobante calza con la reserva: misma validación del panel "
+                    + "(boleta o factura, pago.validado → reserva confirmada → constancia), actor «Canchita (IA)» en la bitácora y "
+                    + "la lectura guardada. Idempotente; 422 PAGO_NO_EN_REVISION si el pago no está en revisión.")
+    @PostMapping("/pagos/{id}/validar-ia")
+    public CobroRespuesta validarPorIa(@PathVariable Long id, @Valid @RequestBody SolicitudValidacionIa solicitud) {
+        String lectura = solicitud.lectura().isTextual() ? solicitud.lectura().asText() : solicitud.lectura().toString();
+        return pagos.validarPorIa(id, lectura, solicitud.validadoPor());
     }
 
     @Operation(summary = "PDF de un comprobante", description = "Lo usa notificaciones-service para adjuntarlo al correo y WhatsApp.")

@@ -56,7 +56,7 @@ class UsuarioServicioImplTest {
         when(administradores.countByRolAndEstado(Rol.ADMIN, EstadoUsuario.ACTIVO)).thenReturn(1L);
 
         assertThatThrownBy(() -> servicio.editar(1L, new EditarUsuarioSolicitud("Rosa", "Huamán", "rhuaman",
-                "rhuaman@alcanfores.pe", Rol.RECEPCION), actor))
+                "rhuaman@alcanfores.pe", Rol.RECEPCION, null), actor))
                 .isInstanceOf(NegocioExcepcion.class)
                 .satisfies(e -> {
                     NegocioExcepcion n = (NegocioExcepcion) e;
@@ -90,7 +90,7 @@ class UsuarioServicioImplTest {
         Administrador a = admin(1L);
         when(administradores.findById(1L)).thenReturn(Optional.of(a));
 
-        servicio.editar(1L, new EditarUsuarioSolicitud("Rosa", "Huamán", "rhuaman", "rhuaman@alcanfores.pe", Rol.ADMIN), actor);
+        servicio.editar(1L, new EditarUsuarioSolicitud("Rosa", "Huamán", "rhuaman", "rhuaman@alcanfores.pe", Rol.ADMIN, null), actor);
 
         verify(administradores).save(a);
         verify(bitacora, never()).registrar(any(), any(), any(), any());

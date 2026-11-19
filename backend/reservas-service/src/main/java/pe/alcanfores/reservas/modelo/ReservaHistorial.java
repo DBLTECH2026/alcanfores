@@ -27,6 +27,7 @@ public class ReservaHistorial {
     public static final String CONFIRMADA = "CONFIRMADA";
     public static final String ASISTENCIA = "ASISTENCIA";
     public static final String CANCELADA = "CANCELADA";
+    public static final String REPROGRAMADA = "REPROGRAMADA";
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

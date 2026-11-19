@@ -93,7 +93,8 @@ class CorreoSmtpTest extends PruebaIntegracion {
         Notificacion n = correo();
         assertThat(n.getEstado()).isEqualTo(EstadoNotificacion.FALLIDO);
         assertThat(n.getIntentos()).isEqualTo(1);
-        assertThat(n.getUltimoError()).startsWith("El servidor de correo no aceptó el mensaje");
+        assertThat(n.getUltimoError()).isEqualTo("No pudimos conectarnos a 127.0.0.1 por el puerto 3025. Revisa el puerto "
+                + "(465 con SSL o 587 con STARTTLS) y que el servidor permita la conexión.");
     }
 
     private static void recorrer(Part parte, List<Part> hojas) throws Exception {

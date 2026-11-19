@@ -5,7 +5,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import pe.alcanfores.comun.error.NegocioExcepcion;
 import pe.alcanfores.comun.util.Tiempo;
-import pe.alcanfores.notificaciones.canal.ArchivoPdf;
+import pe.alcanfores.notificaciones.canal.ArchivoAdjunto;
 import pe.alcanfores.notificaciones.canal.CanalEnvio;
 import pe.alcanfores.notificaciones.canal.EnvioExcepcion;
 import pe.alcanfores.notificaciones.cliente.PagosCliente;
@@ -14,6 +14,8 @@ import pe.alcanfores.notificaciones.modelo.Adjunto;
 import pe.alcanfores.notificaciones.modelo.CanalNotificacion;
 import pe.alcanfores.notificaciones.modelo.EstadoNotificacion;
 import pe.alcanfores.notificaciones.modelo.Notificacion;
+import pe.alcanfores.notificaciones.modelo.TipoAdjunto;
+import pe.alcanfores.notificaciones.plantilla.Tarjetas;
 import pe.alcanfores.notificaciones.repositorio.NotificacionRepositorio;
 import pe.alcanfores.notificaciones.servicio.EnvioServicio;
 
@@ -27,7 +29,8 @@ import java.util.Map;
 /**
  * Envío de avisos. Nunca lanza excepción por una falla del proveedor: la deja anotada en el aviso (FALLIDO,
  * {@code intentos + 1}, {@code ultimo_error}) para que la tarea de reintentos lo vuelva a intentar.
- * Si un PDF no se pudo descargar, el mensaje sale igual sin él y el adjunto queda NO_DISPONIBLE con el motivo.
+ * Si un PDF no se pudo descargar, el mensaje sale igual sin él y el adjunto queda NO_DISPONIBLE con el motivo. La
+ * tarjeta ilustrada (IMAGEN) se lee del propio servicio.
  */
 @Service
 public class EnvioServicioImpl implements EnvioServicio {
@@ -39,13 +42,15 @@ public class EnvioServicioImpl implements EnvioServicio {
     private final ReservasCliente reservas;
     private final PagosCliente pagos;
     private final NotificacionRepositorio notificaciones;
+    private final Tarjetas tarjetas;
 
     public EnvioServicioImpl(List<CanalEnvio> canales, ReservasCliente reservas, PagosCliente pagos,
-                             NotificacionRepositorio notificaciones) {
+                             NotificacionRepositorio notificaciones, Tarjetas tarjetas) {
         canales.forEach(c -> this.canales.put(c.canal(), c));
         this.reservas = reservas;
         this.pagos = pagos;
         this.notificaciones = notificaciones;
+        this.tarjetas = tarjetas;
     }
 
     @Override
@@ -64,12 +69,13 @@ public class EnvioServicioImpl implements EnvioServicio {
     }
 
     private Notificacion enviar(Notificacion n, Map<String, Descarga> descargas) {
-        List<ArchivoPdf> pdfs = new ArrayList<>();
+        List<ArchivoAdjunto> archivos = new ArrayList<>();
         List<Adjunto> adjuntos = new ArrayList<>();
         for (Adjunto a : n.getAdjuntos()) {
             Descarga d = descargas.computeIfAbsent(a.tipo() + ":" + a.referencia(), k -> descargar(a));
             if (d.contenido() != null) {
-                pdfs.add(new ArchivoPdf(a.nombreArchivo(), d.contenido()));
+                archivos.add(new ArchivoAdjunto(a.nombreArchivo(), d.contenido(),
+                        a.tipo() == TipoAdjunto.IMAGEN ? ArchivoAdjunto.MIME_JPG : ArchivoAdjunto.MIME_PDF, a.leyenda()));
                 adjuntos.add(a.adjuntado());
             } else {
                 adjuntos.add(a.noDisponible(d.motivo()));
@@ -82,7 +88,7 @@ public class EnvioServicioImpl implements EnvioServicio {
             n.registrarResultado(EstadoNotificacion.SIMULADO, null, Tiempo.ahora());
         } else {
             try {
-                canal.enviar(n, pdfs);
+                canal.enviar(n, archivos);
                 n.registrarResultado(EstadoNotificacion.ENVIADO, null, Tiempo.ahora());
             } catch (EnvioExcepcion e) {
                 log.warn("Aviso {} por {} a {} falló (intento {}): {}", n.getEvento(), n.getCanal(), n.getDestino(),
@@ -94,11 +100,13 @@ public class EnvioServicioImpl implements EnvioServicio {
     }
 
     private Descarga descargar(Adjunto a) {
+        if (a.tipo() == TipoAdjunto.IMAGEN) {
+            return tarjetas.leer(a.referencia()).map(b -> new Descarga(b, null))
+                    .orElseGet(() -> new Descarga(null, "No existe la tarjeta " + a.nombreArchivo() + "."));
+        }
         try {
-            byte[] pdf = switch (a.tipo()) {
-                case CONSTANCIA -> reservas.constanciaPdf(a.referencia());
-                case COMPROBANTE -> pagos.comprobantePdf(Long.valueOf(a.referencia()));
-            };
+            byte[] pdf = a.tipo() == TipoAdjunto.CONSTANCIA ? reservas.constanciaPdf(a.referencia())
+                    : pagos.comprobantePdf(Long.valueOf(a.referencia()));
             if (!esPdf(pdf)) {
                 return new Descarga(null, "El archivo recibido no es un PDF válido.");
             }

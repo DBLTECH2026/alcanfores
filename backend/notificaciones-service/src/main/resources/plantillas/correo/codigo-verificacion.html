@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{base :: correo('Tu cuenta', 'Código para cambiar tu contraseña', 'Vence en 10 minutos. Si no fuiste tú, ignora este mensaje.', ~{::contenido})}">
+<body>
+<th:block th:fragment="contenido">
+    <p style="margin:0 0 12px 0;" th:text="|${saludo}:|">Hola:</p>
+    <p style="margin:0;">Tu código para cambiar tu contraseña de Alcanfores es:</p>
+
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0"
+           style="width:100%;margin:20px 0;background-color:#E8F3EC;border:1px solid #B9DCC6;border-radius:12px;">
+        <tr>
+            <td align="center" style="padding:22px;">
+                <p class="codigo" style="margin:0;font-family:'Barlow Semi Condensed',Arial,Helvetica,sans-serif;font-size:42px;line-height:48px;font-weight:700;letter-spacing:10px;color:#091A2A;"
+                   th:text="${codigoVerificacion}">123456</p>
+            </td>
+        </tr>
+    </table>
+
+    <table th:replace="~{componentes :: nota('Vence en 10 minutos', 'Si no fuiste tú, ignora este mensaje: tu contraseña no cambia mientras nadie use el código.')}"></table>
+</th:block>
+</body>
+</html>

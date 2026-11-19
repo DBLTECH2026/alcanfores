@@ -76,6 +76,7 @@ public class UsuarioServicioImpl implements UsuarioServicio {
         a.setUsuario(usuario);
         a.setCorreo(correo);
         a.setRol(s.rol());
+        a.setTelefono(Texto.normalizarCelular(s.telefono()));
         a.setEstado(EstadoUsuario.ACTIVO);
         a.setContrasenaHash(codificador.encode(s.contrasena()));
         administradores.save(a);
@@ -108,11 +109,14 @@ public class UsuarioServicioImpl implements UsuarioServicio {
         anotar(cambios, "usuario", a.getUsuario(), usuario);
         anotar(cambios, "correo", a.getCorreo(), correo);
         anotar(cambios, "rol", a.getRol().name(), s.rol().name());
+        String telefono = Texto.normalizarCelular(s.telefono());
+        anotar(cambios, "telefono", a.getTelefono(), telefono);
         a.setNombres(Texto.titulo(s.nombres()));
         a.setApellidos(Texto.titulo(s.apellidos()));
         a.setUsuario(usuario);
         a.setCorreo(correo);
         a.setRol(s.rol());
+        a.setTelefono(telefono);
         administradores.save(a);
         if (!cambios.isEmpty()) {
             bitacora.registrar("EDITAR_USUARIO", ENTIDAD, a.getId(), a.getUsuario() + ": " + String.join("; ", cambios));

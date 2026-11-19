@@ -16,7 +16,7 @@ import org.hibernate.type.SqlTypes;
 
 import java.time.LocalDateTime;
 
-/** Recordatorio «tu partido es en 2 horas»: uno por reserva confirmada ({@code codigo_reserva} único). */
+/** Recordatorio «tu partido es en 2 horas»: uno por reserva confirmada y por anticipación (UNIQUE codigo_reserva + minutos_antes). */
 @Entity
 @Table(name = "recordatorio")
 @Getter
@@ -27,8 +27,12 @@ public class Recordatorio {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "codigo_reserva", nullable = false, unique = true, length = 12)
+    @Column(name = "codigo_reserva", nullable = false, length = 12)
     private String codigoReserva;
+
+    /** Cuántos minutos antes del inicio se envía (uno de los valores de {@code recordatorio_minutos}). */
+    @Column(name = "minutos_antes", nullable = false)
+    private int minutosAntes;
 
     @Column(name = "enviar_en", nullable = false)
     private LocalDateTime enviarEn;
@@ -51,20 +55,35 @@ public class Recordatorio {
     @Column(length = 255)
     private String detalle;
 
-    public Recordatorio(String codigoReserva, LocalDateTime enviarEn, LocalDateTime inicioReserva, DatosRecordatorio datos) {
+    /**
+     * Cuándo ocurrió el evento (confirmación o cambio de horario) del que salen el inicio y los datos; si los toma de
+     * reservas al enviar, el momento de esa consulta. Un evento más viejo que esto no los reemplaza.
+     */
+    @Column(name = "datos_al")
+    private LocalDateTime datosAl;
+
+    public Recordatorio(String codigoReserva, int minutosAntes, LocalDateTime inicioReserva, DatosRecordatorio datos,
+                        LocalDateTime datosAl) {
         this.codigoReserva = codigoReserva;
-        this.enviarEn = enviarEn;
+        this.minutosAntes = minutosAntes;
+        this.enviarEn = inicioReserva.minusMinutes(minutosAntes);
         this.inicioReserva = inicioReserva;
         this.datos = datos;
+        this.datosAl = datosAl;
         this.estado = EstadoRecordatorio.PROGRAMADO;
     }
 
-    /** Si la reserva se vuelve a confirmar (p. ej. cambio de datos), se reprograma con lo último. */
-    public void reprogramar(LocalDateTime nuevoEnviarEn, LocalDateTime nuevoInicio, DatosRecordatorio nuevosDatos) {
-        this.enviarEn = nuevoEnviarEn;
+    /**
+     * Vuelve a PROGRAMADO para ese inicio con los datos nuevos: la reserva se volvió a confirmar o cambió de horario
+     * (un recordatorio ya enviado del horario anterior se envía de nuevo para el nuevo).
+     */
+    public void reprogramar(LocalDateTime nuevoInicio, DatosRecordatorio nuevosDatos, LocalDateTime nuevosDatosAl) {
+        this.enviarEn = nuevoInicio.minusMinutes(minutosAntes);
         this.inicioReserva = nuevoInicio;
         this.datos = nuevosDatos;
+        this.datosAl = nuevosDatosAl;
         this.estado = EstadoRecordatorio.PROGRAMADO;
+        this.enviadoEn = null;
         this.detalle = null;
     }
 

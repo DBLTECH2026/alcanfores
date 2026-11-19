@@ -326,6 +326,38 @@ class GatewayIntegracionTest {
     }
 
     @Test
+    void recuperarContrasenaEsPublicoYAlSextoIntentoDeUnaIpResponde429() {
+        String[] pasos = {"opciones", "enviar", "verificar", "restablecer", "opciones"};
+        for (String paso : pasos) {
+            web.post().uri("/api/auth/recuperar/" + paso).header("X-Forwarded-For", "203.0.113.23")
+                    .contentType(MediaType.APPLICATION_JSON).bodyValue("{}")
+                    .exchange().expectStatus().isOk()
+                    .expectHeader().valueEquals("X-RateLimit-Limit", "5")
+                    .expectBody().jsonPath("$.ruta").isEqualTo("/api/auth/recuperar/" + paso);
+        }
+        web.post().uri("/api/auth/recuperar/verificar").header("X-Forwarded-For", "203.0.113.23")
+                .contentType(MediaType.APPLICATION_JSON).bodyValue("{}")
+                .exchange()
+                .expectStatus().isEqualTo(429)
+                .expectBody().jsonPath("$.codigo").isEqualTo("DEMASIADAS_SOLICITUDES");
+        // Otra IP sigue pasando y el login de la misma IP tiene su propio cupo.
+        web.post().uri("/api/auth/recuperar/opciones").header("X-Forwarded-For", "203.0.113.24")
+                .contentType(MediaType.APPLICATION_JSON).bodyValue("{}").exchange().expectStatus().isOk();
+        web.post().uri("/api/auth/login").header("X-Forwarded-For", "203.0.113.23")
+                .contentType(MediaType.APPLICATION_JSON).bodyValue("{}").exchange().expectStatus().isOk();
+    }
+
+    @Test
+    void laConfiguracionDelCorreoVaANotificacionesConToken() {
+        web.get().uri("/api/admin/correo").exchange().expectStatus().isUnauthorized();
+        web.post().uri("/api/admin/correo/prueba").header(HttpHeaders.AUTHORIZATION, "Bearer " + jwt.generar(rosa))
+                .contentType(MediaType.APPLICATION_JSON).bodyValue("{}")
+                .exchange()
+                .expectStatus().isEqualTo(503)
+                .expectBody().jsonPath("$.mensaje").value(containsString("servicio de notificaciones"));
+    }
+
+    @Test
     void elUndecimoLoginDeClienteEnUnMinutoResponde429() {
         for (int i = 0; i < 10; i++) {
             web.post().uri("/api/auth/clientes/login").header("X-Forwarded-For", "203.0.113.22")

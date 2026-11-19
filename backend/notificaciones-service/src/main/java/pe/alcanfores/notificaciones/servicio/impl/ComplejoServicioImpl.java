@@ -12,6 +12,9 @@ import pe.alcanfores.notificaciones.servicio.DatosComplejo;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -58,6 +61,19 @@ public class ComplejoServicioImpl implements ComplejoServicio {
         return nuevos;
     }
 
+    @Override
+    public DatosComplejo actualizados() {
+        try {
+            DatosComplejo nuevos = combinar(catalogo.configuracion());
+            enCache = nuevos;
+            venceCache = Tiempo.ahora().plus(VIGENCIA);
+            return nuevos;
+        } catch (NegocioExcepcion e) {
+            log.warn("Configuración del complejo no disponible al confirmar ({}); se usa la última conocida", e.getMessage());
+            return datos();
+        }
+    }
+
     DatosComplejo combinar(Map<String, String> c) {
         NotificacionesPropiedades.Complejo d = propiedades.getComplejo();
         return new DatosComplejo(
@@ -67,8 +83,26 @@ public class ComplejoServicioImpl implements ComplejoServicio {
                 texto(c, "mapa_url", d.getMapaUrl()),
                 texto(c, "whatsapp", d.getWhatsapp()),
                 texto(c, "correo", d.getCorreo()),
-                entero(c, "recordatorio_horas", propiedades.getRecordatorio().getHorasPorDefecto(), 1, 48),
+                minutosRecordatorio(c.get("recordatorio_minutos"), propiedades.getRecordatorio().getMinutosPorDefecto()),
                 entero(c, "devolucion_horas", DEVOLUCION_HORAS_POR_DEFECTO, 0, 720));
+    }
+
+    /**
+     * «120,15» → [120, 15] (de mayor a menor). Si el valor no cumple la regla del catálogo (1 a 3 valores de 5 a 1440,
+     * sin repetir) se usan los minutos por defecto: nunca se deja una reserva sin recordatorio.
+     */
+    static List<Integer> minutosRecordatorio(String valor, List<Integer> porDefecto) {
+        if (valor == null || valor.isBlank()) {
+            return porDefecto;
+        }
+        try {
+            List<Integer> lista = Arrays.stream(valor.split(",")).map(String::trim).map(Integer::valueOf).toList();
+            boolean valida = !lista.isEmpty() && lista.size() <= 3 && lista.stream().distinct().count() == lista.size()
+                    && lista.stream().allMatch(m -> m >= 5 && m <= 1440);
+            return valida ? lista.stream().sorted(Comparator.reverseOrder()).toList() : porDefecto;
+        } catch (NumberFormatException e) {
+            return porDefecto;
+        }
     }
 
     private static String texto(Map<String, String> c, String clave, String porDefecto) {

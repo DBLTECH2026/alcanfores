@@ -26,6 +26,7 @@ public final class Eventos {
     public static final String RESERVA_CONFIRMADA = "reserva.confirmada";
     public static final String RESERVA_CANCELADA = "reserva.cancelada";
     public static final String RESERVA_ASISTENCIA = "reserva.asistencia";
+    public static final String RESERVA_REPROGRAMADA = "reserva.reprogramada";
     public static final String PAGO_REGISTRADO = "pago.registrado";
     public static final String PAGO_VALIDADO = "pago.validado";
     public static final String PAGO_RECHAZADO = "pago.rechazado";

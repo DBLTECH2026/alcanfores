@@ -6,8 +6,11 @@ import pe.alcanfores.comun.eventos.DatosReserva;
 import pe.alcanfores.comun.validacion.Documentos;
 import pe.alcanfores.reservas.dto.AdminDtos.ClienteCompleto;
 import pe.alcanfores.reservas.dto.AdminDtos.ClienteFila;
+import pe.alcanfores.reservas.dto.AdminDtos.HorarioReprogramado;
+import pe.alcanfores.reservas.dto.AdminDtos.ReprogramacionInfo;
 import pe.alcanfores.reservas.dto.AdminDtos.ReservaAdminDetalle;
 import pe.alcanfores.reservas.dto.AdminDtos.ReservaFila;
+import pe.alcanfores.reservas.dto.InternoDtos.ReservaDelCliente;
 import pe.alcanfores.reservas.dto.InternoDtos.ReservaInterna;
 import pe.alcanfores.reservas.dto.InternoDtos.ReservaSemilla;
 import pe.alcanfores.reservas.dto.ReservaDtos.CanchaResumen;
@@ -22,7 +25,10 @@ import pe.alcanfores.reservas.modelo.Cancelacion;
 import pe.alcanfores.reservas.modelo.Cliente;
 import pe.alcanfores.reservas.modelo.Reserva;
 import pe.alcanfores.reservas.modelo.ReservaHistorial;
+import pe.alcanfores.reservas.modelo.ReservaReprogramacion;
 import pe.alcanfores.reservas.modelo.Turno;
+import pe.alcanfores.comun.util.Tiempo;
+import pe.alcanfores.reservas.servicio.ComplejoServicio;
 import pe.alcanfores.reservas.servicio.ReglasReserva;
 
 import java.time.LocalDateTime;
@@ -35,15 +41,27 @@ import java.util.List;
 @Component
 public class ReservaMapeador {
 
-    public ClienteContacto contacto(Cliente c) {
-        return new ClienteContacto(c.getDni(), c.getNombres(), c.getApellidos(), c.getTelefono(), c.getCorreo());
+    private final ComplejoServicio complejo;
+
+    public ReservaMapeador(ComplejoServicio complejo) {
+        this.complejo = complejo;
+    }
+
+    /**
+     * Contacto para los avisos de ESA reserva: nombres y correo del cliente, pero el celular con el que se hizo la reserva
+     * (si alguien reserva después con el mismo DNI y otro número, los avisos de esta no se van a ese número).
+     */
+    public ClienteContacto contacto(Reserva r) {
+        Cliente c = r.getCliente();
+        String celular = r.getTelefonoContacto() != null ? r.getTelefonoContacto() : c.getTelefono();
+        return new ClienteContacto(c.getDni(), c.getNombres(), c.getApellidos(), celular, c.getCorreo());
     }
 
     public DatosReserva datos(Reserva r) {
         Turno t = r.getTurno();
         return new DatosReserva(r.getId(), r.getCodigoReserva(), t.getIdCancha(), t.getNombreCancha(), t.getDeporte(),
                 t.getFecha(), r.horaInicio(), r.horaFin(), r.getMontoTotal(), r.getMontoAdelanto(), r.getMontoPagado(),
-                contacto(r.getCliente()), r.horarioTexto(), r.cantidadTurnos());
+                contacto(r), r.horarioTexto(), r.cantidadTurnos());
     }
 
     /** Turnos de la reserva con su precio (si no tiene filas en reserva_turno, el primer turno con el total). */
@@ -81,29 +99,38 @@ public class ReservaMapeador {
         return historial.stream().map(h -> new EventoLinea(h.getEvento(), h.getFecha(), h.getDetalle())).toList();
     }
 
-    /** {@code yaResenada}: catálogo ya tiene la reseña de esta reserva (entonces no se ofrece «Calificar»). */
+    /**
+     * {@code yaResenada}: catálogo ya tiene la reseña de esta reserva (entonces no se ofrece «Calificar»).
+     * {@code cambios}: su historial de cambios de horario ({@code reprogramaciones} = cuántos; {@code puedeReprogramar}
+     * con las reglas del cliente: a tiempo y sin haber usado su único cambio). {@code montoEnRevision}: el comprobante que
+     * se está validando (Canchita lo suma a lo pagado en la vista previa de un cambio de horario).
+     */
     public ReservaClienteDetalle detalleCliente(Reserva r, Cancelacion c, List<ReservaHistorial> historial, LocalDateTime ahora,
-                                                boolean yaResenada) {
+                                                boolean yaResenada, List<ReservaReprogramacion> cambios) {
         Turno t = r.getTurno();
+        long delCliente = cambios.stream().filter(rp -> rp.getActor().delCliente()).count();
         return new ReservaClienteDetalle(r.getCodigoReserva(), r.getEstado(), r.getEstadoPago(), r.getVenceEn(), cancha(t),
                 t.getFecha(), r.horaInicio(), r.horaFin(), r.getMontoTotal(), r.getMontoAdelanto(),
                 clientePublico(r.getCliente()), r.getAsistencia(), r.getMontoPagado(), r.saldo(), r.getMetodoPagoPrevisto(),
                 cancelacion(c), linea(historial), ReglasReserva.puedeCancelarCliente(r, ahora),
                 ReglasReserva.puedeReenviarComprobante(r, ahora), !yaResenada && ReglasReserva.puedeResenar(r, ahora),
-                turnos(r), r.horarioTexto(), r.cantidadTurnos(), yaResenada);
+                turnos(r), r.horarioTexto(), r.cantidadTurnos(), yaResenada, cambios.size(),
+                ReglasReserva.puedeReprogramarCliente(r, ahora, delCliente), r.getMontoEnRevision());
     }
 
-    /** Ítem de «Mis reservas». */
-    public ReservaClienteItem itemCliente(Reserva r, LocalDateTime ahora, boolean yaResenada) {
+    /** Ítem de «Mis reservas». {@code c}: su cancelación (null si no está cancelada), igual que en el detalle. */
+    public ReservaClienteItem itemCliente(Reserva r, Cancelacion c, LocalDateTime ahora, boolean yaResenada) {
         Turno t = r.getTurno();
         return new ReservaClienteItem(r.getCodigoReserva(), r.getEstado(), r.getEstadoPago(), r.getAsistencia(), r.getOrigen(),
                 cancha(t), t.getFecha(), r.horaInicio(), r.horaFin(), r.horarioTexto(), r.cantidadTurnos(), turnos(r),
                 r.getMontoTotal(), r.getMontoAdelanto(), r.getMontoPagado(), r.saldo(), r.getVenceEn(), r.getFechaRegistro(),
                 ReglasReserva.puedeCancelarCliente(r, ahora), ReglasReserva.puedeReenviarComprobante(r, ahora),
-                !yaResenada && ReglasReserva.puedeResenar(r, ahora), yaResenada);
+                !yaResenada && ReglasReserva.puedeResenar(r, ahora), yaResenada, cancelacion(c));
     }
 
-    public ReservaAdminDetalle detalleAdmin(Reserva r, Cancelacion c, List<ReservaHistorial> historial, LocalDateTime ahora) {
+    /** {@code cambios}: historial de cambios de horario, el más reciente primero. */
+    public ReservaAdminDetalle detalleAdmin(Reserva r, Cancelacion c, List<ReservaHistorial> historial, LocalDateTime ahora,
+                                            List<ReservaReprogramacion> cambios) {
         Turno t = r.getTurno();
         Cliente cl = r.getCliente();
         return new ReservaAdminDetalle(r.getCodigoReserva(), r.getEstado(), r.getEstadoPago(), r.getAsistencia(), r.getOrigen(),
@@ -113,8 +140,27 @@ public class ReservaMapeador {
                 new ClienteCompleto(cl.getId(), cl.getDni(), cl.getNombres(), cl.getApellidos(), cl.getTelefono(),
                         cl.getCorreo(), cl.isVerificadoReniec()),
                 cancelacion(c), linea(historial), ReglasReserva.puedeCancelarAdmin(r),
-                ReglasReserva.puedeMarcarAsistencia(r, ahora), ReglasReserva.puedeCobrarSaldo(r), turnos(r), r.horarioTexto(),
-                r.cantidadTurnos());
+                ReglasReserva.puedeMarcarAsistencia(r, ahora, complejo.parametros().asistenciaDesdeMin()),
+                ReglasReserva.puedeCobrarSaldo(r), turnos(r), r.horarioTexto(),
+                r.cantidadTurnos(), ReglasReserva.reprogramable(r, ahora), cambios.stream().map(this::reprogramacion).toList());
+    }
+
+    public ReprogramacionInfo reprogramacion(ReservaReprogramacion rp) {
+        return new ReprogramacionInfo(rp.getId(), rp.getActor().name(), rp.getUsuario(), rp.getMotivo(), rp.getCreadoEn(),
+                horario(rp.anterior()), horario(rp.nuevo()));
+    }
+
+    private static HorarioReprogramado horario(ReservaReprogramacion.Horario h) {
+        return new HorarioReprogramado(h.idCancha(), h.cancha(), h.fecha(), h.horaInicio(), h.horaFin(), h.horarioTexto(),
+                h.idsTurno(), h.idsTurno().size(), h.total());
+    }
+
+    /** Reserva de un cliente para Canchita (consulta por DNI + celular). */
+    public ReservaDelCliente delCliente(Reserva r) {
+        Turno t = r.getTurno();
+        return new ReservaDelCliente(r.getCodigoReserva(), t.getNombreCancha(), t.getFecha(), r.horaInicio(), r.horaFin(),
+                r.horarioTexto(), r.cantidadTurnos(), turnos(r), r.getEstado(), r.getEstadoPago(), r.getMontoTotal(),
+                r.getMontoPagado(), r.saldo());
     }
 
     public ReservaFila fila(Reserva r) {
@@ -123,14 +169,15 @@ public class ReservaMapeador {
         return new ReservaFila(r.getCodigoReserva(), new ClienteFila(c.getNombres(), c.getApellidos(), c.getDni(), c.getTelefono()),
                 t.getNombreCancha(), t.getFecha(), r.horaInicio(), r.horaFin(), r.getEstado(), r.getEstadoPago(),
                 r.getAsistencia(), r.getOrigen(), r.getMontoTotal(), r.getMontoPagado(), r.getFechaRegistro(), turnos(r),
-                r.horarioTexto(), r.cantidadTurnos());
+                r.horarioTexto(), r.cantidadTurnos(),
+                ReglasReserva.puedeMarcarAsistencia(r, Tiempo.ahora(), complejo.parametros().asistenciaDesdeMin()));
     }
 
     public ReservaInterna interna(Reserva r) {
         Turno t = r.getTurno();
         return new ReservaInterna(r.getId(), r.getCodigoReserva(), t.getIdCancha(), t.getNombreCancha(), t.getDeporte(),
                 t.getFecha(), r.horaInicio(), r.horaFin(), r.getMontoTotal(), r.getMontoAdelanto(), r.getMontoPagado(),
-                contacto(r.getCliente()), r.getEstado(), r.getEstadoPago(), r.getAsistencia(), r.getOrigen(),
+                contacto(r), r.getEstado(), r.getEstadoPago(), r.getAsistencia(), r.getOrigen(),
                 r.getMetodoPagoPrevisto(), r.saldo(), r.inicio(), r.getVenceEn(), r.horarioTexto(), r.cantidadTurnos(),
                 turnos(r));
     }
@@ -139,7 +186,7 @@ public class ReservaMapeador {
         Turno t = r.getTurno();
         return new ReservaSemilla(r.getCodigoReserva(), r.getEstado(), r.getEstadoPago(), r.getMetodoPagoPrevisto(),
                 r.getMontoTotal(), r.getMontoAdelanto(), r.getMontoPagado(), r.getFechaRegistro(), r.getConfirmadaEn(),
-                r.getOrigen(), t.getNombreCancha(), t.getFecha(), r.horaInicio(), contacto(r.getCliente()),
+                r.getOrigen(), t.getNombreCancha(), t.getFecha(), r.horaInicio(), contacto(r),
                 c != null && c.isDevolucion() ? c.getMontoDevolucion() : null);
     }
 }

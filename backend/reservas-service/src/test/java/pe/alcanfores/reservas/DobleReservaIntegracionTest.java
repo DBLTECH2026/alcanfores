@@ -118,8 +118,8 @@ class DobleReservaIntegracionTest extends PruebaIntegracion {
         Turno t = turno(3, HOY.plusDays(1), 18);
         reservarWeb(t.getId(), "43000001");
         Long idCliente = jdbc.queryForObject("SELECT id_cliente FROM cliente LIMIT 1", Long.class);
-        String insertar = "INSERT INTO reserva (codigo_reserva, id_cliente, id_turno, estado, estado_pago, origen, monto_total,"
-                + " monto_adelanto, fecha_registro) VALUES (?, ?, ?, 'PENDIENTE', 'SIN_PAGO', 'WEB', 120, 60, NOW())";
+        String insertar = "INSERT INTO reserva (codigo_reserva, id_cliente, telefono_contacto, id_turno, estado, estado_pago, origen,"
+                + " monto_total, monto_adelanto, fecha_registro) VALUES (?, ?, '987654321', ?, 'PENDIENTE', 'SIN_PAGO', 'WEB', 120, 60, NOW())";
         assertThatThrownBy(() -> jdbc.update(insertar, "ALC-ZZZZZZ", idCliente, t.getId()))
                 .isInstanceOf(DataIntegrityViolationException.class);
         // Una reserva CANCELADA del mismo turno sí se permite (no ocupa el turno).
@@ -176,8 +176,8 @@ class DobleReservaIntegracionTest extends PruebaIntegracion {
         Long idCliente = jdbc.queryForObject("SELECT id_cliente FROM cliente LIMIT 1", Long.class);
         Turno t11 = turno(2, dia, 11);
         // Otra reserva (primer turno distinto) que intenta incluir el turno de las 10 sin pasar por el bloqueo.
-        jdbc.update("INSERT INTO reserva (codigo_reserva, id_cliente, id_turno, estado, estado_pago, origen, monto_total,"
-                + " monto_adelanto, fecha_registro) VALUES ('ALC-WWWWWW', ?, ?, 'PENDIENTE', 'SIN_PAGO', 'WEB', 140, 70, NOW())",
+        jdbc.update("INSERT INTO reserva (codigo_reserva, id_cliente, telefono_contacto, id_turno, estado, estado_pago, origen,"
+                + " monto_total, monto_adelanto, fecha_registro) VALUES ('ALC-WWWWWW', ?, '987654321', ?, 'PENDIENTE', 'SIN_PAGO', 'WEB', 140, 70, NOW())",
                 idCliente, t11.getId());
         Long idOtra = jdbc.queryForObject("SELECT id_reserva FROM reserva WHERE codigo_reserva = 'ALC-WWWWWW'", Long.class);
         String insertar = "INSERT INTO reserva_turno (id_reserva, id_turno, precio, vigente) VALUES (?, ?, 70, ?)";

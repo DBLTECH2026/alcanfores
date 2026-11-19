@@ -6,3 +6,4 @@ CREATE DATABASE IF NOT EXISTS alcanfores_catalogo       CHARACTER SET utf8mb4 CO
 CREATE DATABASE IF NOT EXISTS alcanfores_reservas       CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE DATABASE IF NOT EXISTS alcanfores_pagos          CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE DATABASE IF NOT EXISTS alcanfores_notificaciones CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE DATABASE IF NOT EXISTS alcanfores_asistente      CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

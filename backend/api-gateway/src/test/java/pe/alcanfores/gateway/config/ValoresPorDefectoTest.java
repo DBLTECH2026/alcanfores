@@ -49,12 +49,14 @@ class ValoresPorDefectoTest {
     @Test
     void elCircuitoDeDocumentosEsperaMasQueElNormal() {
         GatewayPropiedades props = new GatewayPropiedades(DataSize.ofMegabytes(6), Duration.ofSeconds(10), 20_000, 20_000,
-                List.of(), List.of());
+                60_000, List.of(), List.of());
         assertThat(CircuitoConfig.limite("reservas-documentos", props)).isEqualTo(Duration.ofSeconds(22));
         assertThat(CircuitoConfig.limite("reservas", props)).isEqualTo(Duration.ofSeconds(12));
         assertThat(CircuitoConfig.limite("pagos-archivos", props)).isEqualTo(Duration.ofSeconds(22));
-        GatewayPropiedades sinValor = new GatewayPropiedades(null, null, 0, 0, null, null);
+        assertThat(CircuitoConfig.limite("asistente", props)).isEqualTo(Duration.ofSeconds(62));
+        GatewayPropiedades sinValor = new GatewayPropiedades(null, null, 0, 0, 0, null, null);
         assertThat(sinValor.timeoutDocumentosMs()).isEqualTo(20_000);
+        assertThat(sinValor.timeoutAsistenteMs()).isEqualTo(60_000);
     }
 
     @Test
@@ -82,5 +84,42 @@ class ValoresPorDefectoTest {
         }
         assertThat(catalogo).contains("/api/admin/calendario/**");
         assertThat(reservas).contains("/api/cliente/**");
+    }
+
+    @Test
+    void rutasDeRecuperarContrasenaYCorreo() {
+        Properties p = yml();
+        String notificaciones = null;
+        String lentas = null;
+        boolean recuperar = false;
+        for (int i = 0; p.getProperty("spring.cloud.gateway.server.webflux.routes[" + i + "].id") != null; i++) {
+            String prefijo = "spring.cloud.gateway.server.webflux.routes[" + i + "].";
+            String id = p.getProperty(prefijo + "id");
+            if ("notificaciones".equals(id)) {
+                notificaciones = p.getProperty(prefijo + "predicates[0]");
+            }
+            if ("notificaciones-lentas".equals(id)) {
+                lentas = p.getProperty(prefijo + "predicates[0]");
+            }
+            if ("auth-lentas".equals(id)) {
+                recuperar = true;
+                assertThat(p.getProperty(prefijo + "predicates[0]")).isEqualTo("Path=/api/auth/recuperar/**");
+                assertThat(p.getProperty(prefijo + "order")).isEqualTo("-1");
+                assertThat(p.getProperty(prefijo + "metadata.response-timeout")).isEqualTo("${alcanfores.gateway.timeout-archivos-ms}");
+            }
+        }
+        assertThat(recuperar).isTrue();
+        assertThat(notificaciones).contains("/api/admin/correo/**");
+        assertThat(lentas).contains("/api/admin/correo/prueba");
+        boolean limite = false;
+        for (int i = 0; p.getProperty("alcanfores.gateway.limites[" + i + "].nombre") != null; i++) {
+            if ("recuperar".equals(p.getProperty("alcanfores.gateway.limites[" + i + "].nombre"))) {
+                limite = true;
+                assertThat(p.getProperty("alcanfores.gateway.limites[" + i + "].por-minuto")).isEqualTo("5");
+                assertThat(p.getProperty("alcanfores.gateway.limites[" + i + "].rutas[0]")).isEqualTo("/api/auth/recuperar/**");
+                assertThat(p.getProperty("alcanfores.gateway.limites[" + i + "].metodo")).isNull();
+            }
+        }
+        assertThat(limite).isTrue();
     }
 }

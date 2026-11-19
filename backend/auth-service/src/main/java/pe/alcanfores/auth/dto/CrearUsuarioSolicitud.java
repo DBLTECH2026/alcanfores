@@ -7,6 +7,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import pe.alcanfores.auth.modelo.Rol;
 import pe.alcanfores.auth.validacion.ContrasenaSegura;
+import pe.alcanfores.comun.validacion.Celular;
 import pe.alcanfores.comun.validacion.NombrePersona;
 
 /** Alta de un usuario del panel (solo ADMIN). */
@@ -33,7 +34,15 @@ public record CrearUsuarioSolicitud(
 
         @NotBlank(message = "Ingresa la contraseña inicial.")
         @ContrasenaSegura
-        String contrasena) {
+        String contrasena,
+
+        /** Opcional: con celular puede recibir por WhatsApp el código para cambiar la contraseña. */
+        @Celular
+        String telefono) {
+
+    public CrearUsuarioSolicitud {
+        telefono = Reglas.telefonoOpcional(telefono);
+    }
 
     @Override
     public String toString() {

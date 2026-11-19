@@ -32,8 +32,10 @@ import pe.alcanfores.reservas.dto.AdminDtos.ReservaAdminDetalle;
 import pe.alcanfores.reservas.dto.AdminDtos.ReservaFila;
 import pe.alcanfores.reservas.dto.AdminDtos.ReservaManualRespuesta;
 import pe.alcanfores.reservas.dto.AdminDtos.ReservaManualSolicitud;
+import pe.alcanfores.reservas.dto.AdminDtos.ReprogramacionAdminSolicitud;
 import pe.alcanfores.reservas.dto.Mensajes;
 import pe.alcanfores.reservas.mapeador.ReservaMapeador;
+import pe.alcanfores.reservas.modelo.ActorReprogramacion;
 import pe.alcanfores.reservas.modelo.Asistencia;
 import pe.alcanfores.reservas.modelo.Cancelacion;
 import pe.alcanfores.reservas.modelo.CanceladoPor;
@@ -42,7 +44,9 @@ import pe.alcanfores.reservas.modelo.EstadoReserva;
 import pe.alcanfores.reservas.modelo.Origen;
 import pe.alcanfores.reservas.modelo.Reserva;
 import pe.alcanfores.reservas.modelo.ReservaHistorial;
+import pe.alcanfores.reservas.modelo.ReservaReprogramacion;
 import pe.alcanfores.reservas.repositorio.ReservaRepositorio;
+import pe.alcanfores.reservas.servicio.ComplejoServicio;
 import pe.alcanfores.reservas.servicio.ConstanciaServicio;
 import pe.alcanfores.reservas.servicio.ReglasReserva;
 import pe.alcanfores.reservas.servicio.ReservaAdminServicio;
@@ -71,11 +75,13 @@ public class ReservaAdminServicioImpl implements ReservaAdminServicio {
 
     private final ReservaRepositorio reservas;
     private final OperacionesReserva operaciones;
+    private final ReprogramadorReservas reprogramador;
     private final ReservaMapeador mapeador;
     private final PagosCliente pagos;
     private final ConstanciaServicio constancias;
     private final Auditor auditor;
     private final TransactionTemplate transacciones;
+    private final ComplejoServicio complejo;
 
     @Override
     @Transactional(readOnly = true)
@@ -157,9 +163,12 @@ public class ReservaAdminServicioImpl implements ReservaAdminServicio {
         if (r.getEstado() != EstadoReserva.CONFIRMADA) {
             throw NegocioExcepcion.regla("ASISTENCIA_NO_PERMITIDA", "Solo se registra la asistencia de reservas confirmadas.");
         }
-        if (!ReglasReserva.puedeMarcarAsistencia(r, ahora)) {
-            throw NegocioExcepcion.regla("ASISTENCIA_ANTICIPADA", "La asistencia se registra desde "
-                    + ReglasReserva.MINUTOS_ASISTENCIA + " minutos antes del inicio del turno.");
+        int minutosAntes = complejo.parametros().asistenciaDesdeMin();
+        if (!ReglasReserva.puedeMarcarAsistencia(r, ahora, minutosAntes)) {
+            throw NegocioExcepcion.regla("ASISTENCIA_ANTICIPADA", minutosAntes == 0
+                    ? "La asistencia se registra desde la hora de inicio del turno."
+                    : "La asistencia se registra desde " + minutosAntes + (minutosAntes == 1 ? " minuto" : " minutos")
+                    + " antes del inicio del turno.");
         }
         Asistencia asistencia = Asistencia.valueOf(s.asistencia());
         r.setAsistencia(asistencia);
@@ -172,6 +181,18 @@ public class ReservaAdminServicioImpl implements ReservaAdminServicio {
     }
 
     @Override
+    @Transactional
+    public ReservaAdminDetalle reprogramar(String idOCodigo, ReprogramacionAdminSolicitud s) {
+        UsuarioToken u = SeguridadUtil.requerido();
+        Reserva r = operaciones.bloquear(idOCodigo);
+        ReservaReprogramacion rp = reprogramador.reprogramar(r, new ReprogramadorReservas.Cambio(s.idsTurno(),
+                ActorReprogramacion.PANEL, u.usuario(), s.motivo()));
+        auditor.registrar("REPROGRAMAR_RESERVA", "reserva", r.getCodigoReserva(),
+                ReprogramadorReservas.resumen(rp) + " · " + rp.getMotivo());
+        return detalleDe(r);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public byte[] constancia(String codigo) {
         Reserva r = operaciones.buscar(codigo);
@@ -179,7 +200,8 @@ public class ReservaAdminServicioImpl implements ReservaAdminServicio {
     }
 
     private ReservaAdminDetalle detalleDe(Reserva r) {
-        return mapeador.detalleAdmin(r, operaciones.cancelacionDe(r), operaciones.historialDe(r), Tiempo.ahora());
+        return mapeador.detalleAdmin(r, operaciones.cancelacionDe(r), operaciones.historialDe(r), Tiempo.ahora(),
+                operaciones.reprogramacionesDe(r));
     }
 
     /** Reglas cruzadas del pago inicial que Bean Validation no expresa: operación de Yape/Plin y datos de factura. */

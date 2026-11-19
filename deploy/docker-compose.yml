@@ -1,7 +1,8 @@
 # Alcanfores · sistema de reservas con microservicios (producción en el VPS).
 # Red «interna»: todos los servicios. Solo «alcanfores-web» se une además a la red del Caddy (sirac_default),
 # que publica https://alcanfores.dbltech.tech con SSL automático. notificaciones-service también se une para
-# hablar con el servidor de Evolution API (WhatsApp) que ya corre en el VPS.
+# hablar con el servidor de Evolution API (WhatsApp) que ya corre en el VPS, y asistente-service (Canchita) para
+# recibir su webhook (alias «alcanfores-asistente» en esa red).
 name: alcanfores
 
 x-java: &java
@@ -102,6 +103,7 @@ services:
     environment:
       <<: *entorno-comun
       EUREKA_INSTANCE_HOSTNAME: api-gateway
+      ASISTENTE_URL: http://asistente-service:8096
     healthcheck:
       test: ["CMD", "curl", "-fs", "http://localhost:8086/actuator/health"]
       interval: 15s
@@ -123,6 +125,7 @@ services:
       SEED_CLAVE_ADMIN: ${SEED_CLAVE_ADMIN}
       SEED_CLAVE_RECEPCION: ${SEED_CLAVE_RECEPCION}
       SEED_CLAVE_DOCENTE: ${SEED_CLAVE_DOCENTE}
+      RECUPERAR_DEVOLVER_CODIGO: ${RECUPERAR_DEVOLVER_CODIGO:-}
     healthcheck: &salud
       test: ["CMD-SHELL", "curl -fs http://localhost:$${SERVER_PORT}/actuator/health || exit 1"]
       interval: 15s
@@ -198,9 +201,55 @@ services:
       EVOLUTION_URL: ${EVOLUTION_URL:-}
       EVOLUTION_APIKEY: ${EVOLUTION_APIKEY:-}
       EVOLUTION_INSTANCIA: ${EVOLUTION_INSTANCIA:-alcanfores}
+      CORREO_CLAVE_CIFRADO: ${CORREO_CLAVE_CIFRADO:-}
     networks: [interna, sirac_default]
     healthcheck: *salud
     deploy: { resources: { limits: { memory: 384m } } }
+
+  # Canchita: asistente con IA (Node 22 + SDK de agentes de Claude con la suscripción del dueño). Llama a la API por el
+  # gateway (red interna) y recibe el webhook de Evolution por sirac_default. No usa Eureka ni RabbitMQ.
+  asistente-service:
+    build: { context: ../asistente }
+    image: alcanfores/asistente-service:${VERSION:-local}
+    restart: unless-stopped
+    depends_on:
+      mysql: { condition: service_healthy }
+      api-gateway: { condition: service_healthy }
+    environment:
+      TZ: America/Lima
+      PORT: "8096"
+      DB_HOST: mysql
+      DB_PORT: "3306"
+      DB_USUARIO: asistente_svc
+      DB_CLAVE: ${ASISTENTE_DB_CLAVE}
+      DB_NOMBRE: alcanfores_asistente
+      API_URL: http://api-gateway:8086
+      CATALOGO_URL: http://catalogo-service:8092
+      RESERVAS_URL: http://reservas-service:8093
+      PAGOS_URL: http://pagos-service:8094
+      INTERNO_TOKEN: ${INTERNO_TOKEN}
+      JWT_SECRETO: ${JWT_SECRETO}
+      FRONT_URL: ${FRONT_URL}
+      CLAUDE_CODE_OAUTH_TOKEN: ${CLAUDE_CODE_OAUTH_TOKEN:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      IA_MODELO: ${IA_MODELO:-claude-opus-5-5}
+      IA_ESFUERZO: ${IA_ESFUERZO:-low}
+      EVOLUTION_URL: ${EVOLUTION_URL:-}
+      EVOLUTION_APIKEY: ${EVOLUTION_APIKEY:-}
+      EVOLUTION_INSTANCIA: ${EVOLUTION_INSTANCIA:-alcanfores}
+      ASISTENTE_WEBHOOK_TOKEN: ${ASISTENTE_WEBHOOK_TOKEN:-}
+      ASISTENTE_URL_INTERNA: http://alcanfores-asistente:8096
+    networks:
+      interna: {}
+      sirac_default: { aliases: [alcanfores-asistente] }
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:8096/actuator/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    logging: { driver: json-file, options: { max-size: "10m", max-file: "3" } }
+    deploy: { resources: { limits: { memory: 512m } } }
 
   alcanfores-web:
     build: { context: .., dockerfile: deploy/web/Dockerfile }

@@ -34,6 +34,16 @@ class ParametrosComplejoTest {
     }
 
     @Test
+    void leeLaVentanaDeAsistenciaYSinRecordatorioHorasNoFalla() {
+        assertThat(ParametrosComplejo.porDefecto().asistenciaDesdeMin()).isEqualTo(30);
+        assertThat(ParametrosComplejo.desde(Map.of("asistencia_desde_min", "45", "recordatorio_minutos", "120,15"))
+                .asistenciaDesdeMin()).isEqualTo(45);
+        assertThat(ParametrosComplejo.desde(Map.of("asistencia_desde_min", "0")).asistenciaDesdeMin()).isZero();
+        assertThat(ParametrosComplejo.desde(Map.of("asistencia_desde_min", "181")).asistenciaDesdeMin()).isEqualTo(30);
+        assertThat(ParametrosComplejo.desde(Map.of("asistencia_desde_min", "media hora")).asistenciaDesdeMin()).isEqualTo(30);
+    }
+
+    @Test
     void lasCanchasSemillaTienenLosPreciosDelSpec() {
         assertThat(CanchaCatalogo.semilla()).hasSize(4);
         CanchaCatalogo c3 = CanchaCatalogo.semilla().get(2);

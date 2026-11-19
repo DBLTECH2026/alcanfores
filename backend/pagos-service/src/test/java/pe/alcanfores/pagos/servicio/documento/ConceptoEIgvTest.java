@@ -3,6 +3,8 @@ package pe.alcanfores.pagos.servicio.documento;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.CsvSource;
+import pe.alcanfores.comun.eventos.ClienteContacto;
+import pe.alcanfores.comun.eventos.DatosReserva;
 import pe.alcanfores.comun.util.Dinero;
 import pe.alcanfores.pagos.modelo.InstantaneaReserva;
 import pe.alcanfores.pagos.modelo.TipoPago;
@@ -64,6 +66,32 @@ class ConceptoEIgvTest {
                 .isEqualTo("Alquiler de cancha deportiva · Reserva ALC-7K3M9P");
         assertThat(ConceptoReserva.concepto("Losa", "MULTIUSO", LocalDate.of(2026, 11, 20), "7:00–8:00 p. m. ".repeat(20), 8,
                 "ALC-7K3M9P")).hasSize(160);
+    }
+
+    @Test
+    void conceptoDesdeElEventoDeReservasConYSinHorarioTexto() {
+        ClienteContacto c = new ClienteContacto("70123321", "Diego", "Ramos", "987654321", null);
+        DatosReserva v2 = new DatosReserva(10L, "ALC-7K3M9P", 1L, "Cancha 1", "FUTBOL_5", LocalDate.of(2026, 11, 21),
+                LocalTime.of(9, 0), LocalTime.of(20, 0), new BigDecimal("160.00"), new BigDecimal("80.00"), BigDecimal.ZERO,
+                c, "9:00–10:00 a. m. y 7:00–8:00 p. m.", 2);
+        assertThat(ConceptoReserva.concepto(v2))
+                .isEqualTo("Alquiler de Cancha 1 · Fútbol 5 · sáb 21/11/2026 9:00–10:00 a. m. y 7:00–8:00 p. m. (2 turnos)");
+        // evento v1: sin horarioTexto ni cantidad de turnos → rango del primer al último turno y uno solo
+        DatosReserva v1 = new DatosReserva(10L, "ALC-7K3M9P", 1L, "Cancha 1", "FUTBOL_5", LocalDate.of(2026, 11, 21),
+                LocalTime.of(20, 0), LocalTime.of(21, 0), new BigDecimal("80.00"), new BigDecimal("40.00"), BigDecimal.ZERO,
+                c, null, 0);
+        assertThat(ConceptoReserva.concepto(v1)).isEqualTo("Alquiler de Cancha 1 · Fútbol 5 · sáb 21/11/2026 8:00–9:00 p. m.");
+    }
+
+    @Test
+    void laInstantaneaConOtroHorarioConservaAlCliente() {
+        InstantaneaReserva antes = new InstantaneaReserva("70123321", "Diego", "Ramos", "987654321", "d@correo.pe",
+                "Alquiler de Cancha 2 · Fútbol 6 · vie 20/11/2026 7:00–8:00 p. m.", 50);
+        InstantaneaReserva despues = antes.conHorario("Alquiler de Cancha 1 · Fútbol 5 · sáb 21/11/2026 8:00–9:00 p. m.", 40);
+        assertThat(despues.getConcepto()).isEqualTo("Alquiler de Cancha 1 · Fútbol 5 · sáb 21/11/2026 8:00–9:00 p. m.");
+        assertThat(despues.getPorcentajeAdelanto()).isEqualTo(40);
+        assertThat(despues.contacto()).isEqualTo(antes.contacto());
+        assertThat(antes.getConcepto()).contains("Cancha 2");
     }
 
     @Test

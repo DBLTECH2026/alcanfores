@@ -23,8 +23,10 @@ public enum ClaveConfiguracion {
             "Días hacia adelante con turnos ya creados (14 a 365, al menos los días visibles)."),
     MINUTOS_PARA_PAGAR("minutos_para_pagar", Tipo.ENTERO, 5, 1440, "20",
             "Minutos que tiene el cliente para enviar el comprobante del adelanto."),
-    RECORDATORIO_HORAS("recordatorio_horas", Tipo.ENTERO, 1, 48, "2",
-            "Horas antes del partido en que se envía el recordatorio."),
+    RECORDATORIO_MINUTOS("recordatorio_minutos", Tipo.LISTA_MINUTOS, 5, 1440, "120",
+            "Minutos antes del partido en que se envían los recordatorios (1 a 3, separados por comas)."),
+    ASISTENCIA_DESDE_MIN("asistencia_desde_min", Tipo.ENTERO, 0, 180, "30",
+            "Minutos antes del inicio desde los que se puede marcar la asistencia."),
     YAPE_NUMERO("yape_numero", Tipo.CELULAR, 0, 0, "900111222", "Celular de Yape del complejo (ficticio)."),
     YAPE_TITULAR("yape_titular", Tipo.TEXTO, 3, 60, "Complejo Deportivo Alcanfores", "Titular de la cuenta de Yape."),
     PLIN_NUMERO("plin_numero", Tipo.CELULAR, 0, 0, "900111222", "Celular de Plin del complejo (ficticio)."),
@@ -44,10 +46,15 @@ public enum ClaveConfiguracion {
     LEMA("lema", Tipo.TEXTO, 3, 120, "Reserva tu cancha. Juega cuando quieras.", "Lema del portal."),
     RUC_EMISOR("ruc_emisor", Tipo.RUC, 0, 0, "20000000001", "RUC del emisor de comprobantes (ficticio)."),
     RAZON_SOCIAL_EMISOR("razon_social_emisor", Tipo.TEXTO, 3, 150, "Los Alcanfores Sport E.I.R.L. (ficticia)",
-            "Razón social del emisor (ficticia).");
+            "Razón social del emisor (ficticia)."),
+    IA_WHATSAPP_ACTIVA("ia_whatsapp_activa", Tipo.BOOLEANO, 0, 0, "false",
+            "Canchita responde los chats de WhatsApp (true o false)."),
+    IA_WEB_ACTIVA("ia_web_activa", Tipo.BOOLEANO, 0, 0, "true", "Canchita aparece como chat en la web (true o false)."),
+    IA_VALIDA_PAGOS("ia_valida_pagos", Tipo.BOOLEANO, 0, 0, "true",
+            "Canchita valida sola los comprobantes que calzan con la reserva (true o false).");
 
     public enum Tipo {
-        PORCENTAJE, ENTERO, HORA, CELULAR, TEXTO, CORREO, URL, LATITUD, LONGITUD, RUC
+        PORCENTAJE, ENTERO, LISTA_MINUTOS, HORA, CELULAR, TEXTO, CORREO, URL, LATITUD, LONGITUD, RUC, BOOLEANO
     }
 
     private final String clave;

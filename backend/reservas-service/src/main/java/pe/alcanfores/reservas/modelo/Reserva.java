@@ -52,6 +52,13 @@ public class Reserva {
     @JoinColumn(name = "id_cliente", nullable = false)
     private Cliente cliente;
 
+    /**
+     * Celular (9 dígitos) con el que se hizo ESTA reserva. El de {@link Cliente} es uno por DNI y lo sobrescribe cada
+     * reserva nueva; este no cambia: con él Canchita reconoce al cliente y salen los avisos de la reserva.
+     */
+    @Column(nullable = false, columnDefinition = "CHAR(9)")
+    private String telefonoContacto;
+
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "id_turno", nullable = false)
     private Turno turno;
@@ -88,6 +95,10 @@ public class Reserva {
 
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal montoPagado = BigDecimal.ZERO.setScale(2);
+
+    /** Monto del comprobante que el complejo está validando (de {@code pago.registrado}); 0 si no hay ninguno. */
+    @Column(nullable = false, precision = 10, scale = 2)
+    private BigDecimal montoEnRevision = BigDecimal.ZERO.setScale(2);
 
     private LocalDateTime venceEn;
 

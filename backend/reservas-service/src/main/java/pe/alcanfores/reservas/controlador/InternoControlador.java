@@ -2,6 +2,7 @@ package pe.alcanfores.reservas.controlador;
 
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.NotNull;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
@@ -10,10 +11,14 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import pe.alcanfores.comun.validacion.Celular;
+import pe.alcanfores.comun.validacion.Dni;
 import pe.alcanfores.reservas.dto.InternoDtos.ElegibilidadResena;
+import pe.alcanfores.reservas.dto.InternoDtos.ReservaDelCliente;
 import pe.alcanfores.reservas.dto.InternoDtos.ReservaInterna;
 import pe.alcanfores.reservas.dto.InternoDtos.ReservaSemilla;
 import pe.alcanfores.reservas.dto.InternoDtos.ReservasVigentes;
+import pe.alcanfores.reservas.dto.Mensajes;
 import pe.alcanfores.reservas.servicio.InternoServicio;
 
 import java.time.LocalDate;
@@ -34,6 +39,16 @@ public class InternoControlador {
     public ReservasVigentes vigentes(@RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha,
                                      @RequestParam(required = false) List<Long> idsCancha) {
         return servicio.vigentes(fecha, idsCancha);
+    }
+
+    @GetMapping("/por-cliente")
+    @Operation(summary = "Reservas de un cliente por DNI y celular", description = "Canchita (WhatsApp) reconoce al cliente: "
+            + "reservas del DNI desde hace 30 días en adelante, por fecha y hora, SOLO si el celular registrado del cliente "
+            + "es ese (se aceptan 9 dígitos, 51… o +51…). Si el DNI no existe o el celular no calza, lista vacía.")
+    public List<ReservaDelCliente> porCliente(
+            @RequestParam @NotNull(message = Mensajes.DNI) @Dni String dni,
+            @RequestParam @NotNull(message = Mensajes.CELULAR) @Celular(message = Mensajes.CELULAR) String telefono) {
+        return servicio.porCliente(dni, telefono);
     }
 
     @GetMapping("/{codigo}")

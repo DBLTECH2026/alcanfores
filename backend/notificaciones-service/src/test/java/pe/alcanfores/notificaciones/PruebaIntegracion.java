@@ -54,6 +54,7 @@ public abstract class PruebaIntegracion {
         recordatorios.deleteAll();
         eventosProcesados.deleteAll();
         when(complejoServicio.datos()).thenReturn(Datos.complejo());
+        when(complejoServicio.actualizados()).thenReturn(Datos.complejo());
     }
 
     @AfterEach

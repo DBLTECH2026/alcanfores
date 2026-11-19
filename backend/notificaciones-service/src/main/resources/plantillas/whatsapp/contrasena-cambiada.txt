@@ -1,0 +1,7 @@
+*Tu contraseña se cambió*
+
+[(${saludo})]. La contraseña de tu cuenta de Alcanfores se cambió el [(${cambiadoEn})].
+
+Si no fuiste tú, escríbenos de inmediato por este WhatsApp.
+
+[(${nombreComplejo})]

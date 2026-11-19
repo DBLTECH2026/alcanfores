@@ -1,6 +1,6 @@
 {
   "info": {
-    "_postman_id": "9bfa8e6c-3572-455c-87f1-0cecef99e152",
+    "_postman_id": "5af13dcc-105b-4a87-8187-971e57433d0f",
     "name": "Alcanfores · API de microservicios",
     "description": "Sistema de reservas del Complejo Deportivo Los Alcanfores (UTP · Desarrollo Web Integrado). Todas las peticiones pasan por el API Gateway. Ejecutar en orden: las variables se encadenan.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
@@ -3863,6 +3863,1363 @@
           ]
         }
       ]
+    },
+    {
+      "name": "09 · Recuperar contraseña, celular del panel, correo y recordatorios",
+      "item": [
+        {
+          "name": "Recuperar: por dónde recibir el código",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{ipPrueba}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/recuperar/opciones",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "recuperar",
+                "opciones"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoCuenta\": \"CLIENTE\",\n  \"usuario\": \"{{dniCliente}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('ipPrueba', '198.51.100.' + (1 + Math.floor(Math.random() * 254)));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const clave = 'reintento_' + pm.info.requestId;",
+                  "if (pm.response.code === 429 && !pm.collectionVariables.get(clave)) {",
+                  "  pm.collectionVariables.set(clave, '1');",
+                  "  setTimeout(() => {}, ((Number(pm.response.headers.get('Retry-After')) || 60) + 1) * 1000);",
+                  "  postman.setNextRequest(pm.info.requestName);",
+                  "} else {",
+                  "  pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "  const c = pm.response.json().canales;",
+                  "  pm.test('Correo y WhatsApp enmascarados', () => { pm.expect(c.map(x => x.canal)).to.include.members(['CORREO','WHATSAPP']); pm.expect(c.find(x => x.canal === 'WHATSAPP').destino).to.match(/^\\*\\*\\* \\*\\*\\* \\d{3}$/); pm.expect(c.find(x => x.canal === 'CORREO').destino).to.include('****@'); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recuperar: enviar el código por correo",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{ipPrueba}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/recuperar/enviar",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "recuperar",
+                "enviar"
+              ]
+            },
+            "description": "En local (RECUPERAR_DEVOLVER_CODIGO=true) responde codigoPrueba; en producción no.",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoCuenta\": \"CLIENTE\",\n  \"usuario\": \"{{dniCliente}}\",\n  \"canal\": \"CORREO\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const clave = 'reintento_' + pm.info.requestId;",
+                  "if (pm.response.code === 429 && !pm.collectionVariables.get(clave)) {",
+                  "  pm.collectionVariables.set(clave, '1');",
+                  "  setTimeout(() => {}, ((Number(pm.response.headers.get('Retry-After')) || 60) + 1) * 1000);",
+                  "  postman.setNextRequest(pm.info.requestName);",
+                  "} else {",
+                  "  pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "  const j = pm.response.json(); pm.collectionVariables.set('codigoPrueba', j.codigoPrueba || '');",
+                  "  pm.test('Vence en 10 min y se reenvía en 60 s', () => { pm.expect(j.expiraEn).to.be.a('string'); pm.expect(j.reenviarEnSegundos).to.eql(60); pm.expect(j.simulado).to.be.a('boolean'); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recuperar: código incorrecto",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{ipPrueba}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/recuperar/verificar",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "recuperar",
+                "verificar"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoCuenta\": \"CLIENTE\",\n  \"usuario\": \"{{dniCliente}}\",\n  \"codigo\": \"{{codigoMalo}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.collectionVariables.set('codigoMalo', pm.collectionVariables.get('codigoPrueba') === '000000' ? '111111' : '000000');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const clave = 'reintento_' + pm.info.requestId;",
+                  "if (pm.response.code === 429 && !pm.collectionVariables.get(clave)) {",
+                  "  pm.collectionVariables.set(clave, '1');",
+                  "  setTimeout(() => {}, ((Number(pm.response.headers.get('Retry-After')) || 60) + 1) * 1000);",
+                  "  postman.setNextRequest(pm.info.requestName);",
+                  "} else {",
+                  "  pm.test('Responde 422', () => pm.response.to.have.status(422));",
+                  "  pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });",
+                  "  pm.test('CODIGO_INCORRECTO con intentos restantes', () => { const j = pm.response.json(); pm.expect(j.codigo).to.eql('CODIGO_INCORRECTO'); pm.expect(j.mensaje).to.include('intentos'); });",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recuperar: verificar el código (solo local)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{ipPrueba}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/recuperar/verificar",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "recuperar",
+                "verificar"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tipoCuenta\": \"CLIENTE\",\n  \"usuario\": \"{{dniCliente}}\",\n  \"codigo\": \"{{codigoPrueba}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const clave = 'reintento_' + pm.info.requestId;",
+                  "if (pm.response.code === 429 && !pm.collectionVariables.get(clave)) {",
+                  "  pm.collectionVariables.set(clave, '1');",
+                  "  setTimeout(() => {}, ((Number(pm.response.headers.get('Retry-After')) || 60) + 1) * 1000);",
+                  "  postman.setNextRequest(pm.info.requestName);",
+                  "} else {",
+                  "  if (pm.collectionVariables.get('codigoPrueba')) {",
+                  "    pm.test('Responde 200 con el permiso de un solo uso', () => pm.response.to.have.status(200));",
+                  "    pm.collectionVariables.set('tokenRestablecer', pm.response.json().tokenRestablecer);",
+                  "  } else {",
+                  "    pm.test('Sin codigoPrueba (producción): el código vacío se rechaza con 400', () => pm.response.to.have.status(400));",
+                  "    pm.collectionVariables.set('tokenRestablecer', '');",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recuperar: elegir la contraseña nueva (solo local)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Forwarded-For",
+                "value": "{{ipPrueba}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/recuperar/restablecer",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "recuperar",
+                "restablecer"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"tokenRestablecer\": \"{{tokenRestablecer}}\",\n  \"nueva\": \"Cliente2028\",\n  \"confirmacion\": \"Cliente2028\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const clave = 'reintento_' + pm.info.requestId;",
+                  "if (pm.response.code === 429 && !pm.collectionVariables.get(clave)) {",
+                  "  pm.collectionVariables.set(clave, '1');",
+                  "  setTimeout(() => {}, ((Number(pm.response.headers.get('Retry-After')) || 60) + 1) * 1000);",
+                  "  postman.setNextRequest(pm.info.requestName);",
+                  "} else {",
+                  "  if (pm.collectionVariables.get('tokenRestablecer')) {",
+                  "    pm.test('Contraseña cambiada', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().mensaje).to.include('se cambió'); });",
+                  "  } else {",
+                  "    pm.test('Sin permiso: 400', () => pm.response.to.have.status(400));",
+                  "  }",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mi usuario del panel (con celular)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/auth/yo",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "yo"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json(); pm.collectionVariables.set('correoAdmin', j.correo);",
+                  "pm.test('Trae el campo telefono (puede ser null)', () => pm.expect(j).to.have.property('telefono'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mis datos con celular inválido",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/yo",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "yo"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"telefono\": \"812345678\",\n  \"correo\": \"x\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });",
+                  "pm.test('Error en telefono y correo', () => { const c = pm.response.json().errores.map(e => e.campo); pm.expect(c).to.include.members(['telefono','correo']); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mis datos (mismo correo, sin cambiar el celular)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/auth/yo",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "yo"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"telefono\": \"{{telefonoAdmin}}\",\n  \"correo\": \"{{correoAdmin}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.sendRequest({url: pm.environment.get('base') + '/api/auth/yo', header: {Authorization: 'Bearer ' + pm.collectionVariables.get('token')}}, (e, r) => pm.collectionVariables.set('telefonoAdmin', (r && r.json().telefono) || ''));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Mismo correo', () => pm.expect(pm.response.json().correo).to.eql(pm.collectionVariables.get('correoAdmin')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Correo: configuración vigente",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/admin/correo",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "correo"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('Dice el origen y nunca la contraseña', () => { pm.expect(j.origen).to.be.oneOf(['PANEL','VARIABLES','NINGUNO']); pm.expect(j).to.not.have.property('clave'); pm.expect(j.tieneClave).to.be.a('boolean'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Correo: datos inválidos",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/admin/correo",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "correo"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"host\": \"http://smtp\",\n  \"puerto\": 0,\n  \"usuario\": \"x\",\n  \"remitente\": \"y\",\n  \"seguridad\": null\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });",
+                  "pm.test('Error por campo', () => { const c = pm.response.json().errores.map(e => e.campo); ['host','puerto','usuario','remitente','seguridad'].forEach(x => pm.expect(c).to.include(x)); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Correo: prueba a un destino inválido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/admin/correo/prueba",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "correo",
+                "prueba"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"destino\": \"no-es-correo\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Recordatorios de una reserva (uno por cada tiempo)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/admin/recordatorios?codigo={{codigo}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "recordatorios"
+              ],
+              "query": [
+                {
+                  "key": "codigo",
+                  "value": "{{codigo}}"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Cada fila dice cuántos minutos antes', () => pm.response.json().contenido.forEach(r => pm.expect(r.minutosAntes).to.be.a('number')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reglas públicas: lista de recordatorios y asistencia",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/catalogo/complejo",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "catalogo",
+                "complejo"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const r = pm.response.json().reglas;",
+                  "pm.test('recordatorioMinutos de mayor a menor', () => { pm.expect(r.recordatorioMinutos).to.be.an('array').that.is.not.empty; pm.expect([...r.recordatorioMinutos].sort((a, b) => b - a)).to.eql(r.recordatorioMinutos); pm.expect(r.asistenciaDesdeMin).to.be.a('number'); });"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10 · Cambiar el horario (reprogramar)",
+      "item": [
+        {
+          "name": "Turnos libres para cambiar de horario",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/disponibilidad?fecha={{fechaReprog}}&idCancha={{idCancha}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "disponibilidad"
+              ],
+              "query": [
+                {
+                  "key": "fecha",
+                  "value": "{{fechaReprog}}"
+                },
+                {
+                  "key": "idCancha",
+                  "value": "{{idCancha}}"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = new Date(Date.now() + (6)*86400000 - 5*3600000); pm.collectionVariables.set('fechaReprog', d.toISOString().slice(0,10));",
+                  "pm.collectionVariables.set('dniReprog', '97' + String(Math.floor(Math.random()*1e6)).padStart(6, '0'));"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const t = pm.response.json().canchas[0].turnos.filter(x => x.estado === 'DISPONIBLE');",
+                  "pm.test('Hay al menos 3 turnos libres', () => pm.expect(t.length).to.be.at.least(3));",
+                  "['idTurnoR1', 'idTurnoR2', 'idTurnoR3'].forEach((v, i) => pm.collectionVariables.set(v, t[i].idTurno));",
+                  "pm.collectionVariables.set('precioR2', t[1].precio);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reserva que se va a cambiar",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/reservas",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "reservas"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idsTurno\": [\n    \"{{idTurnoR1}}\"\n  ],\n  \"cliente\": {\n    \"dni\": \"{{dniReprog}}\",\n    \"nombres\": \"Rocío\",\n    \"apellidos\": \"Salas Pinto\",\n    \"telefono\": \"987000333\",\n    \"correo\": \"rocio.prueba@example.com\"\n  },\n  \"metodoPago\": \"YAPE\",\n  \"aceptaTerminos\": true,\n  \"aceptaPrivacidad\": true\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set('codigoReprog', pm.response.json().codigoReserva);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mi reserva ofrece cambiar el horario",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/reservas/{{codigoReprog}}?dni={{dniReprog}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "reservas",
+                "{{codigoReprog}}"
+              ],
+              "query": [
+                {
+                  "key": "dni",
+                  "value": "{{dniReprog}}"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('puedeReprogramar y 0 cambios', () => { const j = pm.response.json(); pm.expect(j.puedeReprogramar).to.eql(true); pm.expect(j.reprogramaciones).to.eql(0); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cambiar con datos inválidos",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/reservas/{{codigoReprog}}/reprogramar",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "reservas",
+                "{{codigoReprog}}",
+                "reprogramar"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"12\",\n  \"idsTurno\": []\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });",
+                  "pm.test('Errores en dni e idsTurno', () => { const c = pm.response.json().errores.map(e => e.campo); pm.expect(c).to.include.members(['dni', 'idsTurno']); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cambiar al mismo horario",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/reservas/{{codigoReprog}}/reprogramar",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "reservas",
+                "{{codigoReprog}}",
+                "reprogramar"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"{{dniReprog}}\",\n  \"idsTurno\": [\n    \"{{idTurnoR1}}\"\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 422', () => pm.response.to.have.status(422));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });",
+                  "pm.test('REPROGRAMAR_MISMO_HORARIO', () => pm.expect(pm.response.json().codigo).to.eql('REPROGRAMAR_MISMO_HORARIO'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cambiar el horario (cliente)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/reservas/{{codigoReprog}}/reprogramar",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "reservas",
+                "{{codigoReprog}}",
+                "reprogramar"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"{{dniReprog}}\",\n  \"idsTurno\": [\n    \"{{idTurnoR2}}\"\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('Nuevo turno y total del turno nuevo', () => { pm.expect(j.turnos[0].idTurno).to.eql(Number(pm.collectionVariables.get('idTurnoR2'))); pm.expect(j.montoTotal).to.be.closeTo(Number(pm.collectionVariables.get('precioR2')), 0.001); });",
+                  "pm.test('Un cambio usado y hito REPROGRAMADA', () => { pm.expect(j.reprogramaciones).to.eql(1); pm.expect(j.puedeReprogramar).to.eql(false); pm.expect(j.linea[j.linea.length - 1].evento).to.eql('REPROGRAMADA'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cambiar otra vez (cliente)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/reservas/{{codigoReprog}}/reprogramar",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "reservas",
+                "{{codigoReprog}}",
+                "reprogramar"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"{{dniReprog}}\",\n  \"idsTurno\": [\n    \"{{idTurnoR3}}\"\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 422', () => pm.response.to.have.status(422));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });",
+                  "pm.test('REPROGRAMACION_NO_PERMITIDA con el mensaje del dueño', () => { const j = pm.response.json(); pm.expect(j.codigo).to.eql('REPROGRAMACION_NO_PERMITIDA'); pm.expect(j.mensaje).to.eql('Ya cambiaste el horario una vez; escríbenos para ayudarte.'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Panel: motivo inválido",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/admin/reservas/{{codigoReprog}}/reprogramar",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "reservas",
+                "{{codigoReprog}}",
+                "reprogramar"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idsTurno\": [\n    \"{{idTurnoR3}}\"\n  ],\n  \"motivo\": \"ok\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 400', () => pm.response.to.have.status(400));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });",
+                  "pm.test('Error en motivo', () => pm.expect(pm.response.json().errores.map(e => e.campo)).to.include('motivo'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Panel con token de cliente",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/admin/reservas/{{codigoReprog}}/reprogramar",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "reservas",
+                "{{codigoReprog}}",
+                "reprogramar"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{tokenCliente}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idsTurno\": [\n    \"{{idTurnoR3}}\"\n  ],\n  \"motivo\": \"Cambio pedido\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 403', () => pm.response.to.have.status(403));",
+                  "pm.test('Cuerpo de error estándar', () => { const j = pm.response.json(); pm.expect(j).to.have.keys('timestamp','status','codigo','mensaje','ruta','errores'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Panel: cambiar el horario con motivo (sin límite)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/admin/reservas/{{codigoReprog}}/reprogramar",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "reservas",
+                "{{codigoReprog}}",
+                "reprogramar"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"idsTurno\": [\n    \"{{idTurnoR3}}\"\n  ],\n  \"motivo\": \"El cliente pidió otra hora por teléfono\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const h = pm.response.json().reprogramaciones;",
+                  "pm.test('Historial: PANEL y luego CLIENTE, con antes y después', () => { pm.expect(h.map(x => x.actor)).to.eql(['PANEL', 'CLIENTE']); pm.expect(h[0].anterior).to.include.keys('cancha','fecha','horarioTexto','idsTurno','total'); pm.expect(h[0].motivo).to.include('teléfono'); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mi reserva no muestra el motivo interno del panel",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/reservas/{{codigoReprog}}?dni={{dniReprog}}",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "reservas",
+                "{{codigoReprog}}"
+              ],
+              "query": [
+                {
+                  "key": "dni",
+                  "value": "{{dniReprog}}"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('Hito REPROGRAMADA sin el motivo', () => { pm.expect(j.linea[j.linea.length - 1].evento).to.eql('REPROGRAMADA'); pm.expect(pm.response.text()).to.not.include('pidió otra hora'); });",
+                  "pm.test('Sin comprobante en revisión', () => pm.expect(j.montoEnRevision).to.eql(0));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Aviso «¡Cambiamos tu horario!» en la bandeja",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/api/admin/notificaciones?q={{codigoReprog}}&evento=reserva.reprogramada",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "admin",
+                "notificaciones"
+              ],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "{{codigoReprog}}"
+                },
+                {
+                  "key": "evento",
+                  "value": "reserva.reprogramada"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{token}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "setTimeout(() => {}, 3000);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Correo y WhatsApp por cada cambio', () => pm.expect(pm.response.json().totalElementos).to.be.at.least(2));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Ruta interna por-cliente bloqueada en el gateway",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base}}/interno/reservas/por-cliente?dni={{dniReprog}}&telefono=987000333",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "interno",
+                "reservas",
+                "por-cliente"
+              ],
+              "query": [
+                {
+                  "key": "dni",
+                  "value": "{{dniReprog}}"
+                },
+                {
+                  "key": "telefono",
+                  "value": "987000333"
+                }
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancelar la reserva de prueba",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base}}/api/reservas/{{codigoReprog}}/cancelar",
+              "host": [
+                "{{base}}"
+              ],
+              "path": [
+                "api",
+                "reservas",
+                "{{codigoReprog}}",
+                "cancelar"
+              ]
+            },
+            "description": "",
+            "auth": {
+              "type": "noauth"
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dni\": \"{{dniReprog}}\",\n  \"motivo\": \"Prueba automática de la colección Postman\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Responde 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
     }
   ],
   "variable": [
@@ -3976,6 +5333,58 @@
     },
     {
       "key": "ayer",
+      "value": ""
+    },
+    {
+      "key": "codigoPrueba",
+      "value": ""
+    },
+    {
+      "key": "codigoMalo",
+      "value": ""
+    },
+    {
+      "key": "tokenRestablecer",
+      "value": ""
+    },
+    {
+      "key": "correoAdmin",
+      "value": ""
+    },
+    {
+      "key": "telefonoAdmin",
+      "value": ""
+    },
+    {
+      "key": "ipPrueba",
+      "value": ""
+    },
+    {
+      "key": "fechaReprog",
+      "value": ""
+    },
+    {
+      "key": "dniReprog",
+      "value": ""
+    },
+    {
+      "key": "idTurnoR1",
+      "value": ""
+    },
+    {
+      "key": "idTurnoR2",
+      "value": ""
+    },
+    {
+      "key": "idTurnoR3",
+      "value": ""
+    },
+    {
+      "key": "precioR2",
+      "value": ""
+    },
+    {
+      "key": "codigoReprog",
       "value": ""
     }
   ]

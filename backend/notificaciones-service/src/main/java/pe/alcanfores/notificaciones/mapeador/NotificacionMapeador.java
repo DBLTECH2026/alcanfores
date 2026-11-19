@@ -8,6 +8,8 @@ import pe.alcanfores.notificaciones.dto.NotificacionResumen;
 import pe.alcanfores.notificaciones.modelo.CanalNotificacion;
 import pe.alcanfores.notificaciones.modelo.EstadoNotificacion;
 import pe.alcanfores.notificaciones.modelo.Notificacion;
+import pe.alcanfores.notificaciones.modelo.TipoAdjunto;
+import pe.alcanfores.notificaciones.plantilla.Tarjetas;
 import pe.alcanfores.notificaciones.plantilla.TipoAviso;
 
 import java.io.IOException;
@@ -20,8 +22,10 @@ import java.util.Base64;
 public class NotificacionMapeador {
 
     private final String logoDataUri;
+    private final Tarjetas tarjetas;
 
-    public NotificacionMapeador() {
+    public NotificacionMapeador(Tarjetas tarjetas) {
+        this.tarjetas = tarjetas;
         try (InputStream in = new ClassPathResource(CorreoCanal.RUTA_LOGO).getInputStream()) {
             this.logoDataUri = "data:image/png;base64," + Base64.getEncoder().encodeToString(in.readAllBytes());
         } catch (IOException e) {
@@ -38,14 +42,18 @@ public class NotificacionMapeador {
     /** {@code reintentable}: el admin puede reenviar a mano cualquier aviso FALLIDO (aunque ya agotó los automáticos). */
     public NotificacionDetalle aDetalle(Notificacion n) {
         boolean correo = n.getCanal() == CanalNotificacion.CORREO;
+        String imagen = n.getAdjuntos().stream().filter(a -> a.tipo() == TipoAdjunto.IMAGEN).findFirst()
+                .flatMap(a -> tarjetas.dataUri(a.referencia())).orElse(null);
         return new NotificacionDetalle(n.getId(), n.getCodigoReserva(), n.getEvento(), TipoAviso.textoDe(n.getEvento()),
                 n.getCanal().name(), n.getDestino(), n.getAsunto(), n.getEstado().name(), n.getIntentos(),
                 n.getUltimoError(), n.getCreadoEn(), n.getEnviadoEn(), correo ? "HTML" : "TEXTO", n.getCuerpo(),
-                correo ? vistaPrevia(n.getCuerpo()) : null, n.getAdjuntos(), n.getEstado() == EstadoNotificacion.FALLIDO);
+                correo ? vistaPrevia(n.getCuerpo(), imagen) : null, n.getAdjuntos(),
+                n.getEstado() == EstadoNotificacion.FALLIDO && TipoAviso.reenviable(n.getEvento()), imagen);
     }
 
-    /** HTML listo para verse fuera de un cliente de correo (logo incrustado). */
-    public String vistaPrevia(String html) {
-        return html.replace("cid:" + CorreoCanal.CID_LOGO, logoDataUri);
+    /** HTML listo para verse fuera de un cliente de correo (logo y tarjeta incrustados). */
+    public String vistaPrevia(String html, String tarjetaDataUri) {
+        String conLogo = html.replace("cid:" + CorreoCanal.CID_LOGO, logoDataUri);
+        return tarjetaDataUri == null ? conLogo : conLogo.replace("cid:" + Tarjetas.CID, tarjetaDataUri);
     }
 }

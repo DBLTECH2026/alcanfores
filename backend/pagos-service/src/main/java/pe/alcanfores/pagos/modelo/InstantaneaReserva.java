@@ -39,6 +39,12 @@ public class InstantaneaReserva {
     @Column(name = "porcentaje_adelanto")
     private Integer porcentajeAdelanto;
 
+    /** La misma fotografía con otro horario (la reserva se reprogramó): los datos del cliente no cambian. */
+    public InstantaneaReserva conHorario(String nuevoConcepto, Integer nuevoPorcentajeAdelanto) {
+        return new InstantaneaReserva(clienteDni, clienteNombres, clienteApellidos, clienteTelefono, clienteCorreo,
+                nuevoConcepto, nuevoPorcentajeAdelanto);
+    }
+
     public ClienteContacto contacto() {
         return new ClienteContacto(clienteDni, clienteNombres, clienteApellidos, clienteTelefono, clienteCorreo);
     }

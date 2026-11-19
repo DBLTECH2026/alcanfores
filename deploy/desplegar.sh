@@ -3,7 +3,9 @@
 #   cd /opt/alcanfores && ./deploy/desplegar.sh
 # 1) trae la última versión de main, 2) construye las imágenes etiquetadas con el commit,
 # 3) levanta los contenedores, 4) espera a que TODOS estén sanos y el gateway responda,
-# 5) si algo falla vuelve a la versión anterior (rollback) y termina con error.
+# 5) si algo falla vuelve a la versión anterior (rollback) y termina con error. El rollback vuelve a levantar TODOS los
+#    servicios de esa versión, Canchita (asistente-service) incluida; si la versión anterior no la tenía, la quita
+#    (--remove-orphans) y su base queda intacta para el próximo intento.
 set -euo pipefail
 
 RAIZ="$(cd "$(dirname "$0")/.." && pwd)"
@@ -26,8 +28,42 @@ NUEVA="$(git rev-parse --short HEAD)"
 registro "Versión a desplegar: $NUEVA ($(git log -1 --pretty=%s))"
 
 export VERSION="$NUEVA"
-registro "Construyendo imágenes (7 microservicios + web)"
+registro "Construyendo imágenes (7 microservicios + Canchita + web)"
 DOCKER_BUILDKIT=1 "${COMPOSE[@]}" build --pull
+
+# Base y usuario de Canchita (asistente-service). Los scripts de deploy/mysql solo corren al crear el volumen de MySQL;
+# en el servidor MySQL ya existe, así que aquí se crean si faltan (idempotente). La clave sale de deploy/.env; si no
+# está, se genera una y se agrega al .env (con respaldo).
+asegurar_bd_asistente() {
+  local clave existe
+  clave="$(grep -E '^ASISTENTE_DB_CLAVE=' deploy/.env | tail -1 | cut -d= -f2- | tr -d "\r\"'")"
+  if [ -z "$clave" ] || [ "$clave" = "cambiar" ]; then
+    clave="$(openssl rand -hex 24)"
+    cp deploy/.env "deploy/.env.antes-asistente-$(date +%Y%m%d%H%M%S)"
+    sed -i '/^ASISTENTE_DB_CLAVE=/d' deploy/.env
+    printf '\nASISTENTE_DB_CLAVE=%s\n' "$clave" >> deploy/.env
+    registro "ASISTENTE_DB_CLAVE generada y agregada a deploy/.env"
+  fi
+  [[ "$clave" =~ ^[A-Za-z0-9._@%+=:,/-]+$ ]] || { error "ASISTENTE_DB_CLAVE solo admite letras, números y . _ @ % + = : , / -"; return 1; }
+  "${COMPOSE[@]}" up -d mysql
+  local inicio=$SECONDS
+  until "${COMPOSE[@]}" exec -T mysql sh -c 'mysqladmin ping -h 127.0.0.1 -uroot -p"$MYSQL_ROOT_PASSWORD" --silent' >/dev/null 2>&1; do
+    (( SECONDS - inicio < 120 )) || { error "MySQL no responde"; return 1; }
+    sleep 3
+  done
+  # El SQL (con la clave) entra por la entrada estándar: no aparece en la lista de procesos.
+  "${COMPOSE[@]}" exec -T mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD" 2>/dev/null' <<SQL
+CREATE DATABASE IF NOT EXISTS alcanfores_asistente CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+CREATE USER IF NOT EXISTS 'asistente_svc'@'%' IDENTIFIED BY '${clave}';
+ALTER USER 'asistente_svc'@'%' IDENTIFIED BY '${clave}';
+GRANT ALL PRIVILEGES ON alcanfores_asistente.* TO 'asistente_svc'@'%';
+FLUSH PRIVILEGES;
+SQL
+  existe="$("${COMPOSE[@]}" exec -T mysql sh -c "mysql -N -uroot -p\"\$MYSQL_ROOT_PASSWORD\" -e \"SELECT COUNT(*) FROM mysql.user WHERE user = 'asistente_svc'\" 2>/dev/null" | tr -d '\r[:space:]')"
+  [ "$existe" = "1" ] || { error "No se pudo crear el usuario asistente_svc en MySQL"; return 1; }
+  registro "Base alcanfores_asistente y usuario asistente_svc listos"
+}
+asegurar_bd_asistente
 
 registro "Levantando contenedores"
 "${COMPOSE[@]}" up -d --remove-orphans

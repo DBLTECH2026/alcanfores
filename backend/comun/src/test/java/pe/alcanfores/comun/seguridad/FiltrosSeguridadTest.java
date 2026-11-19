@@ -181,6 +181,15 @@ class FiltrosSeguridadTest {
         }
 
         @Test
+        void validadorDelTokenSeReutilizaFueraDeInterno() {
+            assertThat(filtro.tokenValido("token-secreto")).isTrue();
+            assertThat(filtro.tokenValido("token-secreto ")).isFalse();
+            assertThat(filtro.tokenValido("")).isFalse();
+            assertThat(filtro.tokenValido(null)).isFalse();
+            assertThat(new InternoFiltro(null, JSON).tokenValido("")).isFalse();
+        }
+
+        @Test
         void sinTokenConfiguradoNadieEntra() throws Exception {
             for (String configurado : new String[]{null, ""}) {
                 InternoFiltro sinToken = new InternoFiltro(configurado, JSON);

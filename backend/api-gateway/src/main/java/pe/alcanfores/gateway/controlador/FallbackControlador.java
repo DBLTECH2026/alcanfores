@@ -31,7 +31,8 @@ public class FallbackControlador {
             "catalogo", "catálogo",
             "reservas", "reservas",
             "pagos", "pagos",
-            "notificaciones", "notificaciones");
+            "notificaciones", "notificaciones",
+            "asistente", "Canchita (asistente)");
 
     private final RespuestaError error;
 

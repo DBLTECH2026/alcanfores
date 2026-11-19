@@ -16,9 +16,15 @@ import java.util.Optional;
 
 public interface RecordatorioRepositorio extends JpaRepository<Recordatorio, Long> {
 
-    Optional<Recordatorio> findByCodigoReserva(String codigoReserva);
+    List<Recordatorio> findByCodigoReservaOrderByMinutosAntesDesc(String codigoReserva);
+
+    Optional<Recordatorio> findByCodigoReservaAndMinutosAntes(String codigoReserva, int minutosAntes);
 
     Page<Recordatorio> findByEstado(EstadoRecordatorio estado, Pageable pageable);
+
+    Page<Recordatorio> findByCodigoReserva(String codigoReserva, Pageable pageable);
+
+    Page<Recordatorio> findByCodigoReservaAndEstado(String codigoReserva, EstadoRecordatorio estado, Pageable pageable);
 
     List<Recordatorio> findByEstadoAndEnviarEnLessThanEqualOrderByEnviarEnAsc(EstadoRecordatorio estado, LocalDateTime limite);
 

@@ -16,6 +16,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -42,11 +43,13 @@ public class ModeloMensajes {
         m.put("whatsappUrl", c.whatsappUrl());
         m.put("correoComplejo", c.correo());
         m.put("devolucionHoras", c.devolucionHoras());
-        m.put("recordatorioHoras", c.recordatorioHoras());
+        m.put("recordatorioTexto", recordatorioTexto(c.recordatorioMinutos()));
         m.put("urlInicio", frontUrl());
         m.put("urlReservar", frontUrl() + "/reservar");
         m.put("urlPrivacidad", frontUrl() + "/privacidad");
         m.put("logoSrc", "cid:" + CorreoCanal.CID_LOGO);
+        m.put("motivoPie", "Recibes este mensaje porque registraste una reserva en el " + c.nombre()
+                + ". Usamos tus datos solo para gestionar tu reserva");
         m.put("anio", Tiempo.hoy().getYear());
         return m;
     }
@@ -62,6 +65,7 @@ public class ModeloMensajes {
         m.put("codigo", r.codigoReserva());
         m.put("cancha", r.nombreCancha());
         m.put("deporte", deporteTexto(r.deporte()));
+        m.put("deporteCodigo", r.deporte());
         m.put("canchaTexto", canchaTexto(r.nombreCancha(), r.deporte()));
         m.put("fecha", capitalizar(Tiempo.fechaLarga(r.fecha())));
         m.put("fechaTexto", Tiempo.fechaLarga(r.fecha()));
@@ -132,6 +136,22 @@ public class ModeloMensajes {
             return Tiempo.horaAmPm(hora) + " de hoy";
         }
         return fechaHoraTexto(venceEn);
+    }
+
+    /**
+     * Para la confirmación: «un recordatorio 2 horas antes del partido» o «recordatorios 2 horas antes y 15 minutos
+     * antes del partido».
+     */
+    public static String recordatorioTexto(List<Integer> minutos) {
+        if (minutos == null || minutos.isEmpty()) {
+            return "un recordatorio antes del partido";
+        }
+        List<String> partes = minutos.stream().map(m -> duracionTexto(m) + " antes").toList();
+        if (partes.size() == 1) {
+            return "un recordatorio " + partes.get(0) + " del partido";
+        }
+        String inicio = String.join(", ", partes.subList(0, partes.size() - 1));
+        return "recordatorios " + inicio + " y " + partes.get(partes.size() - 1) + " del partido";
     }
 
     /** «2 horas», «1 hora y 15 minutos», «45 minutos». */

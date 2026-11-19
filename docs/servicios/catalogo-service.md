@@ -19,13 +19,13 @@ Bean Validation), `mapeador`, `cliente` (`ReservasCliente` HTTP con circuit brea
 (`PublicadorCanchaActualizada`), `config` (seguridad, clientes, OpenAPI, propiedades), `semilla` (`SemillaFotos`) y
 `util` (`Imagenes`, `Slugs`, `Calificaciones`).
 
-## Tablas (Flyway `V1__esquema.sql`, datos en `V2__datos_demo.sql`, v2 en `V4__horario_calendario_resenas.sql`)
+## Tablas (Flyway `V1__esquema.sql`, datos en `V2__datos_demo.sql`, v2 en `V4__horario_calendario_resenas.sql`, `V5__recordatorios_y_asistencia.sql`, Canchita en `V6__asistente_ia.sql`)
 | Tabla | Notas |
 |---|---|
 | `cancha` | `slug` y `nombre` únicos (collation `utf8mb4_unicode_ci`: «Fútbol» = «futbol»), `deporte` ENUM, `caracteristicas` JSON (lista de textos), `precio_dia`/`precio_noche` DECIMAL(6,2), `estado` ENUM, `orden`. CHECK: capacidad 2–30, precios 10–999 y noche ≥ día. |
 | `cancha_foto` | `archivo` = UUID + extensión (único), `leyenda`, `orden`, `principal`, `ancho`, `alto` (nulos en WebP). |
 | `resena` | `codigo_reserva` único (una reseña por reserva), `puntuacion` TINYINT 1–5 (CHECK), `estado` PUBLICADA/OCULTA, `respuesta` y `respondido_en` del administrador. |
-| `configuracion` | clave/valor/descripción (23 claves del SPEC + `dias_generados` = 120 desde la v2). |
+| `configuracion` | clave/valor/descripción (25 claves: las 23 del SPEC + `dias_generados` = 120 desde la v2; desde `V5`, `recordatorio_horas` pasa a `recordatorio_minutos` y se agrega `asistencia_desde_min`; desde `V6`, los 3 interruptores de Canchita → 28 claves). |
 | `cancha` (v2) | + `duracion_turno_min` (30–240, múltiplo de 15; CHECK), `inicio_noche` TIME (toma el valor global al migrar), `feriado_modo` ENUM('ABIERTA','CERRADA'), `recargo_feriado` DECIMAL(8,2) ≥ 0 (adicional por turno en feriado). |
 | `cancha_horario` (v2) | `PK(id_cancha, dia_semana)`, `dia_semana` 1..7 (ISO, 1 = lunes), `abierto`, `apertura`, `cierre` (hora en que TERMINA el último turno; medianoche = 23:59:59). Un día cerrado conserva sus horas. |
 | `dia_especial` (v2) | `fecha` UNIQUE, `tipo` ENUM('FERIADO','NO_LABORABLE'), `nombre` (120), `canchas` JSON (ids; NULL = todas; solo NO_LABORABLE). |
@@ -88,9 +88,16 @@ Swagger: `http://localhost:8092/swagger-ui.html`.
   indicadas o todas; FERIADO: las de modo CERRADA) → 409 `DIA_CON_RESERVAS` con los códigos (consulta
   `GET /interno/reservas/vigentes?fecha&idsCancha` de reservas-service; fechas pasadas no se revisan; reservas caído → 503).
 - **`dias_generados`**: 14–365 y no menor que `dias_visibles`.
+- **Interruptores de Canchita** (tipo BOOLEANO, `V6__asistente_ia.sql`): `ia_whatsapp_activa` (por defecto `false`),
+  `ia_web_activa` (`true`) e `ia_valida_pagos` (`true`). Aceptan `true`/`false` (texto en cualquier mayúscula o booleano
+  JSON) y se guardan en minúsculas; otro valor → 400 «Elige encendido o apagado (true o false).». Salen en
+  `GET/PUT /api/admin/configuracion` y `GET /interno/configuracion` (asistente-service los lee cada 30 s) y
+  `GET /api/catalogo/complejo` agrega `asistente: {webActiva}` para que el portal decida si muestra el botón flotante.
 - **Configuración** (PUT parcial `{clave: valor}`, acepta números o textos): porcentaje 0–100; enteros con rango por
   clave (devolución 1–168 h, duración 30–180 min y múltiplo de 15, días visibles 1–60, minutos para pagar 5–1440,
-  recordatorio 1–48 h); horas `HH:mm`; celulares con el validador de `@Celular` (se guardan normalizados a 9 dígitos);
+  asistencia desde 0–180 min); `recordatorio_minutos` = lista de 1 a 3 enteros 5–1440, separados por comas y sin repetir
+  (se guarda sin espacios y de mayor a menor: «15, 120» → «120,15»; error «Escribe de 1 a 3 tiempos en minutos (5 a 1440),
+  separados por comas y sin repetir.»); horas `HH:mm`; celulares con el validador de `@Celular` (se guardan normalizados a 9 dígitos);
   correo; enlace `https://`; latitud/longitud en rango; RUC con `Documentos.rucValido`; textos con longitud y sin `<`/`>`;
   clave desconocida → error en esa clave. Reglas entre claves: cierre posterior al primer turno, que entre al menos un
   turno, e inicio de la tarifa de noche dentro del horario.
@@ -149,10 +156,22 @@ las ilustraciones del prototipo (IL-05, ARQ-03, ARQ-05 para fútbol; ARQ-04, IL-
 - v2: `POST /api/admin/calendario/feriados-peru` no revisa reservas (carga masiva de feriados oficiales); los turnos con
   reserva los conserva reservas-service. Jueves y Viernes Santo se calculan con la Pascua (algoritmo de Meeus/Jones/Butcher).
 - v2: el ítem de reseña del panel trae `fecha` (= `creadoEn`) y `origen`; el público trae `origen` y `verificada` = origen CLIENTE.
+- **Recordatorios y asistencia (V5, 19/11/2026)**: la migración crea `recordatorio_minutos` = `recordatorio_horas` × 60
+  (máximo 1440; «120» si no había valor), borra `recordatorio_horas` y agrega `asistencia_desde_min` = 30. Probada en
+  MariaDB sobre tablas de prueba (3 h → «180»; 48 h → «1440»; sin fila → «120»). `GET /api/catalogo/complejo` →
+  `reglas: {adelantoPct, devolucionHoras, minutosParaPagar, recordatorioHoras, recordatorioMinutos: [120, 15],
+  asistenciaDesdeMin: 30}` (`recordatorioHoras` = mayor de la lista / 60, hacia abajo, por compatibilidad);
+  `GET /interno/configuracion` trae `"recordatorio_minutos": "120,15"` y `"asistencia_desde_min": "30"` como texto,
+  igual que las demás claves. notificaciones-service usa la lista; reservas-service, la ventana de asistencia.
 - v2: las reseñas del complejo cuentan en el promedio y la distribución igual que las de clientes.
 - Coordenadas del complejo aproximadas (-12.0196, -76.8865); Yape/Plin ficticios 900 111 222 (del prototipo).
 
 ## Pruebas (`mvn -B -f backend/catalogo-service/pom.xml verify`)
+**150 pruebas, 0 fallos (19/11/2026, V5).** `ConfiguracionTest` agrega: la migración deja `recordatorio_minutos` y
+`asistencia_desde_min` (sin `recordatorio_horas`); lista inválida → 400 en su clave (vacía, 4 valores, 4 min, 1441,
+repetidos, texto, `60,,15`, negativo, decimal) y asistencia 181; lista válida normalizada («15,1440, 60» → «1440,60,15») y
+publicada en el complejo (`recordatorioMinutos`, `recordatorioHoras` derivado, `asistenciaDesdeMin`).
+
 **147 pruebas, 0 fallos (19/11/2026, v2).** Nuevas: `HorarioTest` (semilla, cancha nueva con horario global, guardado +
 evento con la semana + interno con 23:59:59, mensaje de «sobra 1 hora», vista previa GET/POST, cierre 24:00, día cerrado,
 400 por campo, 401/403/404), `CalendarioTest` (semilla 2026/2027, público e interno, NO_LABORABLE con canchas, 409

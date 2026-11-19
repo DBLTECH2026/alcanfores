@@ -27,4 +27,12 @@ public interface IntentoPagoRepositorio extends JpaRepository<IntentoPago, Long>
     List<IntentoPago> findByEstadoInAndExpiraEnBefore(Collection<EstadoIntento> estados, LocalDateTime momento);
 
     List<IntentoPago> findByCodigoReservaAndEstadoIn(String codigoReserva, Collection<EstadoIntento> estados);
+
+    /**
+     * Todos los intentos de una reserva, bloqueados y en orden: un consumidor de eventos espera a un webhook que esté
+     * aprobando y lee el estado ya confirmado (sin bloqueo, Hibernate reescribiría la fila con el estado viejo).
+     */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select i from IntentoPago i where i.codigoReserva = :codigo order by i.id")
+    List<IntentoPago> bloquearDeReserva(@Param("codigo") String codigoReserva);
 }

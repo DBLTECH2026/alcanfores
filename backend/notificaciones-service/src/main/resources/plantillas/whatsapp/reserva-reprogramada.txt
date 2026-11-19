@@ -1,0 +1,25 @@
+*¡Cambiamos tu horario!*
+
+[(${saludo})]. Tu nueva fecha y hora ya están separadas.
+
+*Código:* [(${codigo})]
+*Antes:* [(${antesTexto})]
+
+*Ahora*
+*Cancha:* [(${canchaTexto})]
+*Fecha:* [(${fecha})]
+*Hora:* [(${horario})]
+*Total:* [(${montoTotal})]
+*Pagado:* [(${montoPagado})]
+*Saldo:* [(${saldo})]
+[# th:if="${confirmada}"]
+Te enviaremos el recordatorio antes del nuevo horario.[/][# th:if="${enRevision}"]
+Estamos validando tu comprobante: te avisaremos cuando tu reserva quede confirmada.[/][# th:if="${porPagar and conPlazo}"]
+*Adelanto para confirmar:* [(${montoAdelanto})]
+*Plazo para pagar:* [(${plazo})][/][# th:if="${porPagar and !conPlazo}"]
+*Adelanto para confirmar:* [(${montoAdelanto})]
+Puedes pagarlo en el complejo o desde tu reserva en línea.[/]
+Te adjuntamos la constancia actualizada.
+Ver tu reserva: [(${urlMiReserva})]
+
+[(${nombreComplejo})]

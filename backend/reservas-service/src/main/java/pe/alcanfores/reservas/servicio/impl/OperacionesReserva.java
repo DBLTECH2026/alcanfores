@@ -32,12 +32,14 @@ import pe.alcanfores.reservas.modelo.EstadoTurno;
 import pe.alcanfores.reservas.modelo.Origen;
 import pe.alcanfores.reservas.modelo.Reserva;
 import pe.alcanfores.reservas.modelo.ReservaHistorial;
+import pe.alcanfores.reservas.modelo.ReservaReprogramacion;
 import pe.alcanfores.reservas.modelo.TipoDocumento;
 import pe.alcanfores.reservas.modelo.Turno;
 import pe.alcanfores.reservas.repositorio.CancelacionRepositorio;
 import pe.alcanfores.reservas.repositorio.ClienteRepositorio;
 import pe.alcanfores.reservas.repositorio.ConsultaDocumentoRepositorio;
 import pe.alcanfores.reservas.repositorio.HistorialRepositorio;
+import pe.alcanfores.reservas.repositorio.ReprogramacionRepositorio;
 import pe.alcanfores.reservas.repositorio.ReservaRepositorio;
 import pe.alcanfores.reservas.repositorio.ReservaTurnoRepositorio;
 import pe.alcanfores.reservas.repositorio.TurnoRepositorio;
@@ -76,6 +78,7 @@ public class OperacionesReserva {
     private final ClienteRepositorio clientes;
     private final CancelacionRepositorio cancelaciones;
     private final HistorialRepositorio historial;
+    private final ReprogramacionRepositorio reprogramaciones;
     private final ConsultaDocumentoRepositorio consultas;
     private final ComplejoServicio complejo;
     private final ReservaMapeador mapeador;
@@ -101,9 +104,7 @@ public class OperacionesReserva {
         boolean web = n.origen() == Origen.WEB;
         List<Turno> ts = bloquearTurnos(n.turnos());
         Turno primero = ts.get(0);
-        if (primero.getFecha().isBefore(hoy) || primero.getFecha().isAfter(hoy.plusDays(p.diasVisibles()))) {
-            throw NegocioExcepcion.validacion("fecha", Mensajes.rangoFecha(p.diasVisibles()));
-        }
+        validarFecha(primero.getFecha(), hoy, "fecha");
         for (Turno t : ts) {
             validarLibre(t, web, ahora, n.turnos().campo());
         }
@@ -111,6 +112,7 @@ public class OperacionesReserva {
         Reserva r = new Reserva();
         r.setCodigoReserva(nuevoCodigo());
         r.setCliente(guardarCliente(n.cliente(), ahora, !web));
+        r.setTelefonoContacto(Texto.normalizarCelular(n.cliente().telefono()));
         r.setEstado(EstadoReserva.PENDIENTE);
         r.setEstadoPago(EstadoPago.SIN_PAGO);
         BigDecimal total = BigDecimal.ZERO;
@@ -192,6 +194,29 @@ public class OperacionesReserva {
                 .orElseThrow(() -> NegocioExcepcion.noEncontrado(MENSAJE_NO_ENCONTRADA));
     }
 
+    /**
+     * La reserva con su fila bloqueada ({@code SELECT … FOR UPDATE}) por código («ALC-…») o por id numérico (el panel
+     * acepta ambos); 404 si no existe.
+     */
+    public Reserva bloquear(String idOCodigo) {
+        String valor = idOCodigo == null ? "" : idOCodigo.trim();
+        Optional<Reserva> r = valor.matches("\\d{1,18}") ? reservas.bloquearPorId(Long.valueOf(valor))
+                : reservas.bloquearPorCodigo(normalizarCodigo(valor));
+        return r.orElseThrow(() -> NegocioExcepcion.noEncontrado("No encontramos la reserva " + normalizarCodigo(valor) + "."));
+    }
+
+    /** Como {@link #buscarParaCliente} pero con la fila bloqueada; mismo 404 si el código o el DNI no calzan. */
+    public Reserva bloquearParaCliente(String codigo, String dni) {
+        return reservas.bloquearPorCodigo(normalizarCodigo(codigo))
+                .filter(r -> r.getCliente().getDni().equals(dni == null ? null : dni.trim()))
+                .orElseThrow(() -> NegocioExcepcion.noEncontrado(MENSAJE_NO_ENCONTRADA));
+    }
+
+    /** Cambios de horario de la reserva, el más reciente primero. */
+    public List<ReservaReprogramacion> reprogramacionesDe(Reserva r) {
+        return reprogramaciones.findByIdReservaOrderByCreadoEnDescIdDesc(r.getId());
+    }
+
     public Cancelacion cancelacionDe(Reserva r) {
         return r.getEstado() == EstadoReserva.CANCELADA ? cancelaciones.findByReservaId(r.getId()).orElse(null) : null;
     }
@@ -263,16 +288,29 @@ public class OperacionesReserva {
      * @return los turnos ordenados por hora de inicio
      */
     private List<Turno> bloquearTurnos(TurnosPedidos pedidos) {
-        List<Long> ids = pedidos.ids();
-        String campo = pedidos.campo();
-        if (ids.isEmpty() || ids.size() > Mensajes.MAX_TURNOS) {
+        validarLista(pedidos.ids(), pedidos.campo());
+        return validarGrupo(turnos.bloquearPorIds(pedidos.ids()), pedidos.ids().size(), pedidos.campo());
+    }
+
+    /** 1 a 8 turnos sin repetir (400 en el campo de los turnos). La comparten crear y reprogramar. */
+    static void validarLista(List<Long> ids, String campo) {
+        if (ids == null || ids.isEmpty() || ids.size() > Mensajes.MAX_TURNOS) {
             throw NegocioExcepcion.validacion(campo, Mensajes.TURNOS_CANTIDAD);
         }
         if (new HashSet<>(ids).size() != ids.size()) {
             throw NegocioExcepcion.validacion(campo, Mensajes.TURNOS_REPETIDOS);
         }
-        List<Turno> ts = new ArrayList<>(turnos.bloquearPorIds(ids));
-        if (ts.size() != ids.size() || ts.stream().anyMatch(t -> !t.visible())) {
+    }
+
+    /**
+     * Los turnos pedidos (ya bloqueados) existen todos, se muestran (no quedaron fuera del horario de la cancha) y son de
+     * la misma cancha y fecha.
+     *
+     * @return los turnos ordenados por hora de inicio
+     */
+    static List<Turno> validarGrupo(List<Turno> encontrados, int pedidos, String campo) {
+        List<Turno> ts = new ArrayList<>(encontrados);
+        if (ts.size() != pedidos || ts.stream().anyMatch(t -> !t.visible())) {
             throw NegocioExcepcion.validacion(campo, Mensajes.TURNO);
         }
         if (ts.stream().map(Turno::getIdCancha).distinct().count() > 1 || ts.stream().map(Turno::getFecha).distinct().count() > 1) {
@@ -282,19 +320,37 @@ public class OperacionesReserva {
         return ts;
     }
 
+    /** La fecha está entre hoy y hoy + {@code diasVisibles} (lo que el portal deja elegir). */
+    void validarFecha(LocalDate fecha, LocalDate hoy, String campo) {
+        int dias = complejo.parametros().diasVisibles();
+        if (fecha.isBefore(hoy) || fecha.isAfter(hoy.plusDays(dias))) {
+            throw NegocioExcepcion.validacion(campo, Mensajes.rangoFecha(dias));
+        }
+    }
+
     /** Web: empieza en 30 min o más; panel: aún no termina. No bloqueado, cancha activa y sin reserva vigente. */
-    private void validarLibre(Turno t, boolean web, LocalDateTime ahora, String campo) {
+    void validarLibre(Turno t, boolean web, LocalDateTime ahora, String campo) {
+        validarATiempoYActivo(t, web, ahora, campo);
+        if (t.getEstado() == EstadoTurno.BLOQUEADO) {
+            throw NegocioExcepcion.conflicto("TURNO_NO_DISPONIBLE", Mensajes.TURNO);
+        }
+        if (t.getEstado() == EstadoTurno.RESERVADO || reservaTurnos.existsByTurnoIdAndVigenteTrue(t.getId())) {
+            throw ocupado();
+        }
+    }
+
+    /**
+     * La parte de {@link #validarLibre} que vale también para un turno que la propia reserva ya ocupa (al cambiar de
+     * horario cuenta como libre para ella): a tiempo según el canal y con la cancha activa.
+     */
+    void validarATiempoYActivo(Turno t, boolean web, LocalDateTime ahora, String campo) {
         boolean aTiempo = web ? !t.inicio().isBefore(ahora.plusMinutes(ReglasReserva.MINUTOS_ANTICIPACION))
                 : ahora.isBefore(t.fin());
         if (!aTiempo) {
             throw NegocioExcepcion.validacion(campo, Mensajes.TURNO);
         }
-        boolean canchaInactiva = complejo.cancha(t.getIdCancha()).map(c -> !c.activa()).orElse(false);
-        if (t.getEstado() == EstadoTurno.BLOQUEADO || canchaInactiva) {
+        if (complejo.cancha(t.getIdCancha()).map(c -> !c.activa()).orElse(false)) {
             throw NegocioExcepcion.conflicto("TURNO_NO_DISPONIBLE", Mensajes.TURNO);
-        }
-        if (t.getEstado() == EstadoTurno.RESERVADO || reservaTurnos.existsByTurnoIdAndVigenteTrue(t.getId())) {
-            throw ocupado();
         }
     }
 
@@ -312,7 +368,7 @@ public class OperacionesReserva {
         return a.isBefore(b) ? a : b;
     }
 
-    private static NegocioExcepcion ocupado() {
+    static NegocioExcepcion ocupado() {
         return NegocioExcepcion.conflicto("TURNO_OCUPADO", MENSAJE_OCUPADO);
     }
 }

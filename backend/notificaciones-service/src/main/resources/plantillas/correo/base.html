@@ -45,6 +45,13 @@
                         </a>
                     </td>
                 </tr>
+                <!-- Tarjeta ilustrada del aviso (embebida como CID) -->
+                <tr th:if="${tarjetaSrc != null}">
+                    <td style="padding:0;line-height:0;font-size:0;">
+                        <img th:src="${tarjetaSrc}" src="cid:tarjeta-aviso" width="600" th:alt="${asunto}" alt="Aviso"
+                             style="display:block;width:100%;max-width:600px;height:auto;border:0;">
+                    </td>
+                </tr>
                 <!-- Encabezado -->
                 <tr>
                     <td class="px" style="padding:28px 32px;background-color:#091A2A;">
@@ -85,8 +92,8 @@
                 <!-- Aviso de privacidad (Ley 29733) -->
                 <tr>
                     <td class="px" style="padding:14px 32px 24px 32px;background-color:#091A2A;border-top:1px solid #1E3346;font-family:'Inter',Arial,Helvetica,sans-serif;font-size:11px;line-height:17px;color:#8FA3B3;">
-                        Recibes este mensaje porque registraste una reserva en el <span th:text="${nombreComplejo}">complejo</span>.
-                        Usamos tus datos solo para gestionar tu reserva, conforme a la Ley N.° 29733 de Protección de Datos Personales.
+                        <span th:text="${motivoPie}">Recibes este mensaje porque registraste una reserva en el complejo. Usamos tus datos solo para gestionar tu reserva</span>,
+                        conforme a la Ley N.° 29733 de Protección de Datos Personales.
                         <a th:href="${urlPrivacidad}" href="#" target="_blank" style="color:#B9DCC6;">Política de privacidad</a>.
                         Este correo se envía automáticamente; si tienes dudas, escríbenos por WhatsApp.
                     </td>

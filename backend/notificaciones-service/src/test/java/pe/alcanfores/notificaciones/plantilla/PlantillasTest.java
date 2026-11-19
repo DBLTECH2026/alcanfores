@@ -67,11 +67,17 @@ class PlantillasTest {
         m.put("sinDevolucion", false);
         m.put("falta", "2 horas");
         m.put("cuando", "de hoy");
+        m.put("codigoVerificacion", "482913");
+        m.put("cambiadoEn", "jueves 19 de noviembre, 10:30 p. m.");
+        m.put("antesTexto", "Jueves 19 de noviembre de 2026, 6:00–7:00 p. m. (Cancha 2)");
+        m.put("confirmada", true);
+        m.put("enRevision", false);
+        m.put("porPagar", false);
         return m;
     }
 
     @ParameterizedTest(name = "{0}")
-    @EnumSource(value = TipoAviso.class, names = "PRUEBA_WHATSAPP", mode = EnumSource.Mode.EXCLUDE)
+    @EnumSource(value = TipoAviso.class, names = {"PRUEBA_WHATSAPP", "PRUEBA_CORREO"}, mode = EnumSource.Mode.EXCLUDE)
     @DisplayName("Cada aviso renderiza correo HTML con la marca y WhatsApp en texto")
     void renderiza(TipoAviso tipo) {
         MensajeRedactado m = redactor.redactar(tipo, "Asunto de prueba", modeloCompleto());
@@ -130,6 +136,39 @@ class PlantillasTest {
         assertThat(redactor.redactar(TipoAviso.RESERVA_CANCELADA, "x", m).texto())
                 .contains("No recibimos el pago del adelanto a tiempo", "no tienen devolución");
         assertThat(redactor.redactar(TipoAviso.COMPROBANTE_EMITIDO, "x", m).html()).contains("Nota de crédito B001-00000012");
+    }
+
+    @Test
+    @DisplayName("Código de verificación: el texto pedido por el dueño y el código grande en el correo")
+    void codigoVerificacion() {
+        MensajeRedactado m = redactor.redactar(TipoAviso.CODIGO_VERIFICACION, "Tu código", modeloCompleto());
+
+        assertThat(m.texto()).contains("Tu código para cambiar tu contraseña de Alcanfores es *482913*. Vence en 10 minutos. "
+                + "Si no fuiste tú, ignora este mensaje.");
+        assertThat(m.html()).contains("482913", "letter-spacing:10px", "Vence en 10 minutos");
+        assertThat(redactor.redactar(TipoAviso.SALDO_PAGADO, "x", modeloCompleto()).texto())
+                .startsWith("*¡Terminaste de pagar tu cancha!*").contains("*Saldo:* S/ 0.00", "*Hora:* 7:00–8:00 p. m.");
+    }
+
+    @Test
+    @DisplayName("Con tarjetaSrc el correo lleva la tarjeta como cabecera; sin ella, no")
+    void cabeceraConTarjeta() {
+        Map<String, Object> m = modeloCompleto();
+        assertThat(redactor.redactar(TipoAviso.RESERVA_CONFIRMADA, "x", m).html()).doesNotContain("cid:tarjeta-aviso");
+        m.put("tarjetaSrc", "cid:tarjeta-aviso");
+        assertThat(redactor.redactar(TipoAviso.RESERVA_CONFIRMADA, "x", m).html())
+                .contains("src=\"cid:tarjeta-aviso\"", "alt=\"x\"");
+    }
+
+    @Test
+    @DisplayName("Prueba de correo (solo HTML): servidor y remitente, con la marca")
+    void pruebaCorreo() {
+        Map<String, Object> m = modeloCompleto();
+        m.put("servidor", "smtp.hostinger.com:465");
+        m.put("remitenteTexto", "Los Alcanfores <reservas@alcanfores.pe>");
+        assertThat(redactor.redactarCorreo(TipoAviso.PRUEBA_CORREO, "Prueba", m))
+                .contains("¡El correo funciona!", "smtp.hostinger.com:465", "reservas@alcanfores.pe", "cid:logo-alcanfores")
+                .doesNotContain("th:text", "${");
     }
 
     @Test

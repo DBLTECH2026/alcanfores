@@ -6,8 +6,8 @@ Microservicio que **avisa al cliente cada paso de su reserva** por los dos canal
 |---|---|
 | Paquete | `pe.alcanfores.notificaciones` |
 | Puerto | 8095 |
-| Base de datos | `alcanfores_notificaciones` (Flyway `V1__esquema.sql`) |
-| Rutas del gateway | `/api/admin/notificaciones/**`, `/api/admin/recordatorios/**`, `/api/admin/whatsapp/**` |
+| Base de datos | `alcanfores_notificaciones` (Flyway `V1__esquema.sql`, `V2__correo_panel_y_recordatorios.sql`, `V3__recordatorio_datos_al.sql`) |
+| Rutas del gateway | `/api/admin/notificaciones/**`, `/api/admin/recordatorios/**`, `/api/admin/whatsapp/**`, `/api/admin/correo/**` |
 | Depende de | reservas-service (constancia y datos de la reserva), pagos-service (PDF del comprobante), catalogo-service (configuración del complejo), RabbitMQ, SMTP, Evolution API |
 
 ## Responsabilidad
@@ -25,8 +25,9 @@ El servicio **solo envía**: no lee ni responde chats.
 | Tabla | Columnas | Notas |
 |---|---|---|
 | `notificacion` | `id, codigo_reserva, evento, canal ENUM('WHATSAPP','CORREO'), destino, asunto, cuerpo MEDIUMTEXT, adjuntos JSON, estado ENUM('PENDIENTE','ENVIADO','FALLIDO','SIMULADO'), intentos, ultimo_error, creado_en, enviado_en` | Una fila por aviso y canal. `cuerpo` = HTML del correo (logo como `cid:`) o texto del WhatsApp. `adjuntos` = `[{tipo, referencia, nombreArchivo, estado, detalle}]`: no se guarda el PDF, sino de dónde sacarlo (así el reintento lo vuelve a descargar). Índices por reserva, por `(estado, intentos)` y por fecha. |
-| `recordatorio` | `id, codigo_reserva UQ, enviar_en, inicio_reserva, estado ENUM('PROGRAMADO','ENVIADO','CANCELADO','OMITIDO'), datos JSON, enviado_en, detalle` | `datos` = `{reserva: DatosReserva, saldoPendiente}`. `detalle` explica por qué se canceló u omitió (columna añadida al SPEC). |
+| `recordatorio` | `id, codigo_reserva, minutos_antes (UQ con codigo_reserva desde V2), enviar_en, inicio_reserva, estado ENUM('PROGRAMADO','ENVIADO','CANCELADO','OMITIDO'), datos JSON, datos_al (V3), enviado_en, detalle` | `datos` = `{reserva: DatosReserva, saldoPendiente}`. `detalle` explica por qué se canceló u omitió (columna añadida al SPEC). `datos_al` = cuándo ocurrió el evento del que salen `inicio_reserva` y `datos` (un evento más viejo no los reemplaza). |
 | `evento_procesado` | `id_evento CHAR(36) PK, tipo, procesado_en` | Idempotencia de los consumidores. |
+| `config_correo` (V2) | `id = 1, host, puerto, usuario, clave_cifrada, remitente, nombre_remitente, seguridad ENUM('SSL','STARTTLS'), actualizado_en, actualizado_por` | Una sola fila (CHECK `id = 1`). La clave va cifrada con AES-256-GCM; nunca se devuelve ni se escribe en logs ni en la bitácora. |
 
 ## Eventos consumidos
 
@@ -40,6 +41,8 @@ Colas propias, durables y con DLX (`alcanfores.eventos.dlx`): `notificaciones.<e
 | `reserva.confirmada` | `notificaciones.reserva-confirmada` | Confirmación + saldo a pagar en el complejo + cómo llegar (dirección, referencia, Google Maps) | Constancia | **Programa el recordatorio.** |
 | `comprobante.emitido` | `notificaciones.comprobante-emitido` | Boleta, factura o nota de crédito (con aviso de comprobante simulado) | Comprobante | — |
 | `reserva.cancelada` | `notificaciones.reserva-cancelada` | Motivo, quién canceló, devolución o regla de no devolución | — | **Cancela el recordatorio.** |
+| `pago.validado` (v2.1) | `notificaciones.pago-validado` | Solo con `tipoPago = SALDO`: «¡Terminaste de pagar tu cancha!» (cancha, fecha, horario y saldo S/ 0.00; la boleta del saldo sigue llegando con `comprobante.emitido`) | — | Datos de la reserva desde reservas-service. |
+| `reserva.reprogramada` (19-nov) | `notificaciones.reserva-reprogramada` | «¡Cambiamos tu horario!»: código, «Antes: fecha, horario (cancha)», «Ahora»: cancha, fecha, hora, total, pagado, saldo y enlace a Mi reserva; según el pago: confirmada → «te enviaremos el recordatorio»; `EN_REVISION` → «Estamos validando tu comprobante»; sin pago u observado → adelanto nuevo y plazo (o «en el complejo o en línea» si no hay plazo). El motivo del panel NO se muestra (nota interna). Tarjeta `reserva-reprogramada` | Constancia (actualizada) | Si la reserva está CONFIRMADA, **mueve los recordatorios** al nuevo inicio; si no, no crea ninguno. |
 | `reserva.asistencia` | `notificaciones.reserva-asistencia` | Si `ASISTIO`: invitación a calificar con `FRONT_URL/canchas/{idCancha}?resena=ALC-…` | — | `NO_ASISTIO`: no se envía nada. |
 
 **Publica:** solo `auditoria.accion` (a través del `Auditor` de `comun`) en las acciones administrativas: `REINTENTAR_NOTIFICACION`, `EJECUTAR_RECORDATORIOS`, `CONECTAR_WHATSAPP`, `DESCONECTAR_WHATSAPP` y `PRUEBA_WHATSAPP`.
@@ -56,7 +59,7 @@ Colas propias, durables y con DLX (`alcanfores.eventos.dlx`): `notificaciones.<e
 
 | Canal | Configurado si | Sin configuración |
 |---|---|---|
-| Correo | `MAIL_HOST` (+ `MAIL_PORT`, `MAIL_USUARIO`, `MAIL_CLAVE`, `MAIL_REMITENTE`; STARTTLS con `MAIL_STARTTLS`, `MAIL_AUTH`) | SIMULADO: se guarda el HTML y se ve en el panel |
+| Correo | Configuración del panel (`config_correo`) → si no, `MAIL_HOST` (+ `MAIL_PORT`, `MAIL_USUARIO`, `MAIL_CLAVE`, `MAIL_REMITENTE`; STARTTLS con `MAIL_STARTTLS`, `MAIL_AUTH`) | SIMULADO: se guarda el HTML y se ve en el panel |
 | WhatsApp | `EVOLUTION_URL` + `EVOLUTION_APIKEY` (cabecera `apikey`), instancia `EVOLUTION_INSTANCIA` (`alcanfores` por defecto) | SIMULADO |
 
 - **Correo:** `JavaMailSender`, multipart *mixed/related*, HTML de Thymeleaf. El logo va **embebido como CID** (`cid:logo-alcanfores`, PNG de 11 KB en `resources/correo/`), así se ve aunque el cliente de correo bloquee imágenes remotas. Los PDFs van como adjuntos.
@@ -84,13 +87,30 @@ Las plantillas están en `resources/plantillas/correo/`: `base.html` (layout), `
 
 ## Recordatorio
 
-- Al consumir `reserva.confirmada` se crea (o reprograma) con `enviar_en = inicio − recordatorio_horas` (2 por defecto).
+- **v2.1 · varios recordatorios:** al consumir `reserva.confirmada` se crea (o reprograma) UNA fila por cada valor de
+  `recordatorio_minutos` del catálogo («120,15»; por defecto 120), con `enviar_en = inicio − minutos`. La lista se relee
+  del catálogo en ese momento (sin la caché de 5 min): un cambio aplica a las reservas que se confirmen desde entonces.
+  Si la reserva se vuelve a confirmar con otra lista, los tiempos que ya no están se CANCELAN.
 - **Cron:** `@Scheduled(cron = "0 * * * * *", zone = "America/Lima")` revisa los PROGRAMADOS cuya hora llegó:
-  - si faltan **menos de 30 min** para el inicio → OMITIDO, con el motivo;
+  - si su hora de envío pasó hace **más de 10 min** (reserva confirmada tarde) o el partido ya empezó → OMITIDO, con el motivo;
   - si reservas-service dice que la reserva está CANCELADA → CANCELADO;
   - si no, se toma con un `UPDATE … WHERE estado='PROGRAMADO'` (así dos instancias no lo envían dos veces) y se envía por los dos canales.
 - **Contenido:** el tiempo que falta («Tu partido es en 2 horas», o «1 hora y 30 minutos» si se confirmó tarde), «de hoy» o «de mañana», cancha, hora, **saldo actual** (consultado a reservas; si no responde, se usa el guardado), «Llega 10 minutos antes», dirección + referencia + Google Maps.
-- `reserva.cancelada` → CANCELADO.
+- `reserva.cancelada` → CANCELADOS todos los recordatorios programados de la reserva.
+- **Cambio de horario (19-nov):** `reserva.reprogramada` con la reserva CONFIRMADA → `RecordatorioServicio.moverAlNuevoInicio`:
+  cada valor vigente de `recordatorio_minutos` (releído del catálogo) vuelve a PROGRAMADO para el nuevo inicio con los datos
+  nuevos (también el que ya se había ENVIADO para el horario anterior: es otro partido; `enviado_en` vuelve a nulo), se crean
+  los que falten y se CANCELAN los programados que ya no están en la lista. Si la reserva no está confirmada no se crea nada.
+- **Eventos cruzados (revisión 19-nov):** `reserva.confirmada` y `reserva.reprogramada` llegan por colas distintas. Cada
+  recordatorio guarda `datos_al` (el `ocurridoEn` del evento que lo dejó así). `programar` (confirmación) no toca nada si
+  algún recordatorio de la reserva tiene datos del mismo segundo o posteriores (un cambio de horario ya vio la reserva
+  confirmada); `moverAlNuevoInicio` ignora un cambio más viejo que los datos guardados. Así un recordatorio nunca vuelve
+  al horario anterior. Si dos eventos de la misma reserva crean a la vez la misma fila, el UNIQUE
+  `(codigo_reserva, minutos_antes)` hace fallar a uno: si ese evento NO quedó en `evento_procesado` se relanza la excepción
+  y RabbitMQ lo reintenta (en el reintento la fila ya existe y se actualiza); antes se tomaba como «evento duplicado» y
+  se perdía el aviso en silencio.
+- **Hora vigente al enviar:** si reservas-service dice que la reserva empieza a otra hora que la guardada, el recordatorio
+  se mueve a la hora vigente (con `datos_al` = ahora) en vez de salir con la vieja (red de seguridad).
 - **Varios turnos (v2):** `inicio` = fecha + `horaInicio` de `DatosReserva`, que reservas-service llena con el PRIMER turno;
   así el recordatorio sale `recordatorio_horas` antes del primer turno aunque los turnos no sean seguidos.
 
@@ -110,6 +130,39 @@ Sin migraciones nuevas. La demo (`DatosDemo`) incluye una reserva de 2 turnos no
 
 Las pruebas de WhatsApp del panel no se reintentan solas. Cada intento suma `intentos` y guarda `ultimo_error`. El ADMIN puede reintentar a mano cualquier aviso FALLIDO, aunque ya haya agotado los 3 intentos.
 
+## v2.1 · Correo del panel, códigos de cuenta y WhatsApp ilustrado (19-nov-2026)
+
+### Correo configurable desde el panel
+- `ProveedorCorreo` decide el servidor: **panel** (`config_correo`) → **variables** `MAIL_*` → **ninguno** (SIMULADO). Arma el
+  `JavaMailSender` (SSL directo para 465 o STARTTLS obligatorio para 587, autenticación y tiempos de 10 s) y lo deja en
+  caché; al guardar desde el panel la caché se invalida y el siguiente envío ya usa lo nuevo.
+- `CifradorClaves`: AES-256-GCM con llave = SHA-256 de `CORREO_CLAVE_CIFRADO` (o de `JWT_SECRETO` si está vacía). Si la
+  llave cambia, la clave guardada no se puede leer: el envío falla con «Vuelve a escribirla en el panel».
+- `ErroresCorreo` traduce las fallas SMTP a mensajes amables: usuario o contraseña rechazados, servidor no encontrado,
+  puerto/conexión, SSL/STARTTLS y remitente no aceptado. Esos textos quedan en `ultimo_error` y en el 422 de la prueba.
+- `alcanfores.notificaciones.correo.ssl-confiar` (vacío): solo para un SMTP propio con certificado autofirmado y las pruebas.
+
+### Códigos de la cuenta (`POST /interno/codigos`, lo llama auth-service)
+- `{canal, destino, nombre, codigo, motivo: RECUPERAR_CONTRASENA | CONTRASENA_CAMBIADA}` → `{estado, simulado, detalle}`,
+  síncrono. El mensaje se redacta DOS veces: con el código real (lo que sale por el canal, campo transitorio
+  `Notificacion.cuerpoEnvio`) y con `******` (lo que se guarda). Eventos `cuenta.codigo` y `cuenta.contrasena`.
+- WhatsApp: «Tu código para cambiar tu contraseña de Alcanfores es *123456*. Vence en 10 minutos. Si no fuiste tú, ignora
+  este mensaje.»; correo con el código grande. Los `cuenta.codigo` no se reintentan (ni solos ni a mano: 422
+  `NO_REINTENTABLE`), porque guardado solo existe el texto enmascarado.
+
+### WhatsApp ilustrado
+- 14 tarjetas JPG (1200×800) en `resources/whatsapp/tarjetas/` (la 14.ª, `reserva-reprogramada`: «¡Cambiamos tu horario!»,
+  IL-02-paso1-horario, tono gol; generada con `alcanfores-diseno/whatsapp-tarjetas/generar.cjs` y convertida igual que las
+  demás: Pillow JPEG calidad 86, progresiva, 4:2:0, ~88 KB). Cada `TipoAviso` tiene la suya; el recordatorio usa la del
+  deporte (FUTBOL_* → fútbol, VOLEY y MULTIUSO → vóley, BASQUET → básquet); la asistencia ASISTIO usa
+  `asistencia-confirmada`.
+- `FabricaAvisos` agrega la tarjeta como PRIMER adjunto (`tipo IMAGEN`, se guarda solo el nombre) y deja `tarjetaSrc` en el
+  modelo: el correo la muestra como cabecera embebida (CID `tarjeta-aviso`).
+- `WhatsappCanal`: `sendMedia` con `mediatype:"image"` y el texto como leyenda → cada PDF como documento con leyenda breve
+  («Constancia ALC-…», «Boleta B001-…», «Factura F001-…», «Nota de crédito BC01-…»). Si la imagen falla, se envía solo el
+  texto y la tarjeta queda `NO_DISPONIBLE` («salió solo con el texto»): el aviso no se pierde.
+- Panel: el detalle trae `imagenTarjeta` (data URI) y la `vistaPrevia` del correo con la tarjeta incrustada.
+
 ## Endpoints (todos con JWT; las acciones solo-ADMIN usan `@PreAuthorize`)
 
 | Método | Ruta | Acceso | Respuesta |
@@ -117,11 +170,15 @@ Las pruebas de WhatsApp del panel no se reintentan solas. Cada intento suma `int
 | GET | `/api/admin/notificaciones?canal&estado&evento&q&desde&hasta&page&size&sort` | ADMIN, RECEPCION | Página de `{id, codigoReserva, evento, eventoTexto, canal, destino, asunto, estado, intentos, ultimoError, adjuntos, creadoEn, enviadoEn}`. `q` busca en código, destino y asunto. `sort` admite `creadoEn`, `enviadoEn`, `estado`, `canal`, `evento` e `intentos`. `size` va de 1 a 100. |
 | GET | `/api/admin/notificaciones/{id}` | ADMIN, RECEPCION | Lo anterior + `formato` (HTML/TEXTO), `cuerpo`, `vistaPrevia` (HTML con el logo como data URI, para un iframe), `adjuntos[]` y `reintentable`. |
 | POST | `/api/admin/notificaciones/{id}/reintentar` | ADMIN | Detalle con el nuevo estado. Si no es FALLIDO → 422 `NO_REINTENTABLE`; si otro proceso lo está reenviando → 409 `NOTIFICACION_EN_PROCESO`. |
-| GET | `/api/admin/recordatorios?estado&page&size&sort` | ADMIN | Página de `{id, codigoReserva, cliente, telefono, cancha, inicioReserva, enviarEn, estado, enviadoEn, detalle}`. |
+| GET | `/api/admin/recordatorios?estado&codigo&page&size&sort` | ADMIN | Página de `{id, codigoReserva, minutosAntes, cliente, telefono, cancha, inicioReserva, enviarEn, estado, enviadoEn, detalle}`. |
 | POST | `/api/admin/recordatorios/ejecutar` | ADMIN | `{revisados, enviados, omitidos, cancelados}` (corre el job en el momento, para la demo). |
 | GET | `/api/admin/whatsapp/estado` | ADMIN | `{configurado, instancia, estado: open, connecting, close o NO_CONFIGURADO, numero}` |
 | POST | `/api/admin/whatsapp/conectar` | ADMIN | Cuerpo opcional `{telefono}` (`@Celular`). Responde `{qrBase64 (data URL), codigoEmparejamiento, estado, mensaje}`. |
 | POST | `/api/admin/whatsapp/desconectar` | ADMIN | `{estado:"close", mensaje}` |
+| GET | `/api/admin/correo` | ADMIN | `{configurado, origen: PANEL, VARIABLES o NINGUNO, host, puerto, usuario, remitente, nombreRemitente, seguridad, tieneClave, actualizadoEn, actualizadoPor}` (nunca la clave). |
+| PUT | `/api/admin/correo` | ADMIN | `{host, puerto (1–65535), usuario (correo), clave (vacía = conservar), remitente (correo), nombreRemitente, seguridad: SSL o STARTTLS}` → lo mismo que el GET. Auditado (`CONFIGURAR_CORREO`, sin la clave). |
+| POST | `/api/admin/correo/prueba` | ADMIN | `{destino}` → 200 `{enviado:true, mensaje}` o 422 `CORREO_NO_ENVIADO` con la causa. Auditado (`PRUEBA_CORREO`). |
+| POST | `/interno/codigos` | `X-Interno-Token` | Ver «Códigos de la cuenta». |
 | POST | `/api/admin/whatsapp/prueba` | ADMIN | `{telefono, mensaje}` (celular peruano; mensaje de 1 a 1000 caracteres). Devuelve el detalle del aviso `whatsapp.prueba` (SIMULADO si no hay Evolution). |
 
 **Errores:**
@@ -148,7 +205,7 @@ OpenAPI en `/swagger-ui.html`.
 | Tema | Variables |
 |---|---|
 | Comunes | `DB_HOST/DB_PORT/DB_USUARIO/DB_CLAVE`, `EUREKA_URL`, `RABBIT_*`, `JWT_SECRETO`, `INTERNO_TOKEN`, `FRONT_URL`, `PUBLIC_API_URL` |
-| Correo | `MAIL_HOST`, `MAIL_PORT` (587), `MAIL_USUARIO`, `MAIL_CLAVE`, `MAIL_REMITENTE`, `MAIL_NOMBRE_REMITENTE`, `MAIL_STARTTLS` (true), `MAIL_AUTH` (true) |
+| Correo | `MAIL_HOST`, `MAIL_PORT` (587), `MAIL_USUARIO`, `MAIL_CLAVE`, `MAIL_REMITENTE`, `MAIL_NOMBRE_REMITENTE`, `MAIL_STARTTLS` (true), `MAIL_AUTH` (true) (solo si el panel no tiene configuración); `CORREO_CLAVE_CIFRADO` (llave del cifrado de la clave guardada desde el panel; vacía = `JWT_SECRETO`) |
 | WhatsApp | `EVOLUTION_URL`, `EVOLUTION_APIKEY`, `EVOLUTION_INSTANCIA` (alcanfores), `EVOLUTION_TIMEOUT` (20 s) |
 | Del servicio | `NOTIF_TAREAS` (true; apaga los cron), `NOTIF_DATOS_DEMO` (false; carga avisos de ejemplo si la bandeja está vacía), `RABBIT_ESCUCHAR` (true; `false` para correrlo sin RabbitMQ) |
 
@@ -166,8 +223,15 @@ OpenAPI en `/swagger-ui.html`.
 
 ## Pruebas
 
-`mvn -B -f backend/notificaciones-service/pom.xml verify` → **101 pruebas, 0 fallos** (19/11/2026, v2). JaCoCo: **95,5 % de instrucciones** en total y **94,5 %** en la capa de
-servicio (93,6 % de líneas).
+`mvn -B verify` → **147 pruebas, 0 fallos** en este módulo (19/11/2026, reprogramar + correcciones de la revisión; antes
+141, 132 en la v2.1 y 101 en la v2). JaCoCo: **94,9 % de líneas** en total y **95,1 %** en la capa de servicio.
+
+| Clase (reprogramar, 19-nov) | Qué cubre |
+|---|---|
+| `ReprogramacionAvisosTest` | Texto EXACTO del WhatsApp (antes → ahora, total, pagado, saldo, enlace), correo con «Horario anterior» y la tarjeta, adjuntos tarjeta + constancia; recordatorios movidos con la lista vigente (120 movido, 15 creado, 30 cancelado) e idempotencia; el motivo del panel NO sale al cliente; un recordatorio ya enviado vuelve a PROGRAMADO; pendiente con adelanto y plazo, sin plazo, y con comprobante en revisión («Estamos validando…»), sin recordatorios; confirmación más vieja que llega después del cambio → los recordatorios no vuelven atrás; cambio más viejo que el aplicado → se ignora; recordatorio con hora vieja que se mueve a la que dice reservas y sale a la nueva hora. |
+| `ChoquesAlProcesarTest` | Un choque de unicidad es «duplicado» solo si el evento ya quedó procesado; si no, se relanza para que RabbitMQ reintente. |
+| `AntesTextoTest` | Texto «Antes:» con y sin `horarioTexto`, sin cancha y sin fecha. |
+| `PlantillasTest` | La plantilla nueva entra en la prueba de todas las plantillas (marca, sin variables sin resolver, sin emojis, < 1000 caracteres). |
 
 | Clase | Qué cubre |
 |---|---|
@@ -181,6 +245,12 @@ servicio (93,6 % de líneas).
 | `ControladoresAdminTest` | 401 sin token o con token inválido; **403** para RECEPCION en reintentar, recordatorios y WhatsApp; bandeja con filtros y paginación; 400 por filtros inválidos (canal, `size`, `sort`, fechas, `q`); detalle con vista previa; 404; reintentar (422 y OK, auditado); recordatorios; WhatsApp NO_CONFIGURADO y 409; validaciones de `/prueba` (teléfono, mensaje vacío o de más de 1000 caracteres, JSON inválido); prueba válida SIMULADA y auditada. |
 | `ReintentosTest` | Reintenta FALLIDOS con menos de 3 intentos y PENDIENTES colgados; respeta los agotados, las pruebas de WhatsApp, los recientes y los enviados. |
 | `ClientesInternosTest` | URLs internas, 404 → NO_ENCONTRADO, 500 → 503, respuestas plana y anidada, JSON ilegible, configuración como objeto o lista. |
+| v2.1 · `CorreoPanelTest` | **GreenMail SMTPS** (SSL real): sin configuración (NINGUNO y 422), validación por campo y clave obligatoria la primera vez, 403 a RECEPCION, la clave se guarda cifrada (se descifra igual), no se devuelve ni va a la bitácora y vacía se conserva; correo de prueba enviado con la marca; contraseña incorrecta y puerto equivocado → 422 con el mensaje explicado; código por correo: sale el real y en la bandeja queda `******`. |
+| v2.1 · `CodigosInternosTest` | WhatsApp SIMULADO con número 51…, texto exacto enmascarado y tarjeta; aviso de contraseña cambiada; validación (canal, motivo, 6 dígitos, destino según el canal) y 403 sin token interno; un código FALLIDO no se reintenta solo ni a mano. |
+| v2.1 · `AvisosIlustradosTest` | `pago.validado` SALDO por los dos canales con «S/ 0.00» y la tarjeta saldo-pagado; ADELANTO/TOTAL sin aviso pero procesado; ASISTIO con asistencia-confirmada; tarjeta del recordatorio según el deporte. |
+| v2.1 · `EnvioServicioImplTest` (MockRestServiceServer) | Secuencia **imagen (mediatype image, JPG en base64, texto como leyenda) → PDF (document, «Constancia ALC-…»)**; si la imagen falla: texto + PDF («Boleta B001-…») y tarjeta NO_DISPONIBLE; leyendas de factura y nota de crédito. |
+| v2.1 · `RecordatorioServicioTest` (Tiempo.fijar) | Lista 120,15: dos filas, cada una sale a su hora («en 2 horas», «en 15 minutos»); cancelar anula las tres de 1440,60,15; reconfirmar con otra lista cancela las que sobran; tolerancia de 10 min; filtro por código. |
+| v2.1 · otras | `CorreoUtilidadesTest` (AES-GCM, propiedades SSL/STARTTLS, 7 mensajes de error), `PlantillasTest` (código, saldo pagado, cabecera con tarjeta, prueba de correo), `ComplejoServicioImplTest` (lista de minutos válida o por defecto y relectura al confirmar). |
 | Otras | `ComplejoServicioImplTest` (caché y respaldo), `WhatsappServicioImplTest` (Evolution configurado; errores → 503), `ModeloMensajesTest`, `TareasProgramadasTest`, `DatosDemoTest`. |
 
 Las pruebas usan la BD `alcanfores_notificaciones_test` (MariaDB local) con el perfil `test`: sin RabbitMQ ni Eureka, y con `RabbitTemplate`, `PublicadorEventos`, `Auditor` y los clientes de otros servicios reemplazados por mocks.

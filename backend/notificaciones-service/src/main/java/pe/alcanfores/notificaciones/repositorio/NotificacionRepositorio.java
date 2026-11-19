@@ -18,15 +18,16 @@ public interface NotificacionRepositorio extends JpaRepository<Notificacion, Lon
 
     /**
      * FALLIDOS que aún tienen intentos y PENDIENTES que quedaron colgados (el proceso se cayó a mitad del envío).
-     * Los mensajes de prueba del panel no se reintentan solos.
+     * Los mensajes de prueba del panel y los códigos de verificación ({@code sinReintento}) no se reintentan solos.
      */
     @Query("""
             select n.id from Notificacion n
-            where n.evento <> 'whatsapp.prueba'
+            where n.evento not in :sinReintento
               and ((n.estado = pe.alcanfores.notificaciones.modelo.EstadoNotificacion.FALLIDO and n.intentos < :maxIntentos)
                or (n.estado = pe.alcanfores.notificaciones.modelo.EstadoNotificacion.PENDIENTE and n.creadoEn < :colgadoAntesDe))
             order by n.id""")
-    List<Long> idsPorReintentar(@Param("maxIntentos") int maxIntentos, @Param("colgadoAntesDe") LocalDateTime colgadoAntesDe);
+    List<Long> idsPorReintentar(@Param("maxIntentos") int maxIntentos, @Param("colgadoAntesDe") LocalDateTime colgadoAntesDe,
+                                @Param("sinReintento") List<String> sinReintento);
 
     /**
      * Toma el aviso para reenviarlo solo si sigue en el estado esperado (si hay dos instancias, solo una lo envía).

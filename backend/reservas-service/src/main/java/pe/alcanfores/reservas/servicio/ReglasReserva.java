@@ -17,9 +17,11 @@ public final class ReglasReserva {
 
     /** Minutos de anticipación mínima para reservar por la web. */
     public static final int MINUTOS_ANTICIPACION = 30;
-    /** Desde cuántos minutos antes del inicio se puede registrar la asistencia. */
-    public static final int MINUTOS_ASISTENCIA = 15;
     public static final String MOTIVO_VENCIDA = "Venció el plazo para pagar";
+    /** Horas antes del inicio hasta las que el cliente (o Canchita) puede cambiar el horario. */
+    public static final int HORAS_REPROGRAMAR_CLIENTE = 2;
+    /** Cambios de horario que el cliente (o Canchita) puede hacer por reserva; el panel no tiene límite. */
+    public static final int MAX_REPROGRAMACIONES_CLIENTE = 1;
 
     private static final Map<String, String> DEPORTES = Map.of(
             "FUTBOL_5", "Fútbol 5", "FUTBOL_6", "Fútbol 6", "FUTBOL_7", "Fútbol 7",
@@ -47,8 +49,9 @@ public final class ReglasReserva {
                 && (r.getAsistencia() == Asistencia.ASISTIO || !ahora.isBefore(r.inicio()));
     }
 
-    public static boolean puedeMarcarAsistencia(Reserva r, LocalDateTime ahora) {
-        return r.getEstado() == EstadoReserva.CONFIRMADA && !ahora.isBefore(r.inicio().minusMinutes(MINUTOS_ASISTENCIA));
+    /** Reserva confirmada y ya dentro de la ventana: desde {@code minutosAntes} (configuración del complejo) antes del inicio. */
+    public static boolean puedeMarcarAsistencia(Reserva r, LocalDateTime ahora, int minutosAntes) {
+        return r.getEstado() == EstadoReserva.CONFIRMADA && !ahora.isBefore(r.inicio().minusMinutes(minutosAntes));
     }
 
     /** El panel puede cancelar una reserva vigente mientras no se haya registrado la asistencia. */
@@ -58,6 +61,59 @@ public final class ReglasReserva {
 
     public static boolean puedeCobrarSaldo(Reserva r) {
         return r.getEstado() == EstadoReserva.CONFIRMADA && r.saldo().signum() > 0;
+    }
+
+    /**
+     * Se puede cambiar el horario de una reserva activa que aún no se juega: PENDIENTE (sin pago, en revisión u
+     * observada) o CONFIRMADA (adelanto o total pagado), sin asistencia registrada y cuyo partido aún no empieza. Nunca
+     * una cancelada, asistida, con «no asistió» o ya empezada (aunque nadie haya marcado la asistencia). Es la única
+     * regla que aplica al panel (además de la disponibilidad de los turnos nuevos).
+     */
+    public static boolean reprogramable(Reserva r, LocalDateTime ahora) {
+        return r.vigente() && r.getAsistencia() == Asistencia.PENDIENTE && ahora.isBefore(r.inicio());
+    }
+
+    /**
+     * Plazo del cliente (y de Canchita) para cambiar el horario: hasta {@value #HORAS_REPROGRAMAR_CLIENTE} horas antes
+     * del inicio. La cancelación del cliente no tiene una clave de plazo propia (solo «antes del inicio»), así que se
+     * usa este margen para que el turno que se libera aún pueda reservarlo otra persona.
+     */
+    public static boolean aTiempoParaReprogramar(Reserva r, LocalDateTime ahora) {
+        return ahora.isBefore(r.inicio().minusHours(HORAS_REPROGRAMAR_CLIENTE));
+    }
+
+    /** Lo que ve el portal: reprogramable, a tiempo y sin haber usado su único cambio. */
+    public static boolean puedeReprogramarCliente(Reserva r, LocalDateTime ahora, long cambiosDelCliente) {
+        return reprogramable(r, ahora) && aTiempoParaReprogramar(r, ahora) && cambiosDelCliente < MAX_REPROGRAMACIONES_CLIENTE;
+    }
+
+    /**
+     * Dinero que ya es del cliente: lo pagado y el comprobante que se está validando (el monto con el que pagos lo
+     * registró, guardado al recibir {@code pago.registrado}; el adelanto se recalcula en cada cambio y no sirve para
+     * esto). El nuevo total nunca puede ser menor.
+     */
+    public static BigDecimal montoComprometido(Reserva r) {
+        return r.getMontoPagado().add(r.getMontoEnRevision());
+    }
+
+    /**
+     * Para el cliente y Canchita: si ya pagó algo (o tiene un comprobante en revisión), eso debe cubrir el adelanto del
+     * nuevo horario; si no, la reserva quedaría confirmada con menos del adelanto. Sin pagos no aplica (sigue pendiente
+     * con el adelanto nuevo). El panel no tiene esta regla.
+     */
+    public static boolean adelantoCubierto(BigDecimal comprometido, BigDecimal nuevoAdelanto) {
+        return comprometido.signum() <= 0 || comprometido.compareTo(nuevoAdelanto) >= 0;
+    }
+
+    /**
+     * Estado del pago tras cambiar el total conservando lo pagado (misma regla que al validar un pago): sin pagos no
+     * cambia (sin pago, en revisión u observado); con pagos, PAGADO_TOTAL si cubre el total y ADELANTO_PAGADO si no.
+     */
+    public static EstadoPago estadoPagoTrasCambio(EstadoPago actual, BigDecimal pagado, BigDecimal total) {
+        if (pagado.signum() <= 0) {
+            return actual;
+        }
+        return pagado.compareTo(total) >= 0 ? EstadoPago.PAGADO_TOTAL : EstadoPago.ADELANTO_PAGADO;
     }
 
     /**

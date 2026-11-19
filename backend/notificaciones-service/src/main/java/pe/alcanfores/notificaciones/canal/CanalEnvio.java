@@ -12,6 +12,10 @@ public interface CanalEnvio {
 
     boolean configurado();
 
-    /** @throws EnvioExcepcion si el proveedor rechaza o no responde. */
-    void enviar(Notificacion notificacion, List<ArchivoPdf> adjuntos);
+    /**
+     * Envía el aviso con sus archivos (la tarjeta ilustrada, si hay, y los PDFs).
+     *
+     * @throws EnvioExcepcion si el proveedor rechaza o no responde.
+     */
+    void enviar(Notificacion notificacion, List<ArchivoAdjunto> archivos);
 }

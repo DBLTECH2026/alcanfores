@@ -76,6 +76,13 @@ public final class ReservaDtos {
             @TextoEntre(min = 10, max = 255, message = Mensajes.MOTIVO) String motivo) {
     }
 
+    /** Cambiar el horario desde el portal o Canchita: el DNI de la reserva y los turnos nuevos (1 a 8, misma cancha y fecha). */
+    public record ReprogramacionClienteSolicitud(
+            @NotNull(message = Mensajes.DNI) @Dni String dni,
+            @NotNull(message = Mensajes.TURNOS_CANTIDAD) @Size(min = 1, max = Mensajes.MAX_TURNOS, message = Mensajes.TURNOS_CANTIDAD)
+            List<@NotNull(message = Mensajes.ELEGIR_TURNO) @Positive(message = Mensajes.ELEGIR_TURNO) Long> idsTurno) {
+    }
+
     public record CanchaResumen(Long id, String nombre, String deporte) {
     }
 
@@ -109,16 +116,21 @@ public final class ReservaDtos {
                                         BigDecimal saldo, String metodoPagoPrevisto, CancelacionInfo cancelacion,
                                         List<EventoLinea> linea, boolean puedeCancelar, boolean puedeReenviarComprobante,
                                         boolean puedeResenar, List<TurnoReserva> turnos, String horarioTexto,
-                                        int cantidadTurnos, boolean resenada) {
+                                        int cantidadTurnos, boolean resenada, int reprogramaciones,
+                                        boolean puedeReprogramar, BigDecimal montoEnRevision) {
     }
 
-    /** Ítem de «Mis reservas» (cliente con cuenta: todas las reservas de su DNI). */
+    /**
+     * Ítem de «Mis reservas» (cliente con cuenta: todas las reservas de su DNI). {@code cancelacion}: la misma del detalle
+     * (null si no está cancelada), para que la lista distinga «No confirmada» (la anuló el sistema por vencer el plazo)
+     * de «Cancelada».
+     */
     public record ReservaClienteItem(String codigoReserva, EstadoReserva estado, EstadoPago estadoPago, Asistencia asistencia,
                                      Origen origen, CanchaResumen cancha, LocalDate fecha, LocalTime horaInicio,
                                      LocalTime horaFin, String horarioTexto, int cantidadTurnos, List<TurnoReserva> turnos,
                                      BigDecimal montoTotal, BigDecimal montoAdelanto, BigDecimal montoPagado,
                                      BigDecimal saldo, LocalDateTime venceEn, LocalDateTime fechaRegistro,
                                      boolean puedeCancelar, boolean puedeReenviarComprobante, boolean puedeResenar,
-                                     boolean resenada) {
+                                     boolean resenada, CancelacionInfo cancelacion) {
     }
 }

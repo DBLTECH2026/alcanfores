@@ -41,7 +41,7 @@ class ComplejoServicioImplTest {
     @Test
     @DisplayName("Lee la configuración del catálogo y la guarda 5 minutos")
     void cache() {
-        when(catalogo.configuracion()).thenReturn(Map.of("recordatorio_horas", "3", "direccion", "Av. Nueva 123",
+        when(catalogo.configuracion()).thenReturn(Map.of("recordatorio_minutos", "15,120", "direccion", "Av. Nueva 123",
                 "whatsapp", "+51 914 995 187", "devolucion_horas", "12"));
 
         DatosComplejo d = servicio.datos();
@@ -49,7 +49,7 @@ class ComplejoServicioImplTest {
         Datos.reloj(AHORA.plusMinutes(4));
         servicio.datos();
 
-        assertThat(d.recordatorioHoras()).isEqualTo(3);
+        assertThat(d.recordatorioMinutos()).containsExactly(120, 15);
         assertThat(d.devolucionHoras()).isEqualTo(12);
         assertThat(d.direccion()).isEqualTo("Av. Nueva 123");
         assertThat(d.referencia()).isEqualTo("Paradero Caseta, a dos cuadras de la UTP Santa Clara");
@@ -63,7 +63,7 @@ class ComplejoServicioImplTest {
     }
 
     @Test
-    @DisplayName("Si catálogo no responde usa los datos reales por defecto (2 h) y reintenta al minuto")
+    @DisplayName("Si catálogo no responde usa los datos reales por defecto (120 min) y reintenta al minuto")
     void respaldo() {
         when(catalogo.configuracion()).thenThrow(NegocioExcepcion.noDisponible("SERVICIO_NO_DISPONIBLE", "caído"));
 
@@ -71,7 +71,7 @@ class ComplejoServicioImplTest {
 
         assertThat(d.nombre()).isEqualTo("Complejo Deportivo Los Alcanfores");
         assertThat(d.direccion()).isEqualTo("Carretera Central km 11.5, Santa Clara, Ate");
-        assertThat(d.recordatorioHoras()).isEqualTo(2);
+        assertThat(d.recordatorioMinutos()).containsExactly(120);
         assertThat(d.devolucionHoras()).isEqualTo(24);
         Datos.reloj(AHORA.plusSeconds(61));
         servicio.datos();
@@ -79,13 +79,30 @@ class ComplejoServicioImplTest {
     }
 
     @Test
+    @DisplayName("Al confirmar se relee el catálogo aunque la caché siga vigente; si no responde, se usa lo último")
+    void actualizados() {
+        when(catalogo.configuracion()).thenReturn(Map.of("recordatorio_minutos", "120"))
+                .thenReturn(Map.of("recordatorio_minutos", "60,15"))
+                .thenThrow(NegocioExcepcion.noDisponible("SERVICIO_NO_DISPONIBLE", "caído"));
+
+        assertThat(servicio.datos().recordatorioMinutos()).containsExactly(120);
+        assertThat(servicio.actualizados().recordatorioMinutos()).containsExactly(60, 15);
+        assertThat(servicio.datos().recordatorioMinutos()).containsExactly(60, 15);
+        assertThat(servicio.actualizados().recordatorioMinutos()).containsExactly(60, 15);
+        verify(catalogo, times(3)).configuracion();
+    }
+
+    @Test
     @DisplayName("Valores fuera de rango o no numéricos se ignoran")
     void valoresInvalidos() {
-        DatosComplejo d = servicio.combinar(Map.of("recordatorio_horas", "cero", "devolucion_horas", "-5", "direccion", "  "));
+        DatosComplejo d = servicio.combinar(Map.of("recordatorio_minutos", "cero", "devolucion_horas", "-5", "direccion", "  "));
 
-        assertThat(d.recordatorioHoras()).isEqualTo(2);
+        assertThat(d.recordatorioMinutos()).containsExactly(120);
         assertThat(d.devolucionHoras()).isEqualTo(24);
         assertThat(d.direccion()).isEqualTo("Carretera Central km 11.5, Santa Clara, Ate");
-        assertThat(servicio.combinar(Map.of("recordatorio_horas", "99")).recordatorioHoras()).isEqualTo(2);
+        for (String malo : new String[]{"4", "1441", "60,60", "10,20,30,40", "", "60;15"}) {
+            assertThat(servicio.combinar(Map.of("recordatorio_minutos", malo)).recordatorioMinutos()).as(malo).containsExactly(120);
+        }
+        assertThat(servicio.combinar(Map.of("recordatorio_minutos", " 5 , 1440 ")).recordatorioMinutos()).containsExactly(1440, 5);
     }
 }

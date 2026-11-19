@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import pe.alcanfores.auth.config.AuthPropiedades;
 import pe.alcanfores.auth.dto.CambiarContrasenaSolicitud;
+import pe.alcanfores.auth.dto.EditarMisDatosSolicitud;
 import pe.alcanfores.auth.dto.LoginRespuesta;
 import pe.alcanfores.auth.dto.LoginSolicitud;
 import pe.alcanfores.auth.dto.UsuarioRespuesta;
@@ -16,11 +17,15 @@ import pe.alcanfores.auth.repositorio.AdministradorRepositorio;
 import pe.alcanfores.comun.error.NegocioExcepcion;
 import pe.alcanfores.comun.seguridad.JwtServicio;
 import pe.alcanfores.comun.seguridad.UsuarioToken;
+import pe.alcanfores.comun.util.Texto;
 import pe.alcanfores.comun.util.Tiempo;
 
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -118,6 +123,32 @@ public class AutenticacionServicioImpl implements AutenticacionServicio {
         a.setContrasenaHash(codificador.encode(s.nueva()));
         administradores.save(a);
         bitacora.registrar(ACCION_CAMBIAR_CONTRASENA, "administrador", a.getId(), "Cambió su propia contraseña");
+    }
+
+    @Override
+    @Transactional
+    public UsuarioRespuesta editarMisDatos(UsuarioToken token, EditarMisDatosSolicitud s) {
+        Administrador a = vigente(token);
+        String correo = Texto.correo(s.correo());
+        if (administradores.existsByCorreoAndIdNot(correo, a.getId())) {
+            throw NegocioExcepcion.conflicto("CORREO_DUPLICADO", "Ese correo ya está registrado en otro usuario.");
+        }
+        String telefono = Texto.normalizarCelular(s.telefono());
+        List<String> cambios = new ArrayList<>();
+        if (!Objects.equals(a.getCorreo(), correo)) {
+            cambios.add("correo: " + a.getCorreo() + " -> " + correo);
+        }
+        if (!Objects.equals(a.getTelefono(), telefono)) {
+            cambios.add("telefono: " + (a.getTelefono() == null ? "-" : a.getTelefono()) + " -> "
+                    + (telefono == null ? "-" : telefono));
+        }
+        a.setCorreo(correo);
+        a.setTelefono(telefono);
+        administradores.save(a);
+        if (!cambios.isEmpty()) {
+            bitacora.registrar("EDITAR_MIS_DATOS", "administrador", a.getId(), String.join("; ", cambios));
+        }
+        return UsuarioMapeador.aRespuesta(a);
     }
 
     /** El token puede seguir vigente aunque el usuario haya sido desactivado o eliminado: se revisa en la BD. */

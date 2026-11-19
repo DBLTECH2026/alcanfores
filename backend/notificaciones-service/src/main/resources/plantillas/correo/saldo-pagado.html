@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{base :: correo('Pago completo', '¡Terminaste de pagar tu cancha!', |Saldo S/ 0.00. Reserva ${codigo}.|, ~{::contenido})}">
+<body>
+<th:block th:fragment="contenido">
+    <p style="margin:0 0 12px 0;" th:text="|${saludo}:|">Hola:</p>
+    <p style="margin:0;">
+        Recibimos el pago del saldo de tu reserva <strong th:text="${codigo}">ALC-XXXXXX</strong> por
+        <strong th:text="${montoPago}">S/ 0.00</strong>. Ya no debes nada: solo llega y juega.
+    </p>
+
+    <table th:replace="~{componentes :: tarjeta(false, false)}"></table>
+
+    <table th:replace="~{componentes :: notaVerde('Saldo S/ 0.00', 'Te enviamos la boleta o factura de este pago en un mensaje aparte.')}"></table>
+
+    <table th:replace="~{componentes :: boton(${urlMiReserva}, 'Ver mi reserva')}"></table>
+</th:block>
+</body>
+</html>

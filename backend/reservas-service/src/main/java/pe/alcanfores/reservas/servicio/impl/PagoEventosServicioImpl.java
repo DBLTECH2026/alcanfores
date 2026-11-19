@@ -55,6 +55,7 @@ public class PagoEventosServicioImpl implements PagoEventosServicio {
         if (r.getEstado() == EstadoReserva.PENDIENTE
                 && (r.getEstadoPago() == EstadoPago.SIN_PAGO || r.getEstadoPago() == EstadoPago.OBSERVADO)) {
             r.setEstadoPago(EstadoPago.EN_REVISION);
+            r.setMontoEnRevision(Dinero.redondear(e.monto() == null ? r.getMontoAdelanto() : e.monto()));
             r.setVenceEn(null);
         }
         operaciones.registrarHito(r, ReservaHistorial.COMPROBANTE_RECIBIDO, "Recibimos tu comprobante " + texto(e.metodo())
@@ -75,10 +76,15 @@ public class PagoEventosServicioImpl implements PagoEventosServicio {
         LocalDateTime ahora = Tiempo.ahora();
         BigDecimal pagado = Dinero.redondear(r.getMontoPagado().add(e.monto()));
         r.setMontoPagado(pagado);
-        boolean completo = pagado.compareTo(r.getMontoTotal()) >= 0;
+        r.setMontoEnRevision(BigDecimal.ZERO.setScale(2));
         String tipo = e.tipoPago() == null ? "" : e.tipoPago();
-        r.setEstadoPago(completo || "TOTAL".equals(tipo) ? EstadoPago.PAGADO_TOTAL : EstadoPago.ADELANTO_PAGADO);
+        // Solo con los montos: un pago «TOTAL» calculado antes de un cambio de horario más caro no cubre el nuevo total.
+        r.setEstadoPago(pagado.compareTo(r.getMontoTotal()) >= 0 ? EstadoPago.PAGADO_TOTAL : EstadoPago.ADELANTO_PAGADO);
         r.setVenceEn(null);
+        if (pagado.compareTo(r.getMontoTotal()) > 0 && r.getEstado() != EstadoReserva.CANCELADA) {
+            log.warn("Reserva {}: lo pagado ({}) supera el total ({}); corresponde devolver la diferencia",
+                    r.getCodigoReserva(), pagado, r.getMontoTotal());
+        }
         operaciones.registrarHito(r, ReservaHistorial.PAGO_VALIDADO, "Pago " + switch (tipo) {
             case "TOTAL" -> "total";
             case "SALDO" -> "del saldo";
@@ -112,6 +118,7 @@ public class PagoEventosServicioImpl implements PagoEventosServicio {
             return;
         }
         Reserva r = encontrada.get();
+        r.setMontoEnRevision(BigDecimal.ZERO.setScale(2));
         if (r.getEstado() != EstadoReserva.PENDIENTE) {
             operaciones.registrarHito(r, ReservaHistorial.OBSERVADO, ReglasReserva.textoObservado(e.observacion(), null));
             return;

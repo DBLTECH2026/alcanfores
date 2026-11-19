@@ -8,9 +8,11 @@ import pe.alcanfores.comun.eventos.AsistenciaRegistradaEvento;
 import pe.alcanfores.comun.eventos.ComprobanteEmitidoEvento;
 import pe.alcanfores.comun.eventos.PagoRechazadoEvento;
 import pe.alcanfores.comun.eventos.PagoRegistradoEvento;
+import pe.alcanfores.comun.eventos.PagoValidadoEvento;
 import pe.alcanfores.comun.eventos.ReservaCanceladaEvento;
 import pe.alcanfores.comun.eventos.ReservaConfirmadaEvento;
 import pe.alcanfores.comun.eventos.ReservaRegistradaEvento;
+import pe.alcanfores.comun.eventos.ReservaReprogramadaEvento;
 import pe.alcanfores.notificaciones.config.MensajeriaConfig;
 import pe.alcanfores.notificaciones.servicio.AvisoServicio;
 
@@ -52,6 +54,12 @@ public class ConsumidorEventos {
         avisos.alConfirmarReserva(e);
     }
 
+    @RabbitListener(queues = MensajeriaConfig.COLA_PAGO_VALIDADO)
+    public void alValidarPago(PagoValidadoEvento e) {
+        log.info("pago.validado {} {} ({})", e.codigoReserva(), e.tipoPago(), e.idEvento());
+        avisos.alValidarPago(e);
+    }
+
     @RabbitListener(queues = MensajeriaConfig.COLA_COMPROBANTE_EMITIDO)
     public void alEmitirComprobante(ComprobanteEmitidoEvento e) {
         log.info("comprobante.emitido {} ({})", e.serieNumero(), e.idEvento());
@@ -62,6 +70,12 @@ public class ConsumidorEventos {
     public void alCancelarReserva(ReservaCanceladaEvento e) {
         log.info("reserva.cancelada {} ({})", e.reserva().codigoReserva(), e.idEvento());
         avisos.alCancelarReserva(e);
+    }
+
+    @RabbitListener(queues = MensajeriaConfig.COLA_RESERVA_REPROGRAMADA)
+    public void alReprogramarReserva(ReservaReprogramadaEvento e) {
+        log.info("reserva.reprogramada {} por {} ({})", e.reserva().codigoReserva(), e.actor(), e.idEvento());
+        avisos.alReprogramarReserva(e);
     }
 
     @RabbitListener(queues = MensajeriaConfig.COLA_RESERVA_ASISTENCIA)

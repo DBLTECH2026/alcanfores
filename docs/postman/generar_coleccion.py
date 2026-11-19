@@ -316,6 +316,141 @@ carpetas += [
     ]},
 ]
 
+RECUPERAR = {'tipoCuenta': 'CLIENTE', 'usuario': '{{dniCliente}}'}
+
+
+def con_reintento(*lineas):
+    """El gateway permite 5 llamadas por minuto por IP a /api/auth/recuperar/**: si otra prueba de la misma PC gastó el
+    cupo (429), espera lo que dice Retry-After y repite la petición una sola vez; si no, corre las pruebas normales."""
+    return ["const clave = 'reintento_' + pm.info.requestId;",
+            "if (pm.response.code === 429 && !pm.collectionVariables.get(clave)) {",
+            "  pm.collectionVariables.set(clave, '1');",
+            "  setTimeout(() => {}, ((Number(pm.response.headers.get('Retry-After')) || 60) + 1) * 1000);",
+            "  postman.setNextRequest(pm.info.requestName);",
+            "} else {", *['  ' + l for l in lineas], "}"]
+
+
+carpetas += [
+    {'name': '09 · Recuperar contraseña, celular del panel, correo y recordatorios', 'item': [
+        peticion('Recuperar: por dónde recibir el código', 'POST', '/api/auth/recuperar/opciones', RECUPERAR, pruebas=con_reintento(estado(200),
+            "const c = pm.response.json().canales;",
+            "pm.test('Correo y WhatsApp enmascarados', () => { pm.expect(c.map(x => x.canal)).to.include.members(['CORREO','WHATSAPP']); pm.expect(c.find(x => x.canal === 'WHATSAPP').destino).to.match(/^\\*\\*\\* \\*\\*\\* \\d{3}$/); pm.expect(c.find(x => x.canal === 'CORREO').destino).to.include('****@'); });")),
+        peticion('Recuperar: enviar el código por correo', 'POST', '/api/auth/recuperar/enviar', dict(RECUPERAR, canal='CORREO'),
+                 descripcion='En local (RECUPERAR_DEVOLVER_CODIGO=true) responde codigoPrueba; en producción no.', pruebas=con_reintento(estado(200),
+            "const j = pm.response.json(); pm.collectionVariables.set('codigoPrueba', j.codigoPrueba || '');",
+            "pm.test('Vence en 10 min y se reenvía en 60 s', () => { pm.expect(j.expiraEn).to.be.a('string'); pm.expect(j.reenviarEnSegundos).to.eql(60); pm.expect(j.simulado).to.be.a('boolean'); });")),
+        peticion('Recuperar: código incorrecto', 'POST', '/api/auth/recuperar/verificar', dict(RECUPERAR, codigo='{{codigoMalo}}'),
+                 previas=["pm.collectionVariables.set('codigoMalo', pm.collectionVariables.get('codigoPrueba') === '000000' ? '111111' : '000000');"],
+                 pruebas=con_reintento(estado(422), ES_ERROR,
+            "pm.test('CODIGO_INCORRECTO con intentos restantes', () => { const j = pm.response.json(); pm.expect(j.codigo).to.eql('CODIGO_INCORRECTO'); pm.expect(j.mensaje).to.include('intentos'); });")),
+        peticion('Recuperar: verificar el código (solo local)', 'POST', '/api/auth/recuperar/verificar', dict(RECUPERAR, codigo='{{codigoPrueba}}'),
+                 pruebas=con_reintento(
+            "if (pm.collectionVariables.get('codigoPrueba')) {",
+            "  pm.test('Responde 200 con el permiso de un solo uso', () => pm.response.to.have.status(200));",
+            "  pm.collectionVariables.set('tokenRestablecer', pm.response.json().tokenRestablecer);",
+            "} else {",
+            "  pm.test('Sin codigoPrueba (producción): el código vacío se rechaza con 400', () => pm.response.to.have.status(400));",
+            "  pm.collectionVariables.set('tokenRestablecer', '');",
+            "}")),
+        peticion('Recuperar: elegir la contraseña nueva (solo local)', 'POST', '/api/auth/recuperar/restablecer',
+                 {'tokenRestablecer': '{{tokenRestablecer}}', 'nueva': 'Cliente2028', 'confirmacion': 'Cliente2028'}, pruebas=con_reintento(
+            "if (pm.collectionVariables.get('tokenRestablecer')) {",
+            "  pm.test('Contraseña cambiada', () => { pm.response.to.have.status(200); pm.expect(pm.response.json().mensaje).to.include('se cambió'); });",
+            "} else {",
+            "  pm.test('Sin permiso: 400', () => pm.response.to.have.status(400));",
+            "}")),
+        peticion('Mi usuario del panel (con celular)', 'GET', '/api/auth/yo', token=True, pruebas=[estado(200),
+            "const j = pm.response.json(); pm.collectionVariables.set('correoAdmin', j.correo);",
+            "pm.test('Trae el campo telefono (puede ser null)', () => pm.expect(j).to.have.property('telefono'));"]),
+        peticion('Mis datos con celular inválido', 'PUT', '/api/auth/yo', {'telefono': '812345678', 'correo': 'x'}, token=True,
+                 pruebas=[estado(400), ES_ERROR,
+            "pm.test('Error en telefono y correo', () => { const c = pm.response.json().errores.map(e => e.campo); pm.expect(c).to.include.members(['telefono','correo']); });"]),
+        peticion('Mis datos (mismo correo, sin cambiar el celular)', 'PUT', '/api/auth/yo', {'telefono': '{{telefonoAdmin}}',
+                 'correo': '{{correoAdmin}}'}, token=True, previas=[
+            "pm.sendRequest({url: pm.environment.get('base') + '/api/auth/yo', header: {Authorization: 'Bearer ' + pm.collectionVariables.get('token')}}, (e, r) => pm.collectionVariables.set('telefonoAdmin', (r && r.json().telefono) || ''));"],
+                 pruebas=[estado(200), "pm.test('Mismo correo', () => pm.expect(pm.response.json().correo).to.eql(pm.collectionVariables.get('correoAdmin')));"]),
+        peticion('Correo: configuración vigente', 'GET', '/api/admin/correo', token=True, pruebas=[estado(200),
+            "const j = pm.response.json();",
+            "pm.test('Dice el origen y nunca la contraseña', () => { pm.expect(j.origen).to.be.oneOf(['PANEL','VARIABLES','NINGUNO']); pm.expect(j).to.not.have.property('clave'); pm.expect(j.tieneClave).to.be.a('boolean'); });"]),
+        peticion('Correo: datos inválidos', 'PUT', '/api/admin/correo', {'host': 'http://smtp', 'puerto': 0, 'usuario': 'x',
+                 'remitente': 'y', 'seguridad': None}, token=True, pruebas=[estado(400), ES_ERROR,
+            "pm.test('Error por campo', () => { const c = pm.response.json().errores.map(e => e.campo); ['host','puerto','usuario','remitente','seguridad'].forEach(x => pm.expect(c).to.include(x)); });"]),
+        peticion('Correo: prueba a un destino inválido', 'POST', '/api/admin/correo/prueba', {'destino': 'no-es-correo'}, token=True,
+                 pruebas=[estado(400), ES_ERROR]),
+        peticion('Recordatorios de una reserva (uno por cada tiempo)', 'GET', '/api/admin/recordatorios?codigo={{codigo}}', token=True,
+                 pruebas=[estado(200),
+            "pm.test('Cada fila dice cuántos minutos antes', () => pm.response.json().contenido.forEach(r => pm.expect(r.minutosAntes).to.be.a('number')));"]),
+        peticion('Reglas públicas: lista de recordatorios y asistencia', 'GET', '/api/catalogo/complejo', pruebas=[estado(200),
+            "const r = pm.response.json().reglas;",
+            "pm.test('recordatorioMinutos de mayor a menor', () => { pm.expect(r.recordatorioMinutos).to.be.an('array').that.is.not.empty; pm.expect([...r.recordatorioMinutos].sort((a, b) => b - a)).to.eql(r.recordatorioMinutos); pm.expect(r.asistenciaDesdeMin).to.be.a('number'); });"]),
+    ]},
+]
+
+CLIENTE_ROCIO = {'dni': '{{dniReprog}}', 'nombres': 'Rocío', 'apellidos': 'Salas Pinto', 'telefono': '987000333',
+                 'correo': 'rocio.prueba@example.com'}
+REPROGRAMAR = '/api/reservas/{{codigoReprog}}/reprogramar'
+REPROGRAMAR_PANEL = '/api/admin/reservas/{{codigoReprog}}/reprogramar'
+
+carpetas += [
+    {'name': '10 · Cambiar el horario (reprogramar)', 'item': [
+        peticion('Turnos libres para cambiar de horario', 'GET', '/api/disponibilidad?fecha={{fechaReprog}}&idCancha={{idCancha}}',
+                 previas=[fecha_js('fechaReprog', 6),
+                          "pm.collectionVariables.set('dniReprog', '97' + String(Math.floor(Math.random()*1e6)).padStart(6, '0'));"],
+                 pruebas=[estado(200),
+            "const t = pm.response.json().canchas[0].turnos.filter(x => x.estado === 'DISPONIBLE');",
+            "pm.test('Hay al menos 3 turnos libres', () => pm.expect(t.length).to.be.at.least(3));",
+            "['idTurnoR1', 'idTurnoR2', 'idTurnoR3'].forEach((v, i) => pm.collectionVariables.set(v, t[i].idTurno));",
+            "pm.collectionVariables.set('precioR2', t[1].precio);"]),
+        peticion('Reserva que se va a cambiar', 'POST', '/api/reservas', {'idsTurno': ['{{idTurnoR1}}'], 'cliente': CLIENTE_ROCIO,
+                 'metodoPago': 'YAPE', 'aceptaTerminos': True, 'aceptaPrivacidad': True}, pruebas=[estado(201),
+            "pm.collectionVariables.set('codigoReprog', pm.response.json().codigoReserva);"]),
+        peticion('Mi reserva ofrece cambiar el horario', 'GET', '/api/reservas/{{codigoReprog}}?dni={{dniReprog}}', pruebas=[estado(200),
+            "pm.test('puedeReprogramar y 0 cambios', () => { const j = pm.response.json(); pm.expect(j.puedeReprogramar).to.eql(true); pm.expect(j.reprogramaciones).to.eql(0); });"]),
+        peticion('Cambiar con datos inválidos', 'POST', REPROGRAMAR, {'dni': '12', 'idsTurno': []}, pruebas=[estado(400), ES_ERROR,
+            "pm.test('Errores en dni e idsTurno', () => { const c = pm.response.json().errores.map(e => e.campo); pm.expect(c).to.include.members(['dni', 'idsTurno']); });"]),
+        peticion('Cambiar al mismo horario', 'POST', REPROGRAMAR, {'dni': '{{dniReprog}}', 'idsTurno': ['{{idTurnoR1}}']},
+                 pruebas=[estado(422), ES_ERROR,
+            "pm.test('REPROGRAMAR_MISMO_HORARIO', () => pm.expect(pm.response.json().codigo).to.eql('REPROGRAMAR_MISMO_HORARIO'));"]),
+        peticion('Cambiar el horario (cliente)', 'POST', REPROGRAMAR, {'dni': '{{dniReprog}}', 'idsTurno': ['{{idTurnoR2}}']},
+                 pruebas=[estado(200), "const j = pm.response.json();",
+            "pm.test('Nuevo turno y total del turno nuevo', () => { pm.expect(j.turnos[0].idTurno).to.eql(Number(pm.collectionVariables.get('idTurnoR2'))); pm.expect(j.montoTotal).to.be.closeTo(Number(pm.collectionVariables.get('precioR2')), 0.001); });",
+            "pm.test('Un cambio usado y hito REPROGRAMADA', () => { pm.expect(j.reprogramaciones).to.eql(1); pm.expect(j.puedeReprogramar).to.eql(false); pm.expect(j.linea[j.linea.length - 1].evento).to.eql('REPROGRAMADA'); });"]),
+        peticion('Cambiar otra vez (cliente)', 'POST', REPROGRAMAR, {'dni': '{{dniReprog}}', 'idsTurno': ['{{idTurnoR3}}']},
+                 pruebas=[estado(422), ES_ERROR,
+            "pm.test('REPROGRAMACION_NO_PERMITIDA con el mensaje del dueño', () => { const j = pm.response.json(); pm.expect(j.codigo).to.eql('REPROGRAMACION_NO_PERMITIDA'); pm.expect(j.mensaje).to.eql('Ya cambiaste el horario una vez; escríbenos para ayudarte.'); });"]),
+        peticion('Panel: motivo inválido', 'POST', REPROGRAMAR_PANEL, {'idsTurno': ['{{idTurnoR3}}'], 'motivo': 'ok'}, token=True,
+                 pruebas=[estado(400), ES_ERROR,
+            "pm.test('Error en motivo', () => pm.expect(pm.response.json().errores.map(e => e.campo)).to.include('motivo'));"]),
+        peticion('Panel con token de cliente', 'POST', REPROGRAMAR_PANEL, {'idsTurno': ['{{idTurnoR3}}'], 'motivo': 'Cambio pedido'},
+                 token='tokenCliente', pruebas=[estado(403), ES_ERROR]),
+        peticion('Panel: cambiar el horario con motivo (sin límite)', 'POST', REPROGRAMAR_PANEL, {'idsTurno': ['{{idTurnoR3}}'],
+                 'motivo': 'El cliente pidió otra hora por teléfono'}, token=True, pruebas=[estado(200),
+            "const h = pm.response.json().reprogramaciones;",
+            "pm.test('Historial: PANEL y luego CLIENTE, con antes y después', () => { pm.expect(h.map(x => x.actor)).to.eql(['PANEL', 'CLIENTE']); pm.expect(h[0].anterior).to.include.keys('cancha','fecha','horarioTexto','idsTurno','total'); pm.expect(h[0].motivo).to.include('teléfono'); });"]),
+        peticion('Mi reserva no muestra el motivo interno del panel', 'GET', '/api/reservas/{{codigoReprog}}?dni={{dniReprog}}',
+                 pruebas=[estado(200), "const j = pm.response.json();",
+            "pm.test('Hito REPROGRAMADA sin el motivo', () => { pm.expect(j.linea[j.linea.length - 1].evento).to.eql('REPROGRAMADA'); pm.expect(pm.response.text()).to.not.include('pidió otra hora'); });",
+            "pm.test('Sin comprobante en revisión', () => pm.expect(j.montoEnRevision).to.eql(0));"]),
+        peticion('Aviso «¡Cambiamos tu horario!» en la bandeja', 'GET', '/api/admin/notificaciones?q={{codigoReprog}}&evento=reserva.reprogramada',
+                 token=True, previas=["setTimeout(() => {}, 3000);"], pruebas=[estado(200),
+            "pm.test('Correo y WhatsApp por cada cambio', () => pm.expect(pm.response.json().totalElementos).to.be.at.least(2));"]),
+        peticion('Ruta interna por-cliente bloqueada en el gateway', 'GET', '/interno/reservas/por-cliente?dni={{dniReprog}}&telefono=987000333',
+                 pruebas=[estado(404)]),
+        peticion('Cancelar la reserva de prueba', 'POST', '/api/reservas/{{codigoReprog}}/cancelar',
+                 {'dni': '{{dniReprog}}', 'motivo': 'Prueba automática de la colección Postman'}, pruebas=[estado(200)]),
+    ]},
+]
+
+# Las peticiones de «recuperar» llevan una IP de prueba propia de la corrida (X-Forwarded-For, red de documentación
+# 198.51.100.0/24): así el cupo de 5/min por IP del gateway no se comparte con otras pruebas de la misma PC. En
+# producción nginx reescribe X-Forwarded-For con la IP real, así que allí la cabecera no tiene efecto.
+for carpeta in carpetas:
+    for item in carpeta['item']:
+        if '/api/auth/recuperar/' in item['request']['url']['raw']:
+            item['request']['header'].append({'key': 'X-Forwarded-For', 'value': '{{ipPrueba}}'})
+            if item['request']['url']['raw'].endswith('/opciones'):
+                item['event'] = pre("pm.collectionVariables.set('ipPrueba', '198.51.100.' + (1 + Math.floor(Math.random() * 254)));") + item['event']
+
 coleccion = {
     'info': {'_postman_id': str(uuid.uuid4()), 'name': 'Alcanfores · API de microservicios',
              'description': 'Sistema de reservas del Complejo Deportivo Los Alcanfores (UTP · Desarrollo Web Integrado). '
@@ -329,7 +464,12 @@ coleccion = {
                                                       ('fechaVarios', ''), ('dniCliente', ''), ('correoCliente', ''),
                                                       ('idTurnoA', ''), ('idTurnoB', ''), ('idTurnoC', ''), ('totalVarios', ''),
                                                       ('codigoVarios', ''), ('codigoSesion', ''), ('tokenCliente', ''),
-                                                      ('idResenaCliente', ''), ('idResenaComplejo', ''), ('ayer', '')]],
+                                                      ('idResenaCliente', ''), ('idResenaComplejo', ''), ('ayer', ''),
+                                                      ('codigoPrueba', ''), ('codigoMalo', ''), ('tokenRestablecer', ''),
+                                                      ('correoAdmin', ''), ('telefonoAdmin', ''), ('ipPrueba', ''),
+                                                      ('fechaReprog', ''), ('dniReprog', ''), ('idTurnoR1', ''),
+                                                      ('idTurnoR2', ''), ('idTurnoR3', ''), ('precioR2', ''),
+                                                      ('codigoReprog', '')]],
 }
 json.dump(coleccion, open(os.path.join(AQUI, 'Alcanfores.postman_collection.json'), 'w', encoding='utf-8'), ensure_ascii=False, indent=2)
 for nombre, base in [('local', 'http://localhost:8086'), ('produccion', 'https://alcanfores.dbltech.tech')]:

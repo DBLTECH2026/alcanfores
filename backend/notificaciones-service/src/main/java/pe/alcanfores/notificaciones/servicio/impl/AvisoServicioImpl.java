@@ -13,10 +13,13 @@ import pe.alcanfores.comun.eventos.EventoDominio;
 import pe.alcanfores.comun.eventos.Eventos;
 import pe.alcanfores.comun.eventos.PagoRechazadoEvento;
 import pe.alcanfores.comun.eventos.PagoRegistradoEvento;
+import pe.alcanfores.comun.eventos.PagoValidadoEvento;
 import pe.alcanfores.comun.eventos.ReservaCanceladaEvento;
 import pe.alcanfores.comun.eventos.ReservaConfirmadaEvento;
 import pe.alcanfores.comun.eventos.ReservaRegistradaEvento;
+import pe.alcanfores.comun.eventos.ReservaReprogramadaEvento;
 import pe.alcanfores.comun.util.Dinero;
+import pe.alcanfores.comun.util.Horarios;
 import pe.alcanfores.comun.util.Tiempo;
 import pe.alcanfores.notificaciones.cliente.ReservaInterna;
 import pe.alcanfores.notificaciones.cliente.ReservasCliente;
@@ -34,6 +37,7 @@ import pe.alcanfores.notificaciones.servicio.EnvioServicio;
 import pe.alcanfores.notificaciones.servicio.RecordatorioServicio;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -56,6 +60,7 @@ public class AvisoServicioImpl implements AvisoServicio {
     private static final Logger log = LoggerFactory.getLogger(AvisoServicioImpl.class);
     static final String ASISTIO = "ASISTIO";
     static final String CANAL_COMPROBANTE = "COMPROBANTE";
+    static final String TIPO_SALDO = "SALDO";
 
     private final EventoProcesadoRepositorio eventos;
     private final NotificacionRepositorio notificaciones;
@@ -131,17 +136,32 @@ public class AvisoServicioImpl implements AvisoServicio {
     @Override
     public void alConfirmarReserva(ReservaConfirmadaEvento e) {
         DatosReserva r = e.reserva();
-        int[] horas = new int[1];
+        List<List<Integer>> minutos = new ArrayList<>(1);
         procesar(e, Eventos.RESERVA_CONFIRMADA, () -> {
-            DatosComplejo c = complejo.datos();
-            horas[0] = c.recordatorioHoras();
+            DatosComplejo c = complejo.actualizados();
+            minutos.add(c.recordatorioMinutos());
             Map<String, Object> m = modelos.reserva(r, c);
             modelos.fijarSaldo(m, saldo(e.saldoPendiente(), r));
             String asunto = "Reserva confirmada · " + r.codigoReserva() + " · " + m.get("fechaCorta") + " "
                     + m.get("horaInicio");
             return fabrica.crear(TipoAviso.RESERVA_CONFIRMADA, asunto, m, r.codigoReserva(), r.cliente(),
                     List.of(Adjunto.constancia(r.codigoReserva())));
-        }, () -> recordatorios.programar(r, saldo(e.saldoPendiente(), r), horas[0]));
+        }, () -> recordatorios.programar(r, saldo(e.saldoPendiente(), r), minutos.get(0), e.ocurridoEn()));
+    }
+
+    @Override
+    public void alValidarPago(PagoValidadoEvento e) {
+        procesar(e, Eventos.PAGO_VALIDADO, () -> {
+            if (!TIPO_SALDO.equals(e.tipoPago())) {
+                return List.of();
+            }
+            ReservaInterna ri = reservas.consultar(e.codigoReserva());
+            Map<String, Object> m = modelos.reserva(ri.datos(), complejo.datos());
+            modelos.fijarSaldo(m, BigDecimal.ZERO);
+            m.put("montoPago", Dinero.formato(e.monto() == null ? BigDecimal.ZERO : e.monto()));
+            String asunto = "¡Terminaste de pagar tu cancha! · " + e.codigoReserva();
+            return fabrica.crear(TipoAviso.SALDO_PAGADO, asunto, m, e.codigoReserva(), ri.datos().cliente(), List.of());
+        }, null);
     }
 
     @Override
@@ -190,6 +210,45 @@ public class AvisoServicioImpl implements AvisoServicio {
     }
 
     @Override
+    public void alReprogramarReserva(ReservaReprogramadaEvento e) {
+        DatosReserva r = e.reserva();
+        List<List<Integer>> minutos = new ArrayList<>(1);
+        procesar(e, Eventos.RESERVA_REPROGRAMADA, () -> {
+            DatosComplejo c = complejo.actualizados();
+            minutos.add(c.recordatorioMinutos());
+            Map<String, Object> m = modelos.reserva(r, c);
+            modelos.fijarSaldo(m, saldo(e.saldoPendiente(), r));
+            m.put("antesTexto", antesTexto(e));
+            // El motivo del panel es una nota interna: no se le muestra al cliente.
+            m.put("confirmada", e.confirmada());
+            m.put("enRevision", e.pagoEnRevision());
+            m.put("porPagar", !e.confirmada() && !e.pagoEnRevision());
+            m.put("conPlazo", e.venceEn() != null);
+            m.put("plazo", e.venceEn() != null ? ModeloMensajes.plazoTexto(e.venceEn()) : "");
+            String asunto = "Cambiamos tu horario · " + r.codigoReserva() + " · " + m.get("fechaCorta") + " "
+                    + m.get("horaInicio");
+            return fabrica.crear(TipoAviso.RESERVA_REPROGRAMADA, asunto, m, r.codigoReserva(), r.cliente(),
+                    List.of(Adjunto.constancia(r.codigoReserva())));
+        }, () -> {
+            if (e.confirmada()) {
+                recordatorios.moverAlNuevoInicio(r, saldo(e.saldoPendiente(), r), minutos.get(0), e.ocurridoEn());
+            }
+        });
+    }
+
+    /** «Viernes 20 de noviembre de 2026, 7:00–8:00 p. m. (Cancha 1)»: el horario que tenía antes del cambio. */
+    static String antesTexto(ReservaReprogramadaEvento e) {
+        if (e.fechaAnterior() == null) {
+            return "";
+        }
+        String fecha = Tiempo.fechaLarga(e.fechaAnterior());
+        String hora = e.horarioTextoAnterior() != null && !e.horarioTextoAnterior().isBlank() ? e.horarioTextoAnterior()
+                : Horarios.rango(e.horaInicioAnterior(), e.horaFinAnterior());
+        String cancha = e.canchaAnterior() == null || e.canchaAnterior().isBlank() ? "" : " (" + e.canchaAnterior() + ")";
+        return Character.toUpperCase(fecha.charAt(0)) + fecha.substring(1) + ", " + hora + cancha;
+    }
+
+    @Override
     public void alRegistrarAsistencia(AsistenciaRegistradaEvento e) {
         procesar(e, Eventos.RESERVA_ASISTENCIA, () -> {
             if (!ASISTIO.equals(e.asistencia())) {
@@ -218,9 +277,15 @@ public class AvisoServicioImpl implements AvisoServicio {
                 }
                 return notificaciones.saveAll(nuevas);
             });
-        } catch (DataIntegrityViolationException duplicado) {
-            log.info("Evento {} {} llegó duplicado al mismo tiempo: lo procesó otra copia", tipo, id);
-            return;
+        } catch (DataIntegrityViolationException choque) {
+            if (eventos.existsById(id)) {
+                log.info("Evento {} {} llegó duplicado al mismo tiempo: lo procesó otra copia", tipo, id);
+                return;
+            }
+            // Otro choque (p. ej. dos eventos de la misma reserva crearon a la vez su recordatorio): se relanza para que
+            // RabbitMQ lo reintente; en el reintento la fila ya existe y se actualiza. Así no se pierde el aviso.
+            log.warn("Evento {} {} chocó con otro cambio de la misma reserva: se reintenta", tipo, id);
+            throw choque;
         }
         if (guardadas != null && !guardadas.isEmpty()) {
             envio.enviarTodas(guardadas);

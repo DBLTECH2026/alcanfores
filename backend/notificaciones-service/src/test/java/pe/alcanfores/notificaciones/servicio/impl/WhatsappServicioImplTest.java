@@ -11,6 +11,7 @@ import pe.alcanfores.notificaciones.dto.ConexionWhatsappRespuesta;
 import pe.alcanfores.notificaciones.dto.EstadoWhatsappRespuesta;
 import pe.alcanfores.notificaciones.dto.MensajeRespuesta;
 import pe.alcanfores.notificaciones.mapeador.NotificacionMapeador;
+import pe.alcanfores.notificaciones.plantilla.Tarjetas;
 import pe.alcanfores.notificaciones.repositorio.NotificacionRepositorio;
 import pe.alcanfores.notificaciones.servicio.EnvioServicio;
 
@@ -38,7 +39,7 @@ class WhatsappServicioImplTest {
         when(evolution.instancia()).thenReturn("alcanfores");
         auditor = mock(Auditor.class);
         servicio = new WhatsappServicioImpl(evolution, mock(NotificacionRepositorio.class), mock(EnvioServicio.class),
-                new NotificacionMapeador(), auditor);
+                new NotificacionMapeador(new Tarjetas()), auditor);
     }
 
     @Test

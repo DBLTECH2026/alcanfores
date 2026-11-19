@@ -4,9 +4,11 @@ import pe.alcanfores.comun.eventos.AsistenciaRegistradaEvento;
 import pe.alcanfores.comun.eventos.ComprobanteEmitidoEvento;
 import pe.alcanfores.comun.eventos.PagoRechazadoEvento;
 import pe.alcanfores.comun.eventos.PagoRegistradoEvento;
+import pe.alcanfores.comun.eventos.PagoValidadoEvento;
 import pe.alcanfores.comun.eventos.ReservaCanceladaEvento;
 import pe.alcanfores.comun.eventos.ReservaConfirmadaEvento;
 import pe.alcanfores.comun.eventos.ReservaRegistradaEvento;
+import pe.alcanfores.comun.eventos.ReservaReprogramadaEvento;
 
 /**
  * Convierte cada evento de dominio en avisos al cliente (correo + WhatsApp). Todos los métodos son idempotentes:
@@ -22,9 +24,18 @@ public interface AvisoServicio {
 
     void alConfirmarReserva(ReservaConfirmadaEvento evento);
 
+    /** Solo con {@code tipoPago = SALDO}: «¡Terminaste de pagar tu cancha!» (la boleta llega con comprobante.emitido). */
+    void alValidarPago(PagoValidadoEvento evento);
+
     void alEmitirComprobante(ComprobanteEmitidoEvento evento);
 
     void alCancelarReserva(ReservaCanceladaEvento evento);
+
+    /**
+     * «¡Cambiamos tu horario!» (antes → ahora, montos y constancia actualizada) y, si la reserva está confirmada, sus
+     * recordatorios pasan al nuevo inicio con la configuración vigente.
+     */
+    void alReprogramarReserva(ReservaReprogramadaEvento evento);
 
     void alRegistrarAsistencia(AsistenciaRegistradaEvento evento);
 }

@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
 import org.springframework.web.server.WebFilter;
 import org.springframework.web.server.WebFilterChain;
+import pe.alcanfores.comun.config.AlcanforesPropiedades;
 import pe.alcanfores.gateway.limite.LimitadorSolicitudes;
 import reactor.core.publisher.Mono;
 
@@ -19,10 +20,12 @@ public class FiltroLimiteSolicitudes implements WebFilter, Ordered {
 
     private final LimitadorSolicitudes limitador;
     private final RespuestaError error;
+    private final AlcanforesPropiedades propiedades;
 
-    public FiltroLimiteSolicitudes(LimitadorSolicitudes limitador, RespuestaError error) {
+    public FiltroLimiteSolicitudes(LimitadorSolicitudes limitador, RespuestaError error, AlcanforesPropiedades propiedades) {
         this.limitador = limitador;
         this.error = error;
+        this.propiedades = propiedades;
     }
 
     @Override
@@ -30,7 +33,8 @@ public class FiltroLimiteSolicitudes implements WebFilter, Ordered {
         String ruta = RutaSolicitud.normalizar(exchange.getRequest().getPath().value());
         return limitador.reglaPara(exchange.getRequest().getMethod(), ruta)
                 .map(regla -> {
-                    LimitadorSolicitudes.Resultado r = limitador.consumir(regla, IpCliente.de(exchange));
+                    LimitadorSolicitudes.Resultado r = limitador.consumir(regla,
+                            ClaveLimite.de(exchange, propiedades.getInternoToken()));
                     HttpHeaders h = exchange.getResponse().getHeaders();
                     h.set("X-RateLimit-Limit", String.valueOf(r.limite()));
                     h.set("X-RateLimit-Remaining", String.valueOf(r.restantes()));

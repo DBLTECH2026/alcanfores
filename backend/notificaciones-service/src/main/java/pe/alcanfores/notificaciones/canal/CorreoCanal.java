@@ -2,25 +2,23 @@ package pe.alcanfores.notificaciones.canal;
 
 import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.MailException;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
-import pe.alcanfores.notificaciones.config.NotificacionesPropiedades;
 import pe.alcanfores.notificaciones.modelo.CanalNotificacion;
 import pe.alcanfores.notificaciones.modelo.Notificacion;
+import pe.alcanfores.notificaciones.plantilla.Tarjetas;
 
 import java.io.UnsupportedEncodingException;
 import java.util.List;
 
 /**
- * Correo HTML por SMTP ({@code JavaMailSender}, STARTTLS). El logo viaja embebido (CID {@value #CID_LOGO}) para que se
- * vea aunque el cliente de correo bloquee imágenes remotas. Sin {@code MAIL_HOST} el canal no está configurado.
+ * Correo HTML por SMTP con el servidor que indique {@link ProveedorCorreo} (panel, variables {@code MAIL_*} o ninguno).
+ * El logo (CID {@value #CID_LOGO}) y la tarjeta ilustrada del aviso (CID {@value Tarjetas#CID}) viajan embebidos para
+ * que se vean aunque el cliente de correo bloquee imágenes remotas; los PDFs van como adjuntos.
  */
 @Component
 public class CorreoCanal implements CanalEnvio {
@@ -28,15 +26,10 @@ public class CorreoCanal implements CanalEnvio {
     public static final String CID_LOGO = "logo-alcanfores";
     public static final String RUTA_LOGO = "correo/logo-alcanfores.png";
 
-    private final ObjectProvider<JavaMailSender> correo;
-    private final String host;
-    private final NotificacionesPropiedades.Correo cfg;
+    private final ProveedorCorreo proveedor;
 
-    public CorreoCanal(ObjectProvider<JavaMailSender> correo, @Value("${spring.mail.host:}") String host,
-                       NotificacionesPropiedades propiedades) {
-        this.correo = correo;
-        this.host = host;
-        this.cfg = propiedades.getCorreo();
+    public CorreoCanal(ProveedorCorreo proveedor) {
+        this.proveedor = proveedor;
     }
 
     @Override
@@ -46,26 +39,35 @@ public class CorreoCanal implements CanalEnvio {
 
     @Override
     public boolean configurado() {
-        return StringUtils.hasText(host) && correo.getIfAvailable() != null;
+        return proveedor.vigente().isPresent();
     }
 
     @Override
-    public void enviar(Notificacion n, List<ArchivoPdf> adjuntos) {
-        JavaMailSender emisor = correo.getObject();
+    public void enviar(Notificacion n, List<ArchivoAdjunto> archivos) {
+        ProveedorCorreo.CorreoVigente c = proveedor.vigente()
+                .orElseThrow(() -> new EnvioExcepcion("El correo no está configurado."));
+        if (c.problema() != null) {
+            throw new EnvioExcepcion(c.problema());
+        }
+        JavaMailSender emisor = c.emisor();
         try {
             MimeMessage mensaje = emisor.createMimeMessage();
             MimeMessageHelper m = new MimeMessageHelper(mensaje, MimeMessageHelper.MULTIPART_MODE_MIXED_RELATED, "UTF-8");
-            m.setFrom(cfg.getRemitente(), cfg.getNombreRemitente());
+            m.setFrom(c.remitente(), c.nombreRemitente());
             m.setTo(n.getDestino());
             m.setSubject(n.getAsunto());
-            m.setText(n.getCuerpo(), true);
+            m.setText(n.cuerpoParaEnviar(), true);
             m.addInline(CID_LOGO, new ClassPathResource(RUTA_LOGO), "image/png");
-            for (ArchivoPdf pdf : adjuntos) {
-                m.addAttachment(pdf.nombre(), new ByteArrayResource(pdf.contenido()), "application/pdf");
+            for (ArchivoAdjunto a : archivos) {
+                if (a.imagen()) {
+                    m.addInline(Tarjetas.CID, new ByteArrayResource(a.contenido()), ArchivoAdjunto.MIME_JPG);
+                } else {
+                    m.addAttachment(a.nombre(), new ByteArrayResource(a.contenido()), ArchivoAdjunto.MIME_PDF);
+                }
             }
             emisor.send(mensaje);
         } catch (MailException | MessagingException | UnsupportedEncodingException e) {
-            throw new EnvioExcepcion("El servidor de correo no aceptó el mensaje: " + e.getMessage(), e);
+            throw new EnvioExcepcion(ErroresCorreo.explicar(e, c.host(), c.puerto()), e);
         }
     }
 }

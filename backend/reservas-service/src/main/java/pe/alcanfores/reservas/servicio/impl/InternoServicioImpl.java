@@ -7,6 +7,7 @@ import pe.alcanfores.comun.error.NegocioExcepcion;
 import pe.alcanfores.comun.util.Texto;
 import pe.alcanfores.comun.util.Tiempo;
 import pe.alcanfores.reservas.dto.InternoDtos.ElegibilidadResena;
+import pe.alcanfores.reservas.dto.InternoDtos.ReservaDelCliente;
 import pe.alcanfores.reservas.dto.InternoDtos.ReservaInterna;
 import pe.alcanfores.reservas.dto.InternoDtos.ReservaSemilla;
 import pe.alcanfores.reservas.dto.InternoDtos.ReservasVigentes;
@@ -32,6 +33,8 @@ import java.util.Optional;
 public class InternoServicioImpl implements InternoServicio {
 
     private static final String NO_ENCONTRADA = "No encontramos una reserva con ese código y DNI.";
+    /** Reservas que ve Canchita por DNI + celular: las de los últimos 30 días y todas las próximas. */
+    static final int DIAS_ATRAS_POR_CLIENTE = 30;
 
     private final ReservaRepositorio reservas;
     private final ReservaTurnoRepositorio reservaTurnos;
@@ -43,6 +46,18 @@ public class InternoServicioImpl implements InternoServicio {
     @Transactional(readOnly = true)
     public ReservaInterna reserva(String codigo) {
         return mapeador.interna(operaciones.buscar(codigo));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<ReservaDelCliente> porCliente(String dni, String telefono) {
+        String celular = Texto.normalizarCelular(telefono);
+        if (dni == null || celular == null) {
+            return List.of();
+        }
+        // Se compara con el celular de CADA reserva: quien reserva con un DNI ajeno y su propio número solo ve esa reserva.
+        return reservas.deDniYCelularDesde(dni.trim(), celular, Tiempo.hoy().minusDays(DIAS_ATRAS_POR_CLIENTE)).stream()
+                .map(mapeador::delCliente).toList();
     }
 
     @Override

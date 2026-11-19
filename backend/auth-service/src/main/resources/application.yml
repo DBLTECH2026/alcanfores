@@ -62,6 +62,9 @@ alcanfores:
     bcrypt-fuerza: 12
     intentos-maximos: 5
     minutos-bloqueo: 15
+    recuperar:
+      # SOLO pruebas locales/E2E: devuelve el código en la respuesta de /api/auth/recuperar/enviar. NUNCA en producción.
+      devolver-codigo: ${RECUPERAR_DEVOLVER_CODIGO:false}
     semilla:
       habilitada: ${SEED_HABILITADA:true}
       clave-admin: ${SEED_CLAVE_ADMIN:Alcanfores2026}

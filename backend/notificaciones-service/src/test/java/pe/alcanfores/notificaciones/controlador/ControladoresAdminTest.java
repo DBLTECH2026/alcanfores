@@ -120,7 +120,7 @@ class ControladoresAdminTest extends PruebaIntegracion {
         mvc.perform(conToken(get("/api/admin/notificaciones").param("canal", "CORREO"), admin))
                 .andExpect(jsonPath("$.contenido", hasSize(1)))
                 .andExpect(jsonPath("$.contenido[0].destino").value("diego.ramos@example.com"))
-                .andExpect(jsonPath("$.contenido[0].adjuntos").value(1));
+                .andExpect(jsonPath("$.contenido[0].adjuntos").value(2));
         mvc.perform(conToken(get("/api/admin/notificaciones").param("estado", "FALLIDO"), admin))
                 .andExpect(jsonPath("$.contenido", hasSize(1)))
                 .andExpect(jsonPath("$.contenido[0].ultimoError").value("Evolution API respondió 500"));
@@ -168,8 +168,11 @@ class ControladoresAdminTest extends PruebaIntegracion {
                 .andExpect(jsonPath("$.estado").value("SIMULADO"))
                 .andExpect(jsonPath("$.cuerpo", containsString("cid:logo-alcanfores")))
                 .andExpect(jsonPath("$.vistaPrevia", containsString("data:image/png;base64,")))
-                .andExpect(jsonPath("$.adjuntos[0].tipo").value("CONSTANCIA"))
-                .andExpect(jsonPath("$.adjuntos[0].estado").value("ADJUNTADO"))
+                .andExpect(jsonPath("$.adjuntos[0].tipo").value("IMAGEN"))
+                .andExpect(jsonPath("$.adjuntos[1].tipo").value("CONSTANCIA"))
+                .andExpect(jsonPath("$.adjuntos[1].estado").value("ADJUNTADO"))
+                .andExpect(jsonPath("$.imagenTarjeta", startsWith("data:image/jpeg;base64,")))
+                .andExpect(jsonPath("$.vistaPrevia", containsString("data:image/jpeg;base64,")))
                 .andExpect(jsonPath("$.reintentable").value(false));
         mvc.perform(conToken(get("/api/admin/notificaciones/999999"), admin))
                 .andExpect(status().isNotFound())

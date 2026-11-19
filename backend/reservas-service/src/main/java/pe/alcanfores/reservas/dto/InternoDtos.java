@@ -32,6 +32,15 @@ public final class InternoDtos {
     public record ReservasVigentes(List<String> codigos) {
     }
 
+    /**
+     * Reserva de un cliente identificado por DNI + celular (Canchita por WhatsApp): {@code pagado} = lo cobrado y
+     * validado, {@code saldo} = lo que falta (0 si está cancelada).
+     */
+    public record ReservaDelCliente(String codigo, String cancha, LocalDate fecha, LocalTime horaInicio, LocalTime horaFin,
+                                    String horarioTexto, int cantidadTurnos, List<TurnoReserva> turnos, EstadoReserva estado,
+                                    EstadoPago estadoPago, BigDecimal montoTotal, BigDecimal pagado, BigDecimal saldo) {
+    }
+
     public record ElegibilidadResena(boolean elegible, String motivo, String autor) {
     }
 

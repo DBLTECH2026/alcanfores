@@ -1,5 +1,6 @@
 package pe.alcanfores.pagos.servicio.documento;
 
+import pe.alcanfores.comun.eventos.DatosReserva;
 import pe.alcanfores.comun.util.Horarios;
 import pe.alcanfores.comun.util.Tiempo;
 import pe.alcanfores.pagos.modelo.InstantaneaReserva;
@@ -48,6 +49,17 @@ public final class ConceptoReserva {
             sb.append(" (").append(cantidadTurnos).append(" turnos)");
         }
         return sb.length() > MAX_CONCEPTO ? sb.substring(0, MAX_CONCEPTO) : sb.toString();
+    }
+
+    /**
+     * Desde la fotografía de un evento de reservas ({@code reserva.reprogramada}): el mismo texto que la instantánea del
+     * pago. Si el evento no trae {@code horarioTexto} (v1), el rango del primer al último turno.
+     */
+    public static String concepto(DatosReserva d) {
+        String horario = d.horarioTexto() != null && !d.horarioTexto().isBlank() ? d.horarioTexto()
+                : d.horaInicio() == null || d.horaFin() == null ? null : Horarios.rango(d.horaInicio(), d.horaFin());
+        return concepto(d.nombreCancha(), d.deporte(), d.fecha(), horario, Math.max(1, d.cantidadTurnos()),
+                d.codigoReserva());
     }
 
     /** Descripción del ítem del comprobante: concepto + qué parte se cobra. */

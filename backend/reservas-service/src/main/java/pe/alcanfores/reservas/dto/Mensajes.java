@@ -31,6 +31,7 @@ public final class Mensajes {
     public static final String TURNOS_REPETIDOS = "No repitas el mismo turno.";
     public static final String TURNOS_MISMO_DIA = "Los turnos deben ser de la misma cancha y del mismo día.";
     public static final String ESTADO = "Elige un estado válido: PENDIENTE, CONFIRMADA o CANCELADA.";
+    public static final String MOTIVO_REPROGRAMAR = "Cuéntanos el motivo del cambio (5 a 200 caracteres, sin enlaces ni todo en mayúsculas).";
     /** Máximo de turnos por reserva. */
     public static final int MAX_TURNOS = 8;
 

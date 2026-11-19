@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      th:replace="~{base :: correo('Tu cuenta', 'Tu contraseña se cambió', |Cambio hecho el ${cambiadoEn}.|, ~{::contenido})}">
+<body>
+<th:block th:fragment="contenido">
+    <p style="margin:0 0 12px 0;" th:text="|${saludo}:|">Hola:</p>
+    <p style="margin:0;">
+        La contraseña de tu cuenta de Alcanfores se cambió el <strong th:text="${cambiadoEn}">jueves 19 de noviembre, 10:30 p. m.</strong>
+        Ya puedes iniciar sesión con la nueva.
+    </p>
+
+    <table th:replace="~{componentes :: nota('¿No fuiste tú?', |Escríbenos de inmediato por WhatsApp al +51 ${whatsappTexto} para proteger tu cuenta.|)}"></table>
+
+    <table th:replace="~{componentes :: boton(${urlInicio}, 'Ir a Alcanfores')}"></table>
+</th:block>
+</body>
+</html>

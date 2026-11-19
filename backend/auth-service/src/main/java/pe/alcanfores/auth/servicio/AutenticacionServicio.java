@@ -1,6 +1,7 @@
 package pe.alcanfores.auth.servicio;
 
 import pe.alcanfores.auth.dto.CambiarContrasenaSolicitud;
+import pe.alcanfores.auth.dto.EditarMisDatosSolicitud;
 import pe.alcanfores.auth.dto.LoginRespuesta;
 import pe.alcanfores.auth.dto.LoginSolicitud;
 import pe.alcanfores.auth.dto.UsuarioRespuesta;
@@ -18,4 +19,7 @@ public interface AutenticacionServicio {
     UsuarioRespuesta usuarioActual(UsuarioToken token);
 
     void cambiarContrasena(UsuarioToken token, CambiarContrasenaSolicitud solicitud);
+
+    /** El usuario del panel completa su celular y su correo (409 {@code CORREO_DUPLICADO} si el correo es de otro). */
+    UsuarioRespuesta editarMisDatos(UsuarioToken token, EditarMisDatosSolicitud solicitud);
 }

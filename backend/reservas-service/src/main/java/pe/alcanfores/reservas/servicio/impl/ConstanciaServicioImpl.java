@@ -111,7 +111,8 @@ public class ConstanciaServicioImpl implements ConstanciaServicio {
         m.put("franja", franjas > 1 ? "Tarifa día y noche" : t.getFranja().name().equals("NOCHE") ? "Tarifa noche" : "Tarifa día");
         m.put("cliente", cl.nombreCompleto());
         m.put("dni", Documentos.enmascararDni(cl.getDni()));
-        m.put("telefono", cl.getTelefono().replaceAll("(\\d{3})(\\d{3})(\\d{3})", "$1 $2 $3"));
+        String celular = r.getTelefonoContacto() != null ? r.getTelefonoContacto() : cl.getTelefono();
+        m.put("telefono", celular.replaceAll("(\\d{3})(\\d{3})(\\d{3})", "$1 $2 $3"));
         m.put("correo", cl.getCorreo());
         m.put("registrada", r.getFechaRegistro().format(Tiempo.FECHA_HORA));
         m.put("origen", switch (r.getOrigen()) {

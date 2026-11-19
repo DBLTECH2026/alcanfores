@@ -23,8 +23,8 @@
     <table th:replace="~{componentes :: boton(${urlMiReserva}, 'Ver mi reserva')}"></table>
 
     <p style="margin:0 0 18px 0;font-size:14px;line-height:22px;color:#4A5A68;">
-        Te adjuntamos la constancia en PDF. Te enviaremos un recordatorio
-        <span th:text="${recordatorioHoras == 1 ? '1 hora' : recordatorioHoras + ' horas'}">2 horas</span> antes del partido.
+        Te adjuntamos la constancia en PDF. Te enviaremos
+        <span th:text="${recordatorioTexto}">un recordatorio 2 horas antes del partido</span>.
         Si necesitas cancelar, hazlo desde «Mi reserva»: con al menos
         <span th:text="${devolucionHoras}">24</span> horas de anticipación te devolvemos lo pagado.
     </p>

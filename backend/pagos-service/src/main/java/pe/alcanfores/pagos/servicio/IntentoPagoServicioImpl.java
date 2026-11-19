@@ -230,8 +230,12 @@ public class IntentoPagoServicioImpl implements IntentoPagoServicio {
         };
     }
 
+    /**
+     * Sin transacción a propósito: antes de cobrar se lee la reserva vigente por HTTP y, si cambió de horario (o de
+     * saldo) y el intento ya no es el que se crearía ahora (otro monto u otro horario), el intento se cierra y el
+     * checkout recibe 409 con el motivo.
+     */
     @Override
-    @Transactional(readOnly = true)
     public IntentoPago abiertoParaCobro(String referencia) {
         IntentoPago i = intentos.findByReferencia(referencia)
                 .filter(x -> x.getProveedor() == ProveedorPasarela.BETA)
@@ -241,7 +245,13 @@ public class IntentoPagoServicioImpl implements IntentoPagoServicio {
         }
         if (estadoVisible(i) == EstadoIntento.EXPIRADO) {
             throw NegocioExcepcion.conflicto("INTENTO_EXPIRADO",
-                    "El tiempo para pagar venció. Vuelve a tu reserva y genera un nuevo pago.");
+                    i.getEstado() == EstadoIntento.EXPIRADO && AprobacionEnLinea.cerradoPorMonto(i.getMotivoRechazo())
+                            ? i.getMotivoRechazo()
+                            : "El tiempo para pagar venció. Vuelve a tu reserva y genera un nuevo pago.");
+        }
+        Optional<String> montoViejo = aprobacion.cerrarSiCambioElMonto(referencia);
+        if (montoViejo.isPresent()) {
+            throw NegocioExcepcion.conflicto("INTENTO_EXPIRADO", montoViejo.get());
         }
         return i;
     }

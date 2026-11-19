@@ -9,6 +9,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 import pe.alcanfores.comun.validacion.Ruc;
+import pe.alcanfores.comun.validacion.SinEnlaces;
 import pe.alcanfores.reservas.dto.ReservaDtos.CanchaResumen;
 import pe.alcanfores.reservas.dto.ReservaDtos.CancelacionInfo;
 import pe.alcanfores.reservas.dto.ReservaDtos.ClienteSolicitud;
@@ -77,6 +78,24 @@ public final class AdminDtos {
             Boolean devolucion) {
     }
 
+    /** Cambiar el horario desde el panel: turnos nuevos (1 a 8, misma cancha y fecha) y el motivo (queda en el historial). */
+    public record ReprogramacionAdminSolicitud(
+            @NotNull(message = Mensajes.TURNOS_CANTIDAD) @Size(min = 1, max = Mensajes.MAX_TURNOS, message = Mensajes.TURNOS_CANTIDAD)
+            List<@NotNull(message = Mensajes.ELEGIR_TURNO) @Positive(message = Mensajes.ELEGIR_TURNO) Long> idsTurno,
+            @TextoEntre(min = 5, max = 200, message = Mensajes.MOTIVO_REPROGRAMAR)
+            @SinEnlaces(message = Mensajes.MOTIVO_REPROGRAMAR) String motivo) {
+    }
+
+    /** Un horario de la reserva en el historial de cambios (antes o después). */
+    public record HorarioReprogramado(Long idCancha, String cancha, LocalDate fecha, LocalTime horaInicio, LocalTime horaFin,
+                                      String horarioTexto, List<Long> idsTurno, int cantidadTurnos, BigDecimal total) {
+    }
+
+    /** Cambio de horario: actor CLIENTE, CANCHITA o PANEL; usuario = quién (usuario del panel, «Canchita (IA)» o el cliente). */
+    public record ReprogramacionInfo(Long id, String actor, String usuario, String motivo, LocalDateTime creadoEn,
+                                     HorarioReprogramado anterior, HorarioReprogramado nuevo) {
+    }
+
     public record AsistenciaSolicitud(
             @NotNull(message = Mensajes.ASISTENCIA) @Pattern(regexp = "ASISTIO|NO_ASISTIO", message = Mensajes.ASISTENCIA)
             String asistencia) {
@@ -88,7 +107,8 @@ public final class AdminDtos {
     public record ReservaFila(String codigoReserva, ClienteFila cliente, String cancha, LocalDate fecha, LocalTime horaInicio,
                               LocalTime horaFin, EstadoReserva estado, EstadoPago estadoPago, Asistencia asistencia,
                               Origen origen, BigDecimal montoTotal, BigDecimal montoPagado, LocalDateTime fechaRegistro,
-                              List<TurnoReserva> turnos, String horarioTexto, int cantidadTurnos) {
+                              List<TurnoReserva> turnos, String horarioTexto, int cantidadTurnos,
+                              boolean puedeMarcarAsistencia) {
     }
 
     /** Página de reservas + conteos por estado (PENDIENTE, CONFIRMADA, CANCELADA y EN_REVISION) para las pestañas. */
@@ -108,7 +128,8 @@ public final class AdminDtos {
                                       LocalDateTime confirmadaEn, Long registradoPor, String nota, ClienteCompleto cliente,
                                       CancelacionInfo cancelacion, List<EventoLinea> linea, boolean puedeCancelar,
                                       boolean puedeMarcarAsistencia, boolean puedeCobrarSaldo, List<TurnoReserva> turnos,
-                                      String horarioTexto, int cantidadTurnos) {
+                                      String horarioTexto, int cantidadTurnos, boolean puedeReprogramar,
+                                      List<ReprogramacionInfo> reprogramaciones) {
     }
 
     public record ClienteResumen(Long idCliente, String dni, String nombres, String apellidos, String telefono,

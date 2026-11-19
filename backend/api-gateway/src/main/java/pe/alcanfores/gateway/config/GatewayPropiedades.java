@@ -13,12 +13,14 @@ import java.util.List;
  * @param timeout             tiempo máximo de respuesta de una ruta normal
  * @param timeoutArchivosMs   tiempo máximo de las rutas de archivos (subidas, PDF, Excel)
  * @param timeoutDocumentosMs tiempo máximo de la consulta de DNI/RUC (Factiliza puede tardar ~11 s en un «no existe»)
+ * @param timeoutAsistenteMs  tiempo máximo de Canchita (asistente con IA): una respuesta con herramientas o con la foto
+ *                            del comprobante tarda 5–15 s; 60 s de margen
  * @param servicios           servicios que muestra {@code /api/estado} (nombres de Eureka)
  * @param limites             reglas del limitador de solicitudes por IP
  */
 @ConfigurationProperties(prefix = "alcanfores.gateway")
 public record GatewayPropiedades(DataSize tamanioMaximoCuerpo, Duration timeout, long timeoutArchivosMs,
-                                 long timeoutDocumentosMs,
+                                 long timeoutDocumentosMs, long timeoutAsistenteMs,
                                  List<String> servicios, List<Limite> limites) {
 
     public GatewayPropiedades {
@@ -26,6 +28,7 @@ public record GatewayPropiedades(DataSize tamanioMaximoCuerpo, Duration timeout,
         timeout = timeout == null ? Duration.ofSeconds(10) : timeout;
         timeoutArchivosMs = timeoutArchivosMs <= 0 ? 20_000 : timeoutArchivosMs;
         timeoutDocumentosMs = timeoutDocumentosMs <= 0 ? 20_000 : timeoutDocumentosMs;
+        timeoutAsistenteMs = timeoutAsistenteMs <= 0 ? 60_000 : timeoutAsistenteMs;
         servicios = servicios == null ? List.of() : List.copyOf(servicios);
         limites = limites == null ? List.of() : List.copyOf(limites);
     }

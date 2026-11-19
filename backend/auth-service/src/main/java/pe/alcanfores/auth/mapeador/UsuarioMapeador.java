@@ -13,12 +13,14 @@ public final class UsuarioMapeador {
     }
 
     public static UsuarioSesion aSesion(Administrador a) {
-        return new UsuarioSesion(a.getId(), a.getNombres(), a.getApellidos(), a.getUsuario(), a.getCorreo(), a.getRol());
+        return new UsuarioSesion(a.getId(), a.getNombres(), a.getApellidos(), a.getUsuario(), a.getCorreo(), a.getTelefono(),
+                a.getRol());
     }
 
     public static UsuarioRespuesta aRespuesta(Administrador a) {
         boolean bloqueado = a.estaBloqueado(Tiempo.ahora());
-        return new UsuarioRespuesta(a.getId(), a.getNombres(), a.getApellidos(), a.getUsuario(), a.getCorreo(), a.getRol(),
+        return new UsuarioRespuesta(a.getId(), a.getNombres(), a.getApellidos(), a.getUsuario(), a.getCorreo(), a.getTelefono(),
+                a.getRol(),
                 a.getEstado(), bloqueado, bloqueado ? a.getBloqueadoHasta() : null, a.getUltimoAcceso(), a.getCreadoEn(),
                 a.getActualizadoEn());
     }

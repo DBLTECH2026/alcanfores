@@ -62,7 +62,7 @@ public class LimitadorSolicitudes {
         CubetaTokens cubeta = cubetas.computeIfAbsent(regla.nombre() + "|" + ip, k -> new CubetaTokens(regla.porMinuto(), ahora));
         CubetaTokens.Consumo c = cubeta.consumir(ahora);
         if (!c.permitido()) {
-            log.warn("Límite «{}» alcanzado por la IP {} ({} por minuto)", regla.nombre(), ip, regla.porMinuto());
+            log.warn("Límite «{}» alcanzado por {} ({} por minuto)", regla.nombre(), ip, regla.porMinuto());
         }
         return new Resultado(c.permitido(), regla.porMinuto(), c.restantes(), c.esperaSegundos());
     }

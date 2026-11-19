@@ -7,10 +7,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import pe.alcanfores.auth.dto.CambiarContrasenaSolicitud;
+import pe.alcanfores.auth.dto.EditarMisDatosSolicitud;
 import pe.alcanfores.auth.dto.LoginRespuesta;
 import pe.alcanfores.auth.dto.LoginSolicitud;
 import pe.alcanfores.auth.dto.UsuarioRespuesta;
@@ -41,6 +43,15 @@ public class AutenticacionControlador {
     @Operation(summary = "Usuario conectado", description = "Datos del dueño del token (verifica que siga activo).")
     public UsuarioRespuesta yo(@AuthenticationPrincipal UsuarioToken usuario) {
         return servicio.usuarioActual(usuario);
+    }
+
+    @PutMapping("/yo")
+    @Operation(summary = "Editar mis datos",
+            description = "Celular (opcional; vacío = quitarlo) y correo. Con celular puedes recibir por WhatsApp el código "
+                    + "para cambiar la contraseña.")
+    public UsuarioRespuesta editarMisDatos(@AuthenticationPrincipal UsuarioToken usuario,
+                                           @Valid @RequestBody EditarMisDatosSolicitud solicitud) {
+        return servicio.editarMisDatos(usuario, solicitud);
     }
 
     @PostMapping("/cambiar-contrasena")

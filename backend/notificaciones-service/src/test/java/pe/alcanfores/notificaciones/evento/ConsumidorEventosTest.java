@@ -80,7 +80,14 @@ class ConsumidorEventosTest extends PruebaIntegracion {
                 "*Adelanto para confirmar:* S/ 40.00", "*Plazo para pagar:*",
                 "http://localhost:5186/mi-reserva?codigo=ALC-7K3M9P")
                 .endsWith("Complejo Deportivo Los Alcanfores");
-        Adjunto adjunto = correo.getAdjuntos().get(0);
+        assertThat(correo.getCuerpo()).contains("cid:tarjeta-aviso");
+        assertThat(correo.getAdjuntos().get(0)).satisfies(t -> {
+            assertThat(t.tipo()).isEqualTo(TipoAdjunto.IMAGEN);
+            assertThat(t.nombreArchivo()).isEqualTo("reserva-registrada.jpg");
+            assertThat(t.estado()).isEqualTo(EstadoAdjunto.ADJUNTADO);
+        });
+        assertThat(wsp.getAdjuntos().get(0).referencia()).isEqualTo("reserva-registrada");
+        Adjunto adjunto = correo.getAdjuntos().get(1);
         assertThat(adjunto.tipo()).isEqualTo(TipoAdjunto.CONSTANCIA);
         assertThat(adjunto.estado()).isEqualTo(EstadoAdjunto.ADJUNTADO);
         assertThat(adjunto.nombreArchivo()).isEqualTo("constancia-ALC-7K3M9P.pdf");
@@ -109,7 +116,7 @@ class ConsumidorEventosTest extends PruebaIntegracion {
 
         porCanal().values().forEach(n -> {
             assertThat(n.getEstado()).isEqualTo(EstadoNotificacion.SIMULADO);
-            assertThat(n.getAdjuntos()).singleElement().satisfies(a -> {
+            assertThat(n.getAdjuntos()).hasSize(2).last().satisfies(a -> {
                 assertThat(a.estado()).isEqualTo(EstadoAdjunto.NO_DISPONIBLE);
                 assertThat(a.detalle()).contains("no responde");
             });
@@ -180,9 +187,12 @@ class ConsumidorEventosTest extends PruebaIntegracion {
         assertThat(n.get(CanalNotificacion.WHATSAPP).getCuerpo()).contains("*Reserva confirmada*",
                 "*Saldo a pagar en el complejo:* S/ 40.00", "*Cómo llegar:* Carretera Central km 11.5",
                 "Mapa: https://maps.google.com/?q=alcanfores");
-        assertThat(correo.getAdjuntos()).extracting(Adjunto::estado).containsExactly(EstadoAdjunto.ADJUNTADO);
+        assertThat(correo.getAdjuntos()).extracting(Adjunto::tipo, Adjunto::estado).containsExactly(
+                org.assertj.core.groups.Tuple.tuple(TipoAdjunto.IMAGEN, EstadoAdjunto.ADJUNTADO),
+                org.assertj.core.groups.Tuple.tuple(TipoAdjunto.CONSTANCIA, EstadoAdjunto.ADJUNTADO));
+        assertThat(correo.getCuerpo()).contains("Te enviaremos", "un recordatorio 2 horas antes del partido");
 
-        Recordatorio r = recordatorios.findByCodigoReserva(Datos.CODIGO).orElseThrow();
+        Recordatorio r = recordatorios.findByCodigoReservaAndMinutosAntes(Datos.CODIGO, 120).orElseThrow();
         assertThat(r.getEstado()).isEqualTo(EstadoRecordatorio.PROGRAMADO);
         assertThat(r.getInicioReserva()).isEqualTo(Datos.INICIO);
         assertThat(r.getEnviarEn()).isEqualTo(Datos.INICIO.minusHours(2));
@@ -199,7 +209,8 @@ class ConsumidorEventosTest extends PruebaIntegracion {
         Notificacion correo = n.get(CanalNotificacion.CORREO);
         assertThat(correo.getAsunto()).isEqualTo("Tu boleta electrónica B001-00000012 · ALC-7K3M9P");
         assertThat(correo.getCuerpo()).contains("B001-00000012", "S/ 40.00", "validez tributaria");
-        assertThat(correo.getAdjuntos()).singleElement().satisfies(a -> {
+        assertThat(correo.getAdjuntos().get(0).referencia()).isEqualTo("comprobante-emitido");
+        assertThat(correo.getAdjuntos()).hasSize(2).last().satisfies(a -> {
             assertThat(a.tipo()).isEqualTo(TipoAdjunto.COMPROBANTE);
             assertThat(a.referencia()).isEqualTo("33");
             assertThat(a.nombreArchivo()).isEqualTo("B001-00000012.pdf");
@@ -234,7 +245,7 @@ class ConsumidorEventosTest extends PruebaIntegracion {
                 "Devolución de S/ 40.00", "Reservar otro turno");
         assertThat(n.get(CanalNotificacion.WHATSAPP).getCuerpo()).contains("fue cancelada por ti",
                 "*Motivo:* Se lesionó un jugador del equipo", "*Devolución:* S/ 40.00");
-        Recordatorio r = recordatorios.findByCodigoReserva(Datos.CODIGO).orElseThrow();
+        Recordatorio r = recordatorios.findByCodigoReservaAndMinutosAntes(Datos.CODIGO, 120).orElseThrow();
         assertThat(r.getEstado()).isEqualTo(EstadoRecordatorio.CANCELADO);
         assertThat(r.getDetalle()).contains("CLIENTE");
     }

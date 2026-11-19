@@ -17,6 +17,7 @@ import pe.alcanfores.notificaciones.dto.NotificacionResumen;
 import pe.alcanfores.notificaciones.mapeador.NotificacionMapeador;
 import pe.alcanfores.notificaciones.modelo.EstadoNotificacion;
 import pe.alcanfores.notificaciones.modelo.Notificacion;
+import pe.alcanfores.notificaciones.plantilla.TipoAviso;
 import pe.alcanfores.notificaciones.repositorio.NotificacionRepositorio;
 import pe.alcanfores.notificaciones.servicio.EnvioServicio;
 import pe.alcanfores.notificaciones.servicio.FiltroNotificaciones;
@@ -67,6 +68,10 @@ public class NotificacionServicioImpl implements NotificacionServicio {
             throw NegocioExcepcion.regla("NO_REINTENTABLE",
                     "Solo se pueden reintentar los avisos fallidos; este está " + n.getEstado().name() + ".");
         }
+        if (!TipoAviso.reenviable(n.getEvento())) {
+            throw NegocioExcepcion.regla("NO_REINTENTABLE",
+                    "Los códigos de verificación no se reenvían: el cliente debe pedir un código nuevo.");
+        }
         if (notificaciones.tomarParaEnvio(id, EstadoNotificacion.FALLIDO) == 0) {
             throw NegocioExcepcion.conflicto("NOTIFICACION_EN_PROCESO", "Ese aviso se está reenviando en este momento.");
         }
@@ -79,7 +84,7 @@ public class NotificacionServicioImpl implements NotificacionServicio {
     @Override
     public int reintentarFallidas() {
         List<Long> ids = notificaciones.idsPorReintentar(propiedades.getMaxIntentos(),
-                Tiempo.ahora().minusMinutes(MINUTOS_COLGADO));
+                Tiempo.ahora().minusMinutes(MINUTOS_COLGADO), TipoAviso.sinReintentoAutomatico());
         int reintentados = 0;
         for (Long id : ids) {
             Notificacion n = notificaciones.findById(id).orElse(null);

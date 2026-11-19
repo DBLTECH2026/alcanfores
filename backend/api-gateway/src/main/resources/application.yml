@@ -26,7 +26,17 @@ spring:
             - RemoveRequestHeader=X-Interno-Token
             - DedupeResponseHeader=Access-Control-Allow-Origin Access-Control-Allow-Credentials Vary X-Request-Id, RETAIN_FIRST
           routes:
-            # --- auth-service ---
+            # --- auth-service (recuperar la contraseña envía el código por WhatsApp o correo en el momento: más tiempo) ---
+            - id: auth-lentas
+              order: -1
+              uri: lb://auth-service
+              predicates:
+                - Path=/api/auth/recuperar/**
+              metadata:
+                response-timeout: ${alcanfores.gateway.timeout-archivos-ms}
+              filters:
+                - name: CircuitBreaker
+                  args: { name: auth-archivos, fallbackUri: "forward:/fallback/auth" }
             - id: auth
               uri: lb://auth-service
               predicates:
@@ -108,7 +118,7 @@ spring:
               order: -1
               uri: lb://notificaciones-service
               predicates:
-                - Path=/api/admin/whatsapp/**,/api/admin/recordatorios/ejecutar,/api/admin/notificaciones/*/reintentar
+                - Path=/api/admin/whatsapp/**,/api/admin/recordatorios/ejecutar,/api/admin/notificaciones/*/reintentar,/api/admin/correo/prueba
               metadata:
                 response-timeout: ${alcanfores.gateway.timeout-archivos-ms}
               filters:
@@ -117,10 +127,22 @@ spring:
             - id: notificaciones
               uri: lb://notificaciones-service
               predicates:
-                - Path=/api/admin/notificaciones/**,/api/admin/recordatorios/**
+                - Path=/api/admin/notificaciones/**,/api/admin/recordatorios/**,/api/admin/correo/**
               filters:
                 - name: CircuitBreaker
                   args: { name: notificaciones, fallbackUri: "forward:/fallback/notificaciones" }
+
+            # --- asistente-service (Canchita, IA): no está en Eureka (Node); URI fija por variable. Una respuesta con
+            # herramientas o con la foto del comprobante tarda 5–15 s: 60 s de margen. El chat web usa SSE. ---
+            - id: asistente
+              uri: ${ASISTENTE_URL:http://localhost:8096}
+              predicates:
+                - Path=/api/asistente/**
+              metadata:
+                response-timeout: ${alcanfores.gateway.timeout-asistente-ms}
+              filters:
+                - name: CircuitBreaker
+                  args: { name: asistente, fallbackUri: "forward:/fallback/asistente" }
 
 server:
   port: ${PORT:8086}
@@ -146,6 +168,7 @@ alcanfores:
     timeout: 10s
     timeout-archivos-ms: 20000
     timeout-documentos-ms: 20000
+    timeout-asistente-ms: 60000
     servicios:
       - api-gateway
       - auth-service
@@ -157,9 +180,12 @@ alcanfores:
       - { nombre: login, metodo: POST, rutas: [ "/api/auth/login" ], por-minuto: 10 }
       - { nombre: registro-clientes, metodo: POST, rutas: [ "/api/auth/clientes/registro" ], por-minuto: 5 }
       - { nombre: login-clientes, metodo: POST, rutas: [ "/api/auth/clientes/login" ], por-minuto: 10 }
+      - { nombre: recuperar, rutas: [ "/api/auth/recuperar/**" ], por-minuto: 5 }
       - { nombre: documentos, rutas: [ "/api/documentos/**" ], por-minuto: 20 }
       - { nombre: reservas, metodo: POST, rutas: [ "/api/reservas" ], por-minuto: 10 }
       - { nombre: pasarela, rutas: [ "/api/pasarela/**" ], por-minuto: 30 }
+      # Canchita: mensajes del chat web (y acciones del panel); las lecturas GET (estado, historial) no cuentan.
+      - { nombre: asistente, metodo: POST, rutas: [ "/api/asistente/**" ], por-minuto: 20 }
 
 management:
   endpoints:

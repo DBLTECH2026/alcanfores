@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import pe.alcanfores.reservas.dto.AdminDtos.AsistenciaSolicitud;
 import pe.alcanfores.reservas.dto.AdminDtos.CancelacionAdminSolicitud;
 import pe.alcanfores.reservas.dto.AdminDtos.ListaReservasRespuesta;
+import pe.alcanfores.reservas.dto.AdminDtos.ReprogramacionAdminSolicitud;
 import pe.alcanfores.reservas.dto.AdminDtos.ReservaAdminDetalle;
 import pe.alcanfores.reservas.dto.AdminDtos.ReservaManualRespuesta;
 import pe.alcanfores.reservas.dto.AdminDtos.ReservaManualSolicitud;
@@ -33,7 +34,7 @@ import java.time.LocalDate;
 @RestController
 @RequestMapping("/api/admin/reservas")
 @RequiredArgsConstructor
-@Tag(name = "Reservas (panel)", description = "Listado, detalle, reserva manual, cancelación y asistencia (ADMIN y RECEPCION)")
+@Tag(name = "Reservas (panel)", description = "Listado, detalle, reserva manual, cambio de horario, cancelación y asistencia (ADMIN y RECEPCION)")
 public class ReservaAdminControlador {
 
     private final ReservaAdminServicio servicio;
@@ -77,6 +78,15 @@ public class ReservaAdminControlador {
     @Operation(summary = "Registrar asistencia", description = "Solo reservas confirmadas y desde 15 minutos antes del inicio.")
     public ReservaAdminDetalle asistencia(@PathVariable String codigo, @Valid @RequestBody AsistenciaSolicitud solicitud) {
         return servicio.registrarAsistencia(codigo, solicitud);
+    }
+
+    @PostMapping("/{codigo}/reprogramar")
+    @Operation(summary = "Cambiar el horario (reprogramar)", description = "ADMIN y RECEPCION. Otros turnos (1 a 8, misma cancha "
+            + "y fecha; puede cambiar de cancha y de día) conservando lo pagado y con motivo (5 a 200). Sin el plazo ni el "
+            + "límite de un cambio del cliente. 409 TURNO_OCUPADO, 422 RESERVA_NO_REPROGRAMABLE (cancelada o con asistencia), "
+            + "422 REPROGRAMAR_MONTO_MENOR. Acepta el código (ALC-…) o el id numérico. Responde el detalle con «reprogramaciones».")
+    public ReservaAdminDetalle reprogramar(@PathVariable String codigo, @Valid @RequestBody ReprogramacionAdminSolicitud solicitud) {
+        return servicio.reprogramar(codigo, solicitud);
     }
 
     @GetMapping("/{codigo}/constancia.pdf")

@@ -67,6 +67,10 @@ public class PagoServicioImpl implements PagoServicio {
 
     static final String MENSAJE_RECIBIDO = "Recibimos tu comprobante. Lo validaremos en unos minutos y te avisaremos por WhatsApp y correo.";
 
+    /** Actor por defecto de la validación automática (bitácora y {@code validado_por}). */
+    static final String VALIDADOR_IA = "Canchita (IA)";
+    private static final int MAX_LECTURA = 4000;
+
     private final PagoRepositorio pagos;
     private final ComprobanteRepositorio comprobantes;
     private final DatosFacturacionRepositorio facturacion;
@@ -263,6 +267,31 @@ public class PagoServicioImpl implements PagoServicio {
         Comprobante c = comprobanteServicio.emitirParaPago(p, ahora, true);
         anunciarValidado(p);
         bus.auditar("VALIDAR_PAGO", "pago", p.getId(),
+                p.getCodigoReserva() + " · " + p.getMetodo().texto() + " " + Dinero.formato(p.getMonto()) + " · " + c.serieNumero());
+        return new CobroRespuesta(p.getId(), p.getEstado().name(), p.getMonto(), ComprobanteMapeador.enlaceAdmin(c));
+    }
+
+    @Override
+    @Transactional
+    public CobroRespuesta validarPorIa(Long id, String lectura, String validadoPor) {
+        String actor = Texto.limpiar(validadoPor);
+        actor = actor == null || actor.isBlank() ? VALIDADOR_IA : actor;
+        Pago p = pagos.bloquear(id).orElseThrow(PagoServicioImpl::noExiste);
+        if (p.getEstado() == EstadoValidacion.VALIDADO) {
+            List<Comprobante> emitidos = comprobantes.findByIdPagoOrderByIdAsc(id);
+            return new CobroRespuesta(p.getId(), p.getEstado().name(), p.getMonto(),
+                    emitidos.isEmpty() ? null : ComprobanteMapeador.enlaceAdmin(emitidos.get(0)));
+        }
+        if (p.getEstado() != EstadoValidacion.PENDIENTE || p.getCanal() != CanalPago.COMPROBANTE) {
+            throw NegocioExcepcion.regla("PAGO_NO_EN_REVISION",
+                    "Este pago no está en revisión (estado: " + p.getEstado().name().toLowerCase(Locale.ROOT) + ").");
+        }
+        LocalDateTime ahora = Tiempo.ahora();
+        p.validar(ahora, null, actor);
+        p.setLecturaIa(lectura == null ? null : lectura.substring(0, Math.min(lectura.length(), MAX_LECTURA)));
+        Comprobante c = comprobanteServicio.emitirParaPago(p, ahora, true);
+        anunciarValidado(p);
+        bus.auditarComo(actor, "SISTEMA", "VALIDAR_PAGO_IA", "pago", p.getId(),
                 p.getCodigoReserva() + " · " + p.getMetodo().texto() + " " + Dinero.formato(p.getMonto()) + " · " + c.serieNumero());
         return new CobroRespuesta(p.getId(), p.getEstado().name(), p.getMonto(), ComprobanteMapeador.enlaceAdmin(c));
     }

@@ -18,9 +18,13 @@ public class MensajeriaConfig {
     public static final String COLA_RESERVA_CONFIRMADA = "notificaciones.reserva-confirmada";
     public static final String COLA_RESERVA_CANCELADA = "notificaciones.reserva-cancelada";
     public static final String COLA_RESERVA_ASISTENCIA = "notificaciones.reserva-asistencia";
+    /** «¡Cambiamos tu horario!» y los recordatorios movidos al nuevo inicio. */
+    public static final String COLA_RESERVA_REPROGRAMADA = "notificaciones.reserva-reprogramada";
     public static final String COLA_PAGO_REGISTRADO = "notificaciones.pago-registrado";
     public static final String COLA_PAGO_RECHAZADO = "notificaciones.pago-rechazado";
     public static final String COLA_COMPROBANTE_EMITIDO = "notificaciones.comprobante-emitido";
+    /** Solo para el aviso «¡Terminaste de pagar tu cancha!» (tipoPago = SALDO). */
+    public static final String COLA_PAGO_VALIDADO = "notificaciones.pago-validado";
 
     @Bean
     Queue colaReservaRegistrada() {
@@ -63,6 +67,16 @@ public class MensajeriaConfig {
     }
 
     @Bean
+    Queue colaReservaReprogramada() {
+        return Eventos.cola(COLA_RESERVA_REPROGRAMADA);
+    }
+
+    @Bean
+    Binding enlaceReservaReprogramada(Queue colaReservaReprogramada, TopicExchange intercambioEventos) {
+        return Eventos.enlace(colaReservaReprogramada, intercambioEventos, Eventos.RESERVA_REPROGRAMADA);
+    }
+
+    @Bean
     Queue colaPagoRegistrado() {
         return Eventos.cola(COLA_PAGO_REGISTRADO);
     }
@@ -80,6 +94,16 @@ public class MensajeriaConfig {
     @Bean
     Binding enlacePagoRechazado(Queue colaPagoRechazado, TopicExchange intercambioEventos) {
         return Eventos.enlace(colaPagoRechazado, intercambioEventos, Eventos.PAGO_RECHAZADO);
+    }
+
+    @Bean
+    Queue colaPagoValidado() {
+        return Eventos.cola(COLA_PAGO_VALIDADO);
+    }
+
+    @Bean
+    Binding enlacePagoValidado(Queue colaPagoValidado, TopicExchange intercambioEventos) {
+        return Eventos.enlace(colaPagoValidado, intercambioEventos, Eventos.PAGO_VALIDADO);
     }
 
     @Bean

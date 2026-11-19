@@ -16,6 +16,9 @@ public interface CuentaClienteRepositorio extends JpaRepository<CuentaCliente, L
     @Query("select c from CuentaCliente c where c.dni = :usuario or c.correo = :usuario")
     Optional<CuentaCliente> buscarParaLogin(@Param("usuario") String usuario);
 
+    /** Para recuperar la contraseña: sin bloqueo de fila (no cambia los intentos de login). */
+    Optional<CuentaCliente> findFirstByDniOrCorreo(String dni, String correo);
+
     boolean existsByDni(String dni);
 
     boolean existsByCorreo(String correo);

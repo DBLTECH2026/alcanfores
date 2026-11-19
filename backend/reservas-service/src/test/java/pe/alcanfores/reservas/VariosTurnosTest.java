@@ -201,8 +201,8 @@ class VariosTurnosTest extends PruebaIntegracion {
         Long idCliente = 1L;
         jdbc.update("INSERT INTO cliente (id_cliente, dni, nombres, apellidos, telefono, correo, fecha_registro, actualizado_en) "
                 + "VALUES (1, '70123321', 'Ana', 'Pérez', '987654321', 'ana@example.com', NOW(), NOW())");
-        String insertar = "INSERT INTO reserva (codigo_reserva, id_cliente, id_turno, estado, estado_pago, origen, monto_total,"
-                + " monto_adelanto, fecha_registro) VALUES (?, ?, ?, ?, 'SIN_PAGO', 'WEB', 80, 40, NOW())";
+        String insertar = "INSERT INTO reserva (codigo_reserva, id_cliente, telefono_contacto, id_turno, estado, estado_pago, origen,"
+                + " monto_total, monto_adelanto, fecha_registro) VALUES (?, ?, '987654321', ?, ?, 'SIN_PAGO', 'WEB', 80, 40, NOW())";
         jdbc.update(insertar, "ALC-AAAAAA", idCliente, vigente.getId(), "CONFIRMADA");
         jdbc.update(insertar, "ALC-BBBBBB", idCliente, cancelado.getId(), "CANCELADA");
         Long t9 = turno(2, DIA, 9).getId();

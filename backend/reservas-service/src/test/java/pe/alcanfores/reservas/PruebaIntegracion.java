@@ -82,6 +82,7 @@ public abstract class PruebaIntegracion {
     @BeforeEach
     void prepararBase() {
         jdbc.update("DELETE FROM reserva_historial");
+        jdbc.update("DELETE FROM reserva_reprogramacion");
         jdbc.update("DELETE FROM reserva_turno");
         jdbc.update("DELETE FROM cancelacion");
         jdbc.update("DELETE FROM reserva");

@@ -16,6 +16,7 @@ import pe.alcanfores.reservas.modelo.Turno;
 import pe.alcanfores.reservas.servicio.PagoEventosServicio;
 
 import java.math.BigDecimal;
+import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -24,6 +25,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -110,7 +112,59 @@ class PanelTest extends PruebaIntegracion {
     }
 
     @Test
-    void asistenciaSoloParaConfirmadasYDesdeQuinceMinutosAntes() throws Exception {
+    void asistenciaDesdeLosMinutosConfiguradosEnElCatalogo() throws Exception {
+        when(catalogo.configuracion()).thenReturn(Map.of("asistencia_desde_min", "45"));
+        complejo.refrescar();
+        Turno t = turno(1, HOY, 12);
+        String codigo = reservarWeb(t.getId(), "70123321").get("codigoReserva").asText();
+        pagoEventos.alValidarPago(new PagoValidadoEvento(UUID.randomUUID(), AHORA, 1L, codigo, "YAPE", "COMPROBANTE",
+                new BigDecimal("30.00"), "ADELANTO", "mtorres"));
+
+        // 11:14 → falta 1 minuto para la ventana de 45 minutos.
+        fijarReloj(HOY.atTime(11, 14, 59));
+        mvc.perform(get("/api/admin/reservas/" + codigo).header("Authorization", token("RECEPCION")))
+                .andExpect(jsonPath("$.puedeMarcarAsistencia").value(false));
+        mvc.perform(get("/api/admin/reservas").header("Authorization", token("RECEPCION")).param("estado", "CONFIRMADA"))
+                .andExpect(jsonPath("$.contenido[0].codigoReserva").value(codigo))
+                .andExpect(jsonPath("$.contenido[0].puedeMarcarAsistencia").value(false));
+        mvc.perform(post("/api/admin/reservas/" + codigo + "/asistencia").header("Authorization", token("RECEPCION"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"asistencia\":\"NO_ASISTIO\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.codigo").value("ASISTENCIA_ANTICIPADA"))
+                .andExpect(jsonPath("$.mensaje").value("La asistencia se registra desde 45 minutos antes del inicio del turno."));
+
+        // 11:15 en punto → ya se puede.
+        fijarReloj(HOY.atTime(11, 15));
+        mvc.perform(get("/api/admin/reservas/" + codigo).header("Authorization", token("RECEPCION")))
+                .andExpect(jsonPath("$.puedeMarcarAsistencia").value(true));
+        mvc.perform(get("/api/admin/reservas").header("Authorization", token("RECEPCION")).param("estado", "CONFIRMADA"))
+                .andExpect(jsonPath("$.contenido[0].puedeMarcarAsistencia").value(true));
+        mvc.perform(post("/api/admin/reservas/" + codigo + "/asistencia").header("Authorization", token("RECEPCION"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"asistencia\":\"NO_ASISTIO\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.asistencia").value("NO_ASISTIO"));
+    }
+
+    @Test
+    void conCeroMinutosLaAsistenciaSeMarcaDesdeLaHoraDeInicio() throws Exception {
+        when(catalogo.configuracion()).thenReturn(Map.of("asistencia_desde_min", "0"));
+        complejo.refrescar();
+        Turno t = turno(1, HOY, 12);
+        String codigo = reservarWeb(t.getId(), "70123321").get("codigoReserva").asText();
+        pagoEventos.alValidarPago(new PagoValidadoEvento(UUID.randomUUID(), AHORA, 1L, codigo, "YAPE", "COMPROBANTE",
+                new BigDecimal("30.00"), "ADELANTO", "mtorres"));
+        fijarReloj(HOY.atTime(11, 59));
+        mvc.perform(post("/api/admin/reservas/" + codigo + "/asistencia").header("Authorization", token("RECEPCION"))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"asistencia\":\"ASISTIO\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.mensaje").value("La asistencia se registra desde la hora de inicio del turno."));
+        fijarReloj(HOY.atTime(12, 0));
+        mvc.perform(get("/api/admin/reservas/" + codigo).header("Authorization", token("RECEPCION")))
+                .andExpect(jsonPath("$.puedeMarcarAsistencia").value(true));
+    }
+
+    @Test
+    void asistenciaSoloParaConfirmadasYDesdeLosMinutosPorDefecto() throws Exception {
         Turno t = turno(1, HOY, 12);
         String codigo = reservarWeb(t.getId(), "70123321").get("codigoReserva").asText();
         mvc.perform(post("/api/admin/reservas/" + codigo + "/asistencia").header("Authorization", token("RECEPCION"))

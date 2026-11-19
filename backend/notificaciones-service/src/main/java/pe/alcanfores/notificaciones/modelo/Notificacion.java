@@ -8,6 +8,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -73,6 +74,13 @@ public class Notificacion {
     @Column(name = "enviado_en")
     private LocalDateTime enviadoEn;
 
+    /**
+     * Cuerpo real que se envía cuando difiere del guardado (un código de verificación se guarda como «******»). No se
+     * persiste: por eso esos avisos no se reintentan.
+     */
+    @Transient
+    private String cuerpoEnvio;
+
     public Notificacion(String codigoReserva, String evento, CanalNotificacion canal, String destino, String asunto,
                         String cuerpo, List<Adjunto> adjuntos, LocalDateTime creadoEn) {
         this.codigoReserva = codigoReserva;
@@ -97,6 +105,21 @@ public class Notificacion {
             this.ultimoError = null;
             this.enviadoEn = momento;
         }
+    }
+
+    public void fijarCuerpoEnvio(String cuerpoReal) {
+        this.cuerpoEnvio = cuerpoReal;
+    }
+
+    /** Lo que sale por el canal: el cuerpo real si hay uno distinto del guardado. */
+    public String cuerpoParaEnviar() {
+        return cuerpoEnvio != null ? cuerpoEnvio : cuerpo;
+    }
+
+    /** La tarjeta no se pudo enviar por WhatsApp y el aviso salió solo con el texto: queda anotado para el panel. */
+    public void marcarImagenNoEnviada(String motivo) {
+        this.adjuntos = new ArrayList<>(getAdjuntos().stream()
+                .map(a -> a.tipo() == TipoAdjunto.IMAGEN ? a.noDisponible(motivo) : a).toList());
     }
 
     public void actualizarAdjuntos(List<Adjunto> nuevos) {

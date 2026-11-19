@@ -24,7 +24,7 @@ public class CatalogoCliente {
     }
 
     /**
-     * Claves de configuración como texto ({@code recordatorio_horas → "2"}, {@code direccion → "..."}). Acepta un
+     * Claves de configuración como texto ({@code recordatorio_minutos → "120,15"}, {@code direccion → "..."}). Acepta un
      * objeto {@code {clave: valor}} o una lista {@code [{clave, valor}]}.
      */
     public Map<String, String> configuracion() {

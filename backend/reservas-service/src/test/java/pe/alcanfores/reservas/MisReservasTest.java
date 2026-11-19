@@ -1,8 +1,10 @@
 package pe.alcanfores.reservas;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import pe.alcanfores.reservas.modelo.Turno;
+import pe.alcanfores.reservas.servicio.ExpiracionServicio;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -16,6 +18,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 /** v2 · E: «Mis reservas» del cliente con cuenta (por el DNI del token). */
 class MisReservasTest extends PruebaIntegracion {
+
+    @Autowired
+    private ExpiracionServicio expiracion;
 
     @Test
     void incluyeLasReservasHechasAntesDeCrearLaCuentaYSoloLasDeSuDni() throws Exception {
@@ -32,7 +37,10 @@ class MisReservasTest extends PruebaIntegracion {
                 .andExpect(jsonPath("$.totalElementos").value(2))
                 .andExpect(jsonPath("$.tamanio").value(10))
                 .andExpect(jsonPath("$.contenido[0].codigoReserva").value(otra))
+                .andExpect(jsonPath("$.contenido[0].cancelacion.canceladoPor").value("CLIENTE"))
+                .andExpect(jsonPath("$.contenido[0].cancelacion.motivo").value("Cambiamos de fecha el partido"))
                 .andExpect(jsonPath("$.contenido[1].codigoReserva").value(vieja))
+                .andExpect(jsonPath("$.contenido[1].cancelacion").doesNotExist())
                 .andExpect(jsonPath("$.contenido[1].puedeCancelar").value(true))
                 .andExpect(jsonPath("$.contenido[1].puedeReenviarComprobante").value(true))
                 .andExpect(jsonPath("$.contenido[1].resenada").value(false))
@@ -52,6 +60,20 @@ class MisReservasTest extends PruebaIntegracion {
                 .andExpect(status().isNotFound());
         // Ninguna de estas reservas es reseñable todavía: no se consulta a catálogo.
         verify(catalogo, never()).tieneResena(anyString());
+    }
+
+    @Test
+    void laListaDistingueLaQueAnuloElSistemaPorVencerElPlazo() throws Exception {
+        String vencida = reservarWeb(turno(1, HOY.plusDays(1), 19).getId(), "70123321").path("codigoReserva").asText();
+        fijarReloj(AHORA.plusMinutes(21));
+        assertThat(expiracion.expirarVencidas()).isEqualTo(1);
+
+        mvc.perform(get("/api/cliente/reservas").param("estado", "cancelada").header("Authorization", tokenCliente("70123321")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.contenido[0].codigoReserva").value(vencida))
+                .andExpect(jsonPath("$.contenido[0].estado").value("CANCELADA"))
+                .andExpect(jsonPath("$.contenido[0].cancelacion.canceladoPor").value("SISTEMA"))
+                .andExpect(jsonPath("$.contenido[0].cancelacion.motivo").value("Venció el plazo para pagar"));
     }
 
     @Test

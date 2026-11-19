@@ -21,6 +21,7 @@ import pe.alcanfores.auth.modelo.EstadoUsuario;
 import pe.alcanfores.auth.modelo.Rol;
 import pe.alcanfores.auth.repositorio.AdministradorRepositorio;
 import pe.alcanfores.auth.repositorio.BitacoraRepositorio;
+import pe.alcanfores.auth.repositorio.CodigoRecuperacionRepositorio;
 import pe.alcanfores.auth.repositorio.CuentaClienteRepositorio;
 import pe.alcanfores.auth.repositorio.EventoProcesadoRepositorio;
 import pe.alcanfores.comun.config.AlcanforesPropiedades;
@@ -48,6 +49,8 @@ public abstract class PruebaIntegracion {
     @Autowired
     protected EventoProcesadoRepositorio eventosProcesados;
     @Autowired
+    protected CodigoRecuperacionRepositorio codigosRecuperacion;
+    @Autowired
     protected PasswordEncoder codificador;
     @Autowired
     protected JwtServicio jwt;
@@ -62,6 +65,7 @@ public abstract class PruebaIntegracion {
         Tiempo.restablecer();
         bitacoras.deleteAllInBatch();
         eventosProcesados.deleteAllInBatch();
+        codigosRecuperacion.deleteAllInBatch();
         administradores.deleteAllInBatch();
         cuentas.deleteAllInBatch();
     }

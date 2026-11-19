@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Size;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.validation.annotation.Validated;
@@ -29,7 +30,7 @@ import java.util.Set;
 @Validated
 public class RecordatorioControlador {
 
-    private static final Set<String> ORDEN_PERMITIDO = Set.of("enviarEn", "inicioReserva", "estado", "enviadoEn");
+    private static final Set<String> ORDEN_PERMITIDO = Set.of("enviarEn", "inicioReserva", "estado", "enviadoEn", "minutosAntes");
 
     private final RecordatorioServicio servicio;
 
@@ -37,15 +38,18 @@ public class RecordatorioControlador {
         this.servicio = servicio;
     }
 
-    @Operation(summary = "Lista los recordatorios", description = "Filtro opcional por estado: PROGRAMADO, ENVIADO, CANCELADO u OMITIDO.")
+    @Operation(summary = "Lista los recordatorios",
+            description = "Filtros opcionales: estado (PROGRAMADO, ENVIADO, CANCELADO u OMITIDO) y codigo de reserva.")
     @GetMapping
     public PaginaRespuesta<RecordatorioRespuesta> listar(
             @RequestParam(required = false) EstadoRecordatorio estado,
+            @RequestParam(required = false) @Size(max = 12, message = "El código de reserva tiene el formato ALC-XXXXXX.")
+            String codigo,
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "La página empieza en 0.") int page,
             @RequestParam(defaultValue = "20") @Min(value = 1, message = "El tamaño de página va de 1 a 100.")
             @Max(value = 100, message = "El tamaño de página va de 1 a 100.") int size,
             @RequestParam(required = false) String sort) {
-        return servicio.listar(estado, Paginacion.de(page, size, sort, ORDEN_PERMITIDO,
+        return servicio.listar(estado, codigo, Paginacion.de(page, size, sort, ORDEN_PERMITIDO,
                 Sort.by(Sort.Direction.DESC, "enviarEn", "id")));
     }
 

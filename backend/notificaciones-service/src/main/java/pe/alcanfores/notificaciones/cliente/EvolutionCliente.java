@@ -19,7 +19,7 @@ import java.util.function.Supplier;
  * Cliente de <b>Evolution API v2</b> (WhatsApp con Baileys). Autenticación con la cabecera {@code apikey}.
  * <ul>
  *   <li>{@code POST /message/sendText/{instancia}} {@code {number, text}}</li>
- *   <li>{@code POST /message/sendMedia/{instancia}} {@code {number, mediatype:"document", mimetype, media(base64), fileName, caption}}</li>
+ *   <li>{@code POST /message/sendMedia/{instancia}} {@code {number, mediatype:"document"|"image", mimetype, media(base64), fileName, caption}}</li>
  *   <li>{@code POST /instance/create}, {@code GET /instance/connect/{i}}, {@code GET /instance/connectionState/{i}},
  *       {@code GET /instance/fetchInstances}, {@code DELETE /instance/logout/{i}}</li>
  * </ul>
@@ -30,6 +30,7 @@ public class EvolutionCliente {
     private static final Logger log = LoggerFactory.getLogger(EvolutionCliente.class);
     public static final String CABECERA_CLAVE = "apikey";
     public static final String MIME_PDF = "application/pdf";
+    public static final String MIME_JPG = "image/jpeg";
 
     private final RestClient rest;
     private final NotificacionesPropiedades.Evolution cfg;
@@ -66,14 +67,24 @@ public class EvolutionCliente {
 
     /** Envía un PDF como documento de WhatsApp (base64 sin prefijo {@code data:}). */
     public String enviarDocumento(String numero, byte[] pdf, String nombreArchivo, String leyenda) {
+        return enviarMedio(numero, "document", MIME_PDF, pdf, nombreArchivo, leyenda, "el documento");
+    }
+
+    /** Envía una imagen JPG (la tarjeta ilustrada del aviso) con el texto como leyenda. */
+    public String enviarImagen(String numero, byte[] jpg, String nombreArchivo, String leyenda) {
+        return enviarMedio(numero, "image", MIME_JPG, jpg, nombreArchivo, leyenda, "la imagen");
+    }
+
+    private String enviarMedio(String numero, String tipo, String mime, byte[] contenido, String nombreArchivo,
+                               String leyenda, String queSeEnvia) {
         Map<String, Object> cuerpo = new LinkedHashMap<>();
         cuerpo.put("number", numero);
-        cuerpo.put("mediatype", "document");
-        cuerpo.put("mimetype", MIME_PDF);
-        cuerpo.put("media", Base64.getEncoder().encodeToString(pdf));
+        cuerpo.put("mediatype", tipo);
+        cuerpo.put("mimetype", mime);
+        cuerpo.put("media", Base64.getEncoder().encodeToString(contenido));
         cuerpo.put("fileName", nombreArchivo);
         cuerpo.put("caption", leyenda);
-        JsonNode r = llamar("enviar el documento a " + numero, () -> rest.post()
+        JsonNode r = llamar("enviar " + queSeEnvia + " a " + numero, () -> rest.post()
                 .uri("/message/sendMedia/{instancia}", cfg.getInstancia())
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(cuerpo)

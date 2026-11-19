@@ -19,6 +19,9 @@ public interface AdministradorRepositorio extends JpaRepository<Administrador, L
     @Query("select a from Administrador a where a.usuario = :usuario")
     Optional<Administrador> buscarParaLogin(@Param("usuario") String usuario);
 
+    /** Para recuperar la contraseña: sin bloqueo de fila (no cambia los intentos de login). */
+    Optional<Administrador> findFirstByUsuarioOrCorreo(String usuario, String correo);
+
     boolean existsByUsuario(String usuario);
 
     boolean existsByCorreo(String correo);

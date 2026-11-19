@@ -67,9 +67,13 @@ public class VerificadorReservas {
     /** Fotografía de la reserva que se guarda con el pago. */
     public static InstantaneaReserva instantanea(ReservaInterna r) {
         ClienteContacto c = r.cliente();
-        return new InstantaneaReserva(c.dni(), c.nombres(), c.apellidos(), c.telefono(), c.correo(),
-                ConceptoReserva.concepto(r.nombreCancha(), r.deporte(), r.fecha(), r.horario(), r.turnos(),
-                        r.codigoReserva()),
+        return new InstantaneaReserva(c.dni(), c.nombres(), c.apellidos(), c.telefono(), c.correo(), concepto(r),
                 ConceptoReserva.porcentaje(r.montoAdelanto(), r.montoTotal()));
+    }
+
+    /** «Alquiler de Cancha 2 · Fútbol 6 · vie 20/11/2026 7:00–8:00 p. m.» con el horario que informa reservas. */
+    public static String concepto(ReservaInterna r) {
+        return ConceptoReserva.concepto(r.nombreCancha(), r.deporte(), r.fecha(), r.horario(), r.turnos(),
+                r.codigoReserva());
     }
 }

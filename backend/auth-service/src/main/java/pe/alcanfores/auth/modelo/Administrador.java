@@ -42,6 +42,10 @@ public class Administrador {
     @Column(nullable = false, length = 100, unique = true)
     private String correo;
 
+    /** Celular opcional (9 dígitos): permite recibir por WhatsApp el código para cambiar la contraseña. */
+    @Column(length = 9, columnDefinition = "char(9)")
+    private String telefono;
+
     @Column(name = "contrasena_hash", nullable = false, length = 100)
     private String contrasenaHash;
 

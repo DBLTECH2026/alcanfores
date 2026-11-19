@@ -18,4 +18,9 @@ public final class Reglas {
 
     private Reglas() {
     }
+
+    /** Celular opcional del panel: vacío o solo espacios = sin celular (así el formulario puede borrarlo). */
+    public static String telefonoOpcional(String telefono) {
+        return telefono == null || telefono.isBlank() ? null : telefono;
+    }
 }

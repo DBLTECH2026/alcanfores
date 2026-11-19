@@ -94,10 +94,30 @@ class PublicadorEventosTest {
         assertThat(Eventos.DLX).isEqualTo("alcanfores.eventos.dlx");
         assertThat(Eventos.COLA_MUERTA).isEqualTo("alcanfores.eventos.muertos");
         assertThat(Stream.of(Eventos.RESERVA_REGISTRADA, Eventos.RESERVA_CONFIRMADA, Eventos.RESERVA_CANCELADA,
-                Eventos.RESERVA_ASISTENCIA, Eventos.PAGO_REGISTRADO, Eventos.PAGO_VALIDADO, Eventos.PAGO_RECHAZADO,
-                Eventos.COMPROBANTE_EMITIDO, Eventos.CANCHA_ACTUALIZADA, Eventos.AUDITORIA_ACCION))
+                Eventos.RESERVA_ASISTENCIA, Eventos.RESERVA_REPROGRAMADA, Eventos.PAGO_REGISTRADO, Eventos.PAGO_VALIDADO,
+                Eventos.PAGO_RECHAZADO, Eventos.COMPROBANTE_EMITIDO, Eventos.CANCHA_ACTUALIZADA, Eventos.CALENDARIO_ACTUALIZADO,
+                Eventos.AUDITORIA_ACCION))
                 .doesNotHaveDuplicates()
                 .allMatch(k -> k.matches("^[a-z]+\\.[a-z]+$"));
+    }
+
+    @Test
+    void reprogramadaSabeSiQuedoConfirmada() {
+        DatosReserva reserva = new DatosReserva(1L, "ALC-7K3M9P", 2L, "Cancha 1", "FUTBOL_5", LocalDate.of(2026, 11, 20),
+                LocalTime.of(19, 0), LocalTime.of(20, 0), new BigDecimal("80.00"), new BigDecimal("40.00"),
+                BigDecimal.ZERO, null, "7:00–8:00 p. m.", 1);
+        ReservaReprogramadaEvento confirmada = new ReservaReprogramadaEvento(UUID.randomUUID(), AHORA, reserva, "CONFIRMADA",
+                null, null, null, null, null, null, null, ReservaReprogramadaEvento.CLIENTE, null, "ADELANTO_PAGADO", null);
+        ReservaReprogramadaEvento enRevision = new ReservaReprogramadaEvento(UUID.randomUUID(), AHORA, reserva, "PENDIENTE",
+                null, null, null, null, null, null, null, ReservaReprogramadaEvento.CANCHITA, null, "EN_REVISION", null);
+        ReservaReprogramadaEvento sinPago = new ReservaReprogramadaEvento(UUID.randomUUID(), AHORA, reserva, "PENDIENTE",
+                null, null, null, null, null, null, null, ReservaReprogramadaEvento.CLIENTE, null, "SIN_PAGO",
+                AHORA.plusMinutes(30));
+        assertThat(confirmada.confirmada()).isTrue();
+        assertThat(confirmada.pagoEnRevision()).isFalse();
+        assertThat(enRevision.confirmada()).isFalse();
+        assertThat(enRevision.pagoEnRevision()).isTrue();
+        assertThat(sinPago.pagoEnRevision()).isFalse();
     }
 
     @Test
@@ -120,6 +140,10 @@ class PublicadorEventosTest {
                 new ReservaConfirmadaEvento(id, AHORA, reserva, new BigDecimal("40.00")),
                 new ReservaCanceladaEvento(id, AHORA, reserva, "cliente", "Lluvia", true, new BigDecimal("40.00")),
                 new AsistenciaRegistradaEvento(id, AHORA, reserva, "ASISTIO"),
+                new ReservaReprogramadaEvento(id, AHORA, reserva, "CONFIRMADA", new BigDecimal("40.00"), "Cancha 2",
+                        LocalDate.of(2026, 11, 19), LocalTime.of(18, 0), LocalTime.of(19, 0), "6:00–7:00 p. m.",
+                        new BigDecimal("70.00"), ReservaReprogramadaEvento.PANEL, "Mantenimiento de la cancha 2",
+                        "SIN_PAGO", AHORA.plusMinutes(30)),
                 new PagoRegistradoEvento(id, AHORA, 5L, "ALC-7K3M9P", "YAPE", "WEB", new BigDecimal("40.00"), "ADELANTO"),
                 new PagoValidadoEvento(id, AHORA, 5L, "ALC-7K3M9P", "YAPE", "WEB", new BigDecimal("40.00"), "ADELANTO", "rhuaman"),
                 new PagoRechazadoEvento(id, AHORA, 5L, "ALC-7K3M9P", "Voucher ilegible", "rhuaman"),

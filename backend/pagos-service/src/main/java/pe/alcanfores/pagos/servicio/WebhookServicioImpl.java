@@ -13,6 +13,7 @@ import pe.alcanfores.comun.error.NegocioExcepcion;
 import pe.alcanfores.comun.util.Tiempo;
 import pe.alcanfores.pagos.cliente.MercadoPagoCliente;
 import pe.alcanfores.pagos.cliente.MercadoPagoCliente.PagoMp;
+import pe.alcanfores.pagos.cliente.ReservaInterna;
 import pe.alcanfores.pagos.config.PagosPropiedades;
 import pe.alcanfores.pagos.modelo.MetodoPago;
 import pe.alcanfores.pagos.modelo.ProveedorPasarela;
@@ -60,13 +61,15 @@ public class WebhookServicioImpl implements WebhookServicio {
         JsonNode aviso = leer(cuerpo).orElseThrow(() -> NegocioExcepcion.validacion("cuerpo", "El aviso no es un JSON válido."));
         String tipo = aviso.path("tipo").asText("");
         String referencia = aviso.path("referencia").asText(null);
+        // La reserva vigente se lee ANTES de abrir la transacción (HTTP fuera de ella); si reservas no responde, 503
+        // sin registrar nada y la pasarela reintenta el aviso.
+        ReservaInterna vigente = TIPO_APROBADO.equals(tipo) ? aprobacion.reservaVigente(referencia).orElse(null) : null;
         return procesarUnaVez(ProveedorPasarela.BETA, idEvento.trim(), tipo, cuerpo, () -> {
             if (TIPO_APROBADO.equals(tipo)) {
                 MetodoPago metodo = "YAPE".equals(aviso.path("metodo").asText()) ? MetodoPago.YAPE : MetodoPago.TARJETA;
-                boolean nuevo = aprobacion.aprobar(referencia, new AprobacionEnLinea.Aprobacion(metodo,
+                return texto(aprobacion.aprobar(referencia, new AprobacionEnLinea.Aprobacion(metodo,
                         aviso.path("marca").asText(null), aviso.path("ultimos4").asText(null),
-                        aviso.path("codigoAutorizacion").asText(null), aviso.path("idTransaccion").asText(null)));
-                return nuevo ? "Pago aprobado y registrado" : "El pago ya estaba aprobado";
+                        aviso.path("codigoAutorizacion").asText(null), aviso.path("idTransaccion").asText(null)), vigente));
             }
             if (TIPO_RECHAZADO.equals(tipo)) {
                 aprobacion.rechazar(referencia, aviso.path("motivo").asText(null));
@@ -100,10 +103,11 @@ public class WebhookServicioImpl implements WebhookServicio {
         }
         PagoMp pago = consultado.get();
         String idExterno = "payment:" + pago.id() + ":" + pago.estado();
+        ReservaInterna vigente = pago.aprobado() ? aprobacion.reservaVigente(pago.referenciaExterna()).orElse(null) : null;
         return procesarUnaVez(ProveedorPasarela.MERCADO_PAGO, idExterno, "payment." + pago.estado(), cuerpo, () -> {
             if (pago.aprobado()) {
-                boolean nuevo = aprobacion.aprobar(pago.referenciaExterna(), IntentoPagoServicioImpl.aprobacionDe(pago));
-                return nuevo ? "Pago aprobado y registrado" : "El pago ya estaba aprobado";
+                return texto(aprobacion.aprobar(pago.referenciaExterna(), IntentoPagoServicioImpl.aprobacionDe(pago),
+                        vigente));
             }
             if (pago.rechazado()) {
                 aprobacion.rechazar(pago.referenciaExterna(), IntentoPagoServicioImpl.motivoMercadoPago(pago.detalleEstado()));
@@ -111,6 +115,14 @@ public class WebhookServicioImpl implements WebhookServicio {
             }
             return "Estado " + pago.estado() + " sin acción";
         });
+    }
+
+    static String texto(AprobacionEnLinea.Resultado resultado) {
+        return switch (resultado) {
+            case REGISTRADO -> "Pago aprobado y registrado";
+            case YA_APROBADO -> "El pago ya estaba aprobado";
+            case NO_APLICADO -> "No aplicado: el monto supera el saldo vigente de la reserva (devolver al cliente)";
+        };
     }
 
     /**

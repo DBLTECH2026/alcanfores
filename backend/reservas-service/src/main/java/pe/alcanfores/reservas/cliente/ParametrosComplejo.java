@@ -11,15 +11,16 @@ import java.util.Map;
 
 /**
  * Reglas y datos del complejo que llegan de catalogo-service ({@code GET /interno/configuracion}). Si catálogo no responde
- * se usan los valores por defecto del SPEC (§5.2) para no bloquear el servicio.
+ * se usan los valores por defecto del SPEC (§5.2) para no bloquear el servicio. {@code asistenciaDesdeMin}: desde cuántos
+ * minutos antes del inicio se puede marcar la asistencia (clave {@code asistencia_desde_min}, 0 a 180; 30 por defecto).
  */
 public record ParametrosComplejo(int adelantoPct, int devolucionHoras, LocalTime primerTurno, LocalTime ultimoTurno,
                                  int duracionMin, LocalTime inicioNoche, int diasVisibles, int minutosParaPagar,
-                                 int recordatorioHoras, String nombreComplejo, String direccion, String referencia,
+                                 int asistenciaDesdeMin, String nombreComplejo, String direccion, String referencia,
                                  String whatsapp, String correo, String mapaUrl, int diasGenerados) {
 
     private static final ParametrosComplejo DEFECTO = new ParametrosComplejo(50, 24, LocalTime.of(8, 0), LocalTime.of(23, 0),
-            60, LocalTime.of(18, 0), 14, 20, 2, "Complejo Deportivo Los Alcanfores",
+            60, LocalTime.of(18, 0), 14, 20, 30, "Complejo Deportivo Los Alcanfores",
             "Carretera Central km 11.5, Santa Clara, Ate",
             "Paradero Caseta, a dos cuadras de la UTP Santa Clara",
             "+51 914 995 187", "informes.alcanfores@gmail.com",
@@ -49,7 +50,7 @@ public record ParametrosComplejo(int adelantoPct, int devolucionHoras, LocalTime
                 hora(m, "inicionoche", d.inicioNoche),
                 entero(m, "diasvisibles", d.diasVisibles, 1, 60),
                 entero(m, "minutosparapagar", d.minutosParaPagar, 5, 1440),
-                entero(m, "recordatoriohoras", d.recordatorioHoras, 0, 48),
+                entero(m, "asistenciadesdemin", d.asistenciaDesdeMin, 0, 180),
                 texto(m, "nombrecomplejo", d.nombreComplejo),
                 texto(m, "direccion", d.direccion),
                 texto(m, "referencia", d.referencia),

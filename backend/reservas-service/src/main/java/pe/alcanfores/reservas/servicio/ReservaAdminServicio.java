@@ -4,6 +4,7 @@ import org.springframework.data.domain.Pageable;
 import pe.alcanfores.reservas.dto.AdminDtos.AsistenciaSolicitud;
 import pe.alcanfores.reservas.dto.AdminDtos.CancelacionAdminSolicitud;
 import pe.alcanfores.reservas.dto.AdminDtos.ListaReservasRespuesta;
+import pe.alcanfores.reservas.dto.AdminDtos.ReprogramacionAdminSolicitud;
 import pe.alcanfores.reservas.dto.AdminDtos.ReservaAdminDetalle;
 import pe.alcanfores.reservas.dto.AdminDtos.ReservaManualRespuesta;
 import pe.alcanfores.reservas.dto.AdminDtos.ReservaManualSolicitud;
@@ -25,6 +26,12 @@ public interface ReservaAdminServicio {
     ReservaAdminDetalle cancelar(String codigo, CancelacionAdminSolicitud solicitud);
 
     ReservaAdminDetalle registrarAsistencia(String codigo, AsistenciaSolicitud solicitud);
+
+    /**
+     * Cambia el horario conservando lo pagado. Sin el plazo ni el límite de un cambio del cliente; sí con las reglas de
+     * estado y disponibilidad. Acepta el código («ALC-…») o el id numérico.
+     */
+    ReservaAdminDetalle reprogramar(String idOCodigo, ReprogramacionAdminSolicitud solicitud);
 
     byte[] constancia(String codigo);
 
