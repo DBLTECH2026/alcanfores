@@ -9,8 +9,14 @@ export interface ClienteWhatsapp {
   configurado(): boolean;
   enviarTexto(numero: string, texto: string): Promise<EnvioWhatsapp>;
   escribiendo(numero: string, ms: number): Promise<void>;
-  descargarMedia(idMensaje: string): Promise<{ base64: string; mimetype: string } | null>;
+  /** `crudo` = key + message tal como llegaron en el webhook: Evolution descarga con eso sin buscar el mensaje en su BD. */
+  descargarMedia(idMensaje: string, crudo?: MensajeCrudo): Promise<{ base64: string; mimetype: string } | null>;
   configurarWebhook(activo: boolean, url: string): Promise<void>;
+}
+
+export interface MensajeCrudo {
+  key: unknown;
+  message: unknown;
 }
 
 export class EvolutionHttp implements ClienteWhatsapp {
@@ -50,16 +56,19 @@ export class EvolutionHttp implements ClienteWhatsapp {
     await this.llamar("/chat/sendPresence/{instancia}", { number: numero, presence: "composing", delay: ms }, 5_000);
   }
 
-  async descargarMedia(idMensaje: string): Promise<{ base64: string; mimetype: string } | null> {
+  async descargarMedia(idMensaje: string, crudo?: MensajeCrudo): Promise<{ base64: string; mimetype: string } | null> {
+    // Con solo el id, Evolution busca el mensaje en su BD y, si la instancia no guarda mensajes, responde
+    // 400 «Message not found». Con key + message (lo que trajo el webhook) descarga directo de WhatsApp.
     const r = await this.llamar<{ base64?: string; mimetype?: string }>("/chat/getBase64FromMediaMessage/{instancia}",
-      { message: { key: { id: idMensaje } }, convertToMp4: false }, 30_000);
+      { message: crudo ?? { key: { id: idMensaje } }, convertToMp4: false }, 30_000);
     return r.base64 ? { base64: r.base64, mimetype: r.mimetype ?? "image/jpeg" } : null;
   }
 
   async configurarWebhook(activo: boolean, url: string): Promise<void> {
     await this.llamar("/webhook/set/{instancia}", {
       // SEND_MESSAGE: ids de lo enviado por la API (avisos y Canchita) para no confundirlos con mensajes del equipo.
-      webhook: { enabled: activo, url, events: ["MESSAGES_UPSERT", "SEND_MESSAGE"], byEvents: false, base64: false },
+      // base64: true → la foto del comprobante llega dentro del webhook (message.base64) y no hay que descargarla.
+      webhook: { enabled: activo, url, events: ["MESSAGES_UPSERT", "SEND_MESSAGE"], byEvents: false, base64: true },
     });
   }
 }

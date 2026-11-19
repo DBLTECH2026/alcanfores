@@ -13,7 +13,7 @@ import type { Configuracion } from "../config.js";
 import { leerImagenBase64 } from "../imagenes.js";
 import type { Repositorio } from "../modelo.js";
 import { ahora } from "../tiempo.js";
-import type { ClienteWhatsapp } from "./evolution.js";
+import type { ClienteWhatsapp, MensajeCrudo } from "./evolution.js";
 
 export interface MensajeEntrante {
   tipo: "CLIENTE" | "EQUIPO";
@@ -23,6 +23,9 @@ export interface MensajeEntrante {
   nombre: string | null;
   texto: string;
   imagen: boolean;
+  /** Solo con imagen: la foto si ya vino en el webhook (base64 de Evolution) y el mensaje crudo para descargarla si no. */
+  base64?: string;
+  crudo?: MensajeCrudo;
 }
 
 export type EventoEntrante =
@@ -45,6 +48,7 @@ function textoDe(msg: Dato["message"]): { texto: string; imagen: boolean; ignora
   if (typeof m.conversation === "string") return { texto: m.conversation, imagen: false, ignorar: false };
   if (m.extendedTextMessage) return { texto: campo("extendedTextMessage", "text"), imagen: false, ignorar: false };
   if (m.imageMessage) return { texto: campo("imageMessage", "caption"), imagen: true, ignorar: false };
+  if (m.stickerMessage) return { texto: "(envió un sticker; si era su comprobante, pídele que lo mande como FOTO o captura de pantalla)", imagen: false, ignorar: false };
   if (m.buttonsResponseMessage) return { texto: campo("buttonsResponseMessage", "selectedDisplayText"), imagen: false, ignorar: false };
   if (m.listResponseMessage) return { texto: campo("listResponseMessage", "title"), imagen: false, ignorar: false };
   if (m.audioMessage) return { texto: "(envió una nota de voz; Canchita solo lee texto y fotos)", imagen: false, ignorar: false };
@@ -64,6 +68,17 @@ function direccion(key: NonNullable<Dato["key"]>): { clave: string; destino: str
   }
   const lid = candidatos.find((j) => j.endsWith("@lid"));
   return lid ? { clave: lid, destino: lid } : null;
+}
+
+/** Foto del mensaje: base64 si Evolution la incluyó (webhook con base64) y el mensaje crudo (sin ese base64) para descargarla. */
+function medio(d: Dato, imagen: boolean): { base64?: string; crudo?: MensajeCrudo } {
+  if (!imagen || !d.message) return {};
+  const { base64, ...mensaje } = d.message as Record<string, unknown>;
+  return {
+    // Se valida después al leerla (leerImagenBase64: tipo y tamaño); aquí basta con que venga texto.
+    base64: typeof base64 === "string" && base64.length > 0 ? base64 : undefined,
+    crudo: { key: d.key, message: mensaje },
+  };
 }
 
 export function interpretarEvento(cuerpo: unknown): EventoEntrante[] {
@@ -88,7 +103,7 @@ export function interpretarEvento(cuerpo: unknown): EventoEntrante[] {
     if (key.fromMe) {
       return { tipo: "EQUIPO", ...dir, idMensaje: key.id, nombre: null, texto: contenido.texto, imagen: contenido.imagen };
     }
-    return { tipo: "CLIENTE", ...dir, idMensaje: key.id, nombre: d.pushName?.trim() || null, texto: contenido.texto, imagen: contenido.imagen };
+    return { tipo: "CLIENTE", ...dir, idMensaje: key.id, nombre: d.pushName?.trim() || null, texto: contenido.texto, imagen: contenido.imagen, ...medio(d, contenido.imagen) };
   });
 }
 
@@ -152,7 +167,7 @@ export class ProcesadorWhatsapp {
     let texto = ev.texto;
     if (ev.imagen) {
       try {
-        const media = await this.wa.descargarMedia(ev.idMensaje);
+        const media = ev.base64 ? { base64: ev.base64, mimetype: "image/jpeg" } : await this.wa.descargarMedia(ev.idMensaje, ev.crudo);
         const leida = media ? leerImagenBase64(media.base64) : { error: "sin datos" };
         if ("error" in leida) texto = `${texto} (envió una imagen que no se pudo abrir)`.trim();
         else imagen = leida;

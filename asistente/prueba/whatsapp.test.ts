@@ -103,6 +103,34 @@ describe("WhatsApp", () => {
     expect(entorno.wa.enviados[0].texto).toBe("Veo tu comprobante");
   });
 
+  it("usa la foto que ya trae el webhook (base64 de Evolution) sin descargarla", async () => {
+    entorno = crearEntorno(async ({ entrada }) => (entrada.prompt.includes("idImagen=1") ? "Veo tu comprobante" : "¿?"));
+    entorno.api.configuracion.ia_whatsapp_activa = "true";
+    entorno.cerebro.lecturas.push(lecturaQueCalza(40));
+    const ev = evento({ id: "FOTO2", imagen: true });
+    (ev.data.message as Record<string, unknown>).base64 = PNG_BASE64;
+    await webhook(ev);
+    expect(entorno.wa.enviados[0].texto).toBe("Veo tu comprobante");
+  });
+
+  it("sin base64 descarga con key + message (no solo el id) y sin el base64 dentro del mensaje", () => {
+    const ev = evento({ id: "FOTO3", texto: "ya yapeé", imagen: true });
+    const [m] = interpretarEvento(ev);
+    expect(m).toMatchObject({ tipo: "CLIENTE", imagen: true, texto: "ya yapeé" });
+    if (m.tipo !== "CLIENTE") throw new Error("esperaba CLIENTE");
+    expect(m.base64).toBeUndefined();
+    expect(m.crudo).toEqual({ key: ev.data.key, message: ev.data.message });
+  });
+
+  it("un sticker no se ignora: Canchita recibe el aviso para pedir la foto", () => {
+    const ev = evento({ id: "STK1" });
+    ev.data.message = { stickerMessage: { mimetype: "image/webp" } } as unknown as typeof ev.data.message;
+    const [m] = interpretarEvento(ev);
+    expect(m).toMatchObject({ tipo: "CLIENTE", imagen: false });
+    if (m.tipo !== "CLIENTE") throw new Error("esperaba CLIENTE");
+    expect(m.texto).toContain("sticker");
+  });
+
   it("rechaza un token de webhook incorrecto e ignora grupos y estados", async () => {
     entorno = crearEntorno();
     expect((await webhook(evento({ id: "X" }), "otro")).statusCode).toBe(401);
